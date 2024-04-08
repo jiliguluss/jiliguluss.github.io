@@ -251,7 +251,7 @@
 
 
 <p>在软件开发的世界里，质量和安全性是评估产品成败的重要指标。模糊测试作为一种高效的自动化测试方法，专门用来发现程序中的错误和安全漏洞。本文旨在详细介绍 AFL（American Fuzzy Lop）的基本原理和使用方法。</p>
-<h2><span id="一-afl-的原理介绍">一、AFL 的原理介绍 </span></h2><p> 模糊测试是一种通过向软件输入异常或随机数据的自动化技术，目的是发现程序在处理意外或边缘情况输入时的错误。AFL 是这一测试策略中的杰出代表，它通过不断学习程序反应来改进测试用例，提高测试的覆盖率和发现漏洞的概率。</p>
+<h2 id="一、AFL- 的原理介绍"><a href="# 一、AFL- 的原理介绍" class="headerlink" title="一、AFL 的原理介绍"></a>一、AFL 的原理介绍 </h2><p> 模糊测试是一种通过向软件输入异常或随机数据的自动化技术，目的是发现程序在处理意外或边缘情况输入时的错误。AFL 是这一测试策略中的杰出代表，它通过不断学习程序反应来改进测试用例，提高测试的覆盖率和发现漏洞的概率。</p>
 <p>AFL 利用遗传算法，不断生成测试用例，并通过动态插桩技术监控程序的行为，特别是程序的代码覆盖情况。当新的输入能触发新的代码路径时，这个输入会被保存以供进一步的测试。该过程可以形成一个反馈循环，不断优化测试用例以探索更多程序状态。</p>
 <p>下面是 AFL 工作流程图，展示了从准备测试用例到监控程序行为的步骤：</p>
 <pre class="mermaid">graph TD
@@ -275,12 +275,12 @@
 </li>
 </ol>
 <p>AFL 采用了 fork 的运行模式，这使得当待测程序出现崩溃时，fuzz 进程不会终止，这一点相较于 LibFuzzer 更具优势。然而，频繁的 fork 操作也导致了 AFL 的效率不如 LibFuzzer。</p>
-<h2><span id="二-afl-安装和运行">二、AFL 安装和运行</span></h2><h3><span id="1-支持的系统和架构">1. 支持的系统和架构</span></h3><p>AFL 设计之初主要针对 UNIX-like 系统，其在 Linux 系统上有最好的支持。然而，在社区的努力下，也有 Windows 版本的 AFL，如 winafl，其可以在 Windows 进行模糊测试。</p>
+<h2 id="二、AFL 安装和运行"><a href="# 二、AFL 安装和运行" class="headerlink" title="二、AFL 安装和运行"></a>二、AFL 安装和运行</h2><h3 id="1- 支持的系统和架构"><a href="#1- 支持的系统和架构" class="headerlink" title="1. 支持的系统和架构"></a>1. 支持的系统和架构</h3><p>AFL 设计之初主要针对 UNIX-like 系统，其在 Linux 系统上有最好的支持。然而，在社区的努力下，也有 Windows 版本的 AFL，如 winafl，其可以在 Windows 进行模糊测试。</p>
 <p>AFL 还支持多种 CPU 架构，其中对 x86 和 x64 架构的支持最好。如果要支持 ARM 架构，则需要使用 AFL 的 QEMU 模式。</p>
-<h3><span id="2-安装步骤">2. 安装步骤</span></h3><p>AFL 可以通过源码进行安装：</p>
+<h3 id="2- 安装步骤"><a href="#2- 安装步骤" class="headerlink" title="2. 安装步骤"></a>2. 安装步骤</h3><p>AFL 可以通过源码进行安装：</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">apt install git make gcc</span><br><span class="line">git clone https://github.com/google/AFL.git </span><br><span class="line">cd AFL &amp;&amp; make</span><br></pre></td></tr></table></figure>
 
-<h3><span id="3-运行参数">3. 运行参数 </span></h3><p> 在安装并编译完 AFL 之后，可以使用 <code>afl-fuzz</code> 命令来启动模糊测试。一个基本的 AFL fuzz 命令如下：</p>
+<h3 id="3- 运行参数"><a href="#3- 运行参数" class="headerlink" title="3. 运行参数"></a>3. 运行参数 </h3><p> 在安装并编译完 AFL 之后，可以使用 <code>afl-fuzz</code> 命令来启动模糊测试。一个基本的 AFL fuzz 命令如下：</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">afl-fuzz -i input_dir -o output_dir -- /path/to/program [options] @@</span><br></pre></td></tr></table></figure>
 
 <p>这里：</p>
@@ -291,18 +291,18 @@
 </ul>
 <p><code>--</code> 之后的部分是运行被测试程序的命令行，其中 <code>/path/to/program</code> 替换为需要进行模糊测试的程序的路径，<code>[options]</code> 是运行该程序的任何选项或参数。</p>
 <p>如果测试程序需要从文件中读取输入，可以在实际输入文件路径的位置使用 <code>@@</code> 占位符。AFL 将替换 <code>@@</code> 来插入它正在测试的输入文件。如果省略这个占位符，AFL 将会把模糊测试用例通过 stdin 传递给测试程序。</p>
-<h2><span id="三-afl-的使用示例">三、AFL 的使用示例 </span></h2><p> 本节使用一个简单的示例，演示 AFL 的操作步骤。</p>
+<h2 id="三、AFL 的使用示例"><a href="# 三、AFL 的使用示例" class="headerlink" title="三、AFL 的使用示例"></a>三、AFL 的使用示例 </h2><p> 本节使用一个简单的示例，演示 AFL 的操作步骤。</p>
 <p>这是待测源码，其功能是接受一行命令行输入，进行四则运算。其中使用了不安全的 gets 函数，可能导致缓冲区溢出：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">calculate</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b, <span class="type">char</span> op)</span> &#123;</span><br><span class="line">    <span class="keyword">switch</span> (op) &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">return</span> a + b;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>: <span class="keyword">return</span> a - b;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;x&#x27;</span>: <span class="keyword">return</span> a * b;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>: <span class="keyword">return</span> b ? a / b : <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">default</span>: <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">char</span> input[<span class="number">100</span>];</span><br><span class="line"></span><br><span class="line">    <span class="comment">// unsafe method that may cause buffer overflow</span></span><br><span class="line">    gets(input);</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> a, b, result;</span><br><span class="line">    <span class="type">char</span> op;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">sscanf</span>(input, <span class="string">&quot;%d %c %d&quot;</span>, &amp;a, &amp;op, &amp;b) != <span class="number">3</span>)</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    result = calculate(a, b, op);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Result: %d\n&quot;</span>, result);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
-<h3><span id="1-编译源码">1. 编译源码 </span></h3><p> 使用 AFL 的编译器 <code>afl-gcc</code> 或<code>afl-clang</code>对源文件 <code>hello.c</code> 进行编译，添加所需要的代码覆盖插桩。<code>afl-gcc</code>或 <code>afl-clang</code> 实际上是对常规的 <code>gcc</code> 或<code>clang</code>编译器进行了封装，通过在编译时进行插桩，来统计 fuzz 过程中的代码覆盖率：</p>
+<h3 id="1- 编译源码"><a href="#1- 编译源码" class="headerlink" title="1. 编译源码"></a>1. 编译源码 </h3><p> 使用 AFL 的编译器 <code>afl-gcc</code> 或<code>afl-clang</code>对源文件 <code>hello.c</code> 进行编译，添加所需要的代码覆盖插桩。<code>afl-gcc</code>或 <code>afl-clang</code> 实际上是对常规的 <code>gcc</code> 或<code>clang</code>编译器进行了封装，通过在编译时进行插桩，来统计 fuzz 过程中的代码覆盖率：</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">afl-gcc -o hello hello.c</span><br></pre></td></tr></table></figure>
 
-<h3><span id="2-准备种子语料库">2. 准备种子语料库 </span></h3><p> 不论程序是从 file 还是从 stdin 获取数据，AFL 都需要一个初始语料库来启动模糊测试过程。输入（无论是来自 file 或 stdin）是 AFL 用来开始探索程序行为的基础。初始语料库（seed corpus）是一组文件，其中包含了各种有效的输入示例，这些输入会被 AFL 用作模糊测试的起始点。</p>
+<h3 id="2- 准备种子语料库"><a href="#2- 准备种子语料库" class="headerlink" title="2. 准备种子语料库"></a>2. 准备种子语料库 </h3><p> 不论程序是从 file 还是从 stdin 获取数据，AFL 都需要一个初始语料库来启动模糊测试过程。输入（无论是来自 file 或 stdin）是 AFL 用来开始探索程序行为的基础。初始语料库（seed corpus）是一组文件，其中包含了各种有效的输入示例，这些输入会被 AFL 用作模糊测试的起始点。</p>
 <p>从 stdin 读取输入时，AFL 会将语料库中的每个文件内容作为输入在每次测试运行时送到程序的标准输入流中。使用 AFL 时，必须要有初始语料库。注意这一点 AFL 与 Libfuzzer 不同，Libfuzzer 只接受 stdin，不接受 file，初始语料库为可选项。</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mkdir in</span><br><span class="line">echo &#x27;abc&#x27; &gt; in/seed</span><br></pre></td></tr></table></figure>
 
-<h3><span id="3-执行测试">3. 执行测试 </span></h3><p> 在运行 AFL 之前，需要执行下面的系统设置命令，将字符串”core”写入到文件 <code>/proc/sys/kernel/core_pattern</code> 中。</p>
+<h3 id="3- 执行测试"><a href="#3- 执行测试" class="headerlink" title="3. 执行测试"></a>3. 执行测试 </h3><p> 在运行 AFL 之前，需要执行下面的系统设置命令，将字符串”core”写入到文件 <code>/proc/sys/kernel/core_pattern</code> 中。</p>
 <p>在 Linux 系统中，<code>/proc/sys/kernel/core_pattern</code> 文件用于指定当程序崩溃时，内核转储文件（core dump）的文件名模式。通过修改这个文件，可以控制内核生成 core 文件的行为。</p>
 <p>通过执行这个命令，生成的核心转储文件将以”core”命名，这使得 AFL 更容易检测和处理目标程序的崩溃情况，从而更好地进行模糊测试。</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">echo core | tee /proc/sys/kernel/core_pattern</span><br></pre></td></tr></table></figure>
@@ -310,8 +310,8 @@
 <p>在 hello 中使用 gets 函数从 stdin 中读取数据，因此在运行 AFL 时，不需要添加 <code>@@</code>。是否使用<code>@@</code> 取决于待测程序接受的输入来自 file 还是 stdin。</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">afl-fuzz -i in -o out -- ./hello</span><br></pre></td></tr></table></figure>
 
-<h3><span id="4-结果解读">4. 结果解读</span></h3><p>AFL 开始运行后，将会看到如下的界面显示：</p>
-<img src="/2023/10/15/AFL%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/AFL%E8%BF%90%E8%A1%8C%E7%95%8C%E9%9D%A2.png" class>
+<h3 id="4- 结果解读"><a href="#4- 结果解读" class="headerlink" title="4. 结果解读"></a>4. 结果解读</h3><p>AFL 开始运行后，将会看到如下的界面显示：</p>
+<img src="/2023/10/15/AFL%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/AFL%E8%BF%90%E8%A1%8C%E7%95%8C%E9%9D%A2.png" class="">
 
 <p>从这个界面上可以看到 AFL 找到了多少 crash，但还不能直观地显示覆盖率。<a target="_blank" rel="noopener" href="https://github.com/mboehme/pythia">pythia</a>是一款 AFL 的扩展工具，可以查看代码覆盖率的情况。</p>
 <p>AFL 在运行过程中，会不断地产生输出。输出目录结构如下：</p>
@@ -331,19 +331,19 @@
 <li><p><strong>fuzz_bitmap</strong> - 这是用来记录路径覆盖率的位图（coverage bitmap），非人类可读。AFL 使用这个位图来跟踪程序在处理不同输入时执行的不同分支，用来帮助 AFL 识别新的、唯一的代码路径，以便后续生成更具有探索性的测试样本。</p>
 </li>
 </ul>
-<h2><span id="四-afl-的-qemu-模式">四、AFL 的 QEMU 模式 </span></h2><p> 前面的例子中，AFL 在对待测程序的源码进行编译时插桩。实际中，我们不一定能拿到待测源码，我们要测的可能是一个已经编译好的二进制文件。这种情况下 Libfuzzer 就无能为力了，但 AFL 还能用，这依赖于 AFL 的 QEMU 模式。</p>
+<h2 id="四、AFL 的 QEMU 模式"><a href="# 四、AFL 的 QEMU 模式" class="headerlink" title="四、AFL 的 QEMU 模式"></a>四、AFL 的 QEMU 模式 </h2><p> 前面的例子中，AFL 在对待测程序的源码进行编译时插桩。实际中，我们不一定能拿到待测源码，我们要测的可能是一个已经编译好的二进制文件。这种情况下 Libfuzzer 就无能为力了，但 AFL 还能用，这依赖于 AFL 的 QEMU 模式。</p>
 <p>AFL 的 QEMU 模式，也称为 AFL-QEMU，允许你在二进制模糊测试中使用 AFL，即使源代码不可用。这在对闭源应用进行模糊测试时非常有用。这种模式使用 QEMU 的用户模式仿真，来运行并分析非原生的二进制文件。以下是安装 AFL 的 QEMU 模式和使用步骤的指南：</p>
-<h3><span id="1-编译-qemu-支持">1. 编译 QEMU 支持 </span></h3><p> 在 AFL 主目录下有一个专门的 QEMU 模式目录。进入该目录并编译 QEMU 模式，过程中可能缺少依赖项，根据提示进行安装即可：</p>
+<h3 id="1- 编译 QEMU 支持"><a href="#1- 编译 QEMU 支持" class="headerlink" title="1. 编译 QEMU 支持"></a>1. 编译 QEMU 支持 </h3><p> 在 AFL 主目录下有一个专门的 QEMU 模式目录。进入该目录并编译 QEMU 模式，过程中可能缺少依赖项，根据提示进行安装即可：</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">cd qemu_mode</span><br><span class="line">./build_qemu_support.sh</span><br></pre></td></tr></table></figure>
 
-<h3><span id="2-afl-qemu-使用步骤">2. AFL-QEMU 使用步骤 </span></h3><p> 用法很简单，在 AFL 运行命令中添加 <code>-Q</code> 参数即可：</p>
+<h3 id="2-AFL-QEMU 使用步骤"><a href="#2-AFL-QEMU 使用步骤" class="headerlink" title="2. AFL-QEMU 使用步骤"></a>2. AFL-QEMU 使用步骤 </h3><p> 用法很简单，在 AFL 运行命令中添加 <code>-Q</code> 参数即可：</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">afl-fuzz -i input -o output -Q -- /path/to/binary @@</span><br></pre></td></tr></table></figure>
 
 
-<h2><span id="五-afl-的升级版afl">五、AFL 的升级版——AFL++</span></h2><p>AFL++ 可以看作是原始 AFL 的”增强版”，对 AFL 的调度策略和变异算法进行了很多改进，同时还引入了很多新特性，如 CMPLOG 和持久化这样的特性。</p>
-<h3><span id="1-cmplog">1. CMPLOG</span></h3><p>CMPLOG 是 AFL++ 引入的一个新功能，类似于 Libfuzzer 中的 trace-cmp，它可以极大地提高代码覆盖率。CMPLOG 的主要作用是对程序中的所有比较操作进行记录，包括等于、不等于、小于等逻辑比较。当 fuzzer 执行时，CMPLOG 能够捕获比较操作的参数，并将对应的值添加到 fuzzer 的输入测试用例中。这个过程实际上帮助 fuzzer 更好地理解代码中期待的输入，特别是那些用于逻辑分支的字面值和魔法数字。这种理解能够导向更深入的路径覆盖，进而揭露隐藏更深的潜在缺陷。</p>
-<h3><span id="2-持久化模式">2. 持久化模式</span></h3><p>AFL 的持久化（persistent）模式允许目标程序在单个进程周期内重复执行多次模糊测试用例。这对性能产生了显著的提升，因为它减少了程序启动和终止的开销，特别是当测试的目标程序需要很大的初始化成本时。在 AFL++ 中，持久化模式的执行更为高效，它允许模糊器在目标程序中一次性执行多个测试用例，而非每次执行一个用例都重启目标程序。有了持久化模式，AFL++ 能够在相同的时间内执行更多的测试迭代，从而提高漏洞检测的速度。</p>
-<h2><span id="六-小结">六、小结</span></h2><p>AFL 是一款强大的模糊测试工具，实践中 AFL++ 的应用非常广泛。相比 Libfuzzer，AFL++ 不局限于源码，并且支持多种 cpu 架构，还有丰富的插件生态可以使用。</p>
+<h2 id="五、AFL 的升级版——AFL"><a href="# 五、AFL 的升级版——AFL" class="headerlink" title="五、AFL 的升级版——AFL++"></a>五、AFL 的升级版——AFL++</h2><p>AFL++ 可以看作是原始 AFL 的”增强版”，对 AFL 的调度策略和变异算法进行了很多改进，同时还引入了很多新特性，如 CMPLOG 和持久化这样的特性。</p>
+<h3 id="1-CMPLOG"><a href="#1-CMPLOG" class="headerlink" title="1. CMPLOG"></a>1. CMPLOG</h3><p>CMPLOG 是 AFL++ 引入的一个新功能，类似于 Libfuzzer 中的 trace-cmp，它可以极大地提高代码覆盖率。CMPLOG 的主要作用是对程序中的所有比较操作进行记录，包括等于、不等于、小于等逻辑比较。当 fuzzer 执行时，CMPLOG 能够捕获比较操作的参数，并将对应的值添加到 fuzzer 的输入测试用例中。这个过程实际上帮助 fuzzer 更好地理解代码中期待的输入，特别是那些用于逻辑分支的字面值和魔法数字。这种理解能够导向更深入的路径覆盖，进而揭露隐藏更深的潜在缺陷。</p>
+<h3 id="2- 持久化模式"><a href="#2- 持久化模式" class="headerlink" title="2. 持久化模式"></a>2. 持久化模式</h3><p>AFL 的持久化（persistent）模式允许目标程序在单个进程周期内重复执行多次模糊测试用例。这对性能产生了显著的提升，因为它减少了程序启动和终止的开销，特别是当测试的目标程序需要很大的初始化成本时。在 AFL++ 中，持久化模式的执行更为高效，它允许模糊器在目标程序中一次性执行多个测试用例，而非每次执行一个用例都重启目标程序。有了持久化模式，AFL++ 能够在相同的时间内执行更多的测试迭代，从而提高漏洞检测的速度。</p>
+<h2 id="六、小结"><a href="# 六、小结" class="headerlink" title="六、小结"></a>六、小结</h2><p>AFL 是一款强大的模糊测试工具，实践中 AFL++ 的应用非常广泛。相比 Libfuzzer，AFL++ 不局限于源码，并且支持多种 cpu 架构，还有丰富的插件生态可以使用。</p>
 <p>但模糊测试本身存在覆盖率瓶颈的问题，难以探索复杂的程序路径，这时候可以结合其他的技术，如符号执行来突破。</p>
             
 
@@ -534,7 +534,7 @@
 
         
         
-<div id="cover" style="background-image:url('/assets/images/cover-v1.2.0.jpg');"></div>
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
         <!--SCRIPTS-->
 
 <script src="/assets/js/jquery.js"></script>
