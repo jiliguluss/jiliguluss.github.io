@@ -211,9 +211,25 @@
                  class="
                         hasCoverMetaIn
                         ">
-                <!-- 
-    <div id="post-toc"></div>
- -->
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 5%;
+            width: 250px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <div id="post-toc" class="toc"></div>
+
                 
     <section class="postShorten-group main-content-wrap">
     
@@ -353,15 +369,13 @@
   <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
   <script type="text/javascript">
       tocbot.init({
-      tocSelector: '#post-toc', // 目录容器的 ID 或 class
-      contentSelector: '.post-content', // 内容容器的 ID 或 class
-      headingSelector: 'h2,h3', // 你想要包含在目录中的标题级别
-      position: 'right', // 目录的位置（'left' 或 'right'）
-      scrollSmooth: true, // 是否平滑滚动到标题
-      activeClass: 'active', // 活动标题的类名
-      onToggle: function(e) { // 切换目录项时的回调函数
-        console.log('Toggled', e);
-      }
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3', // 你想要包含在目录中的标题级别
+        collapseDepth: 3,
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
     });
   </script> 
 
