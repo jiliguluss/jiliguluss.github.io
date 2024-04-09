@@ -216,6 +216,9 @@
                         hasCoverMetaIn
                         ">
                 
+    <div id="post-toc"></div>
+
+                
 <article class="post">
     
     
@@ -367,7 +370,7 @@
             <a
                 class="post-action-btn btn btn--default btn-open-shareoptions"
                 href="#btn-open-shareoptions"
-                aria-label="Diesen Beitrag teilen"
+                aria-label="Share this post"
             >
                 <i class="fa fa-share-alt" aria-hidden="true"></i>
             </a>
@@ -378,7 +381,7 @@
         
         <li class="post-action">
             
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
             
                 <i class="fa fa-list" aria-hidden="true"></i>
             </a>
@@ -443,7 +446,7 @@
             <a
                 class="post-action-btn btn btn--default btn-open-shareoptions"
                 href="#btn-open-shareoptions"
-                aria-label="Diesen Beitrag teilen"
+                aria-label="Share this post"
             >
                 <i class="fa fa-share-alt" aria-hidden="true"></i>
             </a>
@@ -454,7 +457,7 @@
         
         <li class="post-action">
             
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
             
                 <i class="fa fa-list" aria-hidden="true"></i>
             </a>
@@ -543,6 +546,23 @@
     
 
 
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+      tocSelector: '#post-toc', // 目录容器的 ID 或 class
+      contentSelector: '.post-content', // 内容容器的 ID 或 class
+      headingSelector: 'h2,h3', // 你想要包含在目录中的标题级别
+      position: 'right', // 目录的位置（'left' 或 'right'）
+      scrollSmooth: true, // 是否平滑滚动到标题
+      activeClass: 'active', // 活动标题的类名
+      onToggle: function(e) { // 切换目录项时的回调函数
+        console.log('Toggled', e);
+      }
+    });
+  </script> 
 
 
     </body>

@@ -214,6 +214,9 @@
                         hasCoverMetaIn
                         ">
                 
+    <div id="post-toc"></div>
+
+                
 <div id="archives" class="main-content-wrap">
     <form id="filter-form" action="#">
         <input name="date" type="text" class="form-control input--xlarge" placeholder="搜索日期 (YYYY/MM/DD)" autofocus="autofocus">
@@ -416,6 +419,23 @@
 
 
 
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+      tocSelector: '#post-toc', // 目录容器的 ID 或 class
+      contentSelector: '.post-content', // 内容容器的 ID 或 class
+      headingSelector: 'h2,h3', // 你想要包含在目录中的标题级别
+      position: 'right', // 目录的位置（'left' 或 'right'）
+      scrollSmooth: true, // 是否平滑滚动到标题
+      activeClass: 'active', // 活动标题的类名
+      onToggle: function(e) { // 切换目录项时的回调函数
+        console.log('Toggled', e);
+      }
+    });
+  </script> 
 
 
     </body>
