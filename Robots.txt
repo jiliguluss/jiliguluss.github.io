@@ -11,8 +11,6 @@ Disallow: /js/
 Disallow: /css/
 Disallow: /fonts/
 Disallow: /music/
-Disallow: /*.js/
-Disallow: /*.css/
 
 Sitemap: https://stepbystep.asia/sitemap.xml
 
