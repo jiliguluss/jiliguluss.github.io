@@ -641,5 +641,22 @@
   </script> 
 
 
+
+  <script src='https://unpkg.com/mermaid@9.0.0/dist/mermaid.min.js'></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+              flowchart:{
+                  useMaxWidth: true,
+                  htmlLabels: true
+              }
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
     </body>
 </html>

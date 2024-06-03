@@ -1,0 +1,660 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>Hexo 捣鼓札记 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/"],"image":"photo.jpg"},"articleBody":"\n\nHexo 简介 Hexo 是一个快速、简洁且强大的静态博客框架，基于 Node.js 开发，允许用户使用 Markdown 语法 编写文章，并将其转换为 HTML 页面，部署后呈现为个人或企业的 web 站点。\n建站\n安装 Node.js：访问 Node.js 官网，下载并安装\n安装 Hexo：在命令行中，通过 npm 命令安装 hexo1npm install -g hexo-cli\n初始化 Hexo 站点：在命令行中，使用 hexo 命令创建一个博客123hexo init blogcd blognpm install\n启动 Hexo 站点：使用 hexo 命令启动本地预览，通过http://localhost:4000 即可访问1hexo server\n新建文章：使用 hexo 命令创建一篇名为 article.md 的文章1hexo new post article\n生成静态文件：使用 hexo 命令生成静态 html 文件1hexo generate\n部署网站：1hexo deploy\n\nHexo 支持的各条指令和使用方法，请参考 Hexo 官网的  命令说明。\n配置  当初始化站点执行成功后，进入站点目录，可以看到如下内容：\n\n.├── _config.yml&emsp;# 网站配置信息 ├── package.json&emsp;# 程序使用的工具和库文件信息 ├── scaffolds&emsp;# 存放网站使用的模版文件 ├── source&emsp;# 存放用户资源，如文章、图片等 |   ├── _drafts&emsp;# 存放未发布的草稿 |   └── _posts&emsp;# 存放正式发布的博文 └── themes&emsp;# 博客使用的主题 \n\n网站配置项都包含在_config.yml 文件中，各配置项的含义，请参考 Hexo 官网的  配置说明。\n常见的个性化定义的配置项包括：\n\n\n\n参数\n含义\n默认值\n\n\n\ntitle\n网站标题\n\n\n\ndescription\n网站描述。主要用于 SEO\n\n\n\nkeywords\n网站关键词\n\n\n\nauthor\n网站作者\n\n\n\nlanguage\n网站语言。中国大陆使用zh-CN\n\n\n\ntimezone\n网站时区。中国大陆使用Asia/Shanghai\n\n\n\npermalink\n文章永久链接格式。为了优化 SEO，建议缩短长度\n:year&#x2F;:month&#x2F;:day&#x2F;:title&#x2F;\n\n\ntheme\n使用的主题名称。为 false 表示禁用主题\n\n\n\ndeploy\n部署环境配置。常见的有 Github\n\n\n\nHexo 主题  对于前端零基础、审美也堪忧的人来说，从空白雕出一个漂亮的网页 UI，那是不可能的，好在 Hexo 提供了丰富的  主题。\n通过预览找到心仪的主题，记住主题的名称，然后到 github 上用 hexo-theme- 主题名称 搜索，即可找到主题对应的代码仓。想不通为什么 Hexo 主题预览不直接提供对应的 github 仓库链接 o(╯□╰)o。\n关于主题挑选，从审美上来说，萝卜青菜，各有所爱；从可用性来说，建议选使用者还算多的，代码仓还有人维护的。不同的主题切换，还是需要一些适配成本的。\n我选的tranquilpeak，用的人不算少，但是作者好像已经不怎么维护和更新了。导致有一些功能需要自己开发和改造，过程中免不了踩一些坑，这也是本篇博文诞生的主要原因。\n后续改动都是基于 tranquilpeak 主题，其他主题不一定能拿去即用，解决方案仅供参考。\n安装  根据 tranquilpeak仓库说明，tranquilpeak 的安装和启用包括以下步骤：\n\n下载  最新版的 tranquilpeak\n解压后，放到 Hexo 博客主目录下 themes 文件夹中\n修改 Hexo 博客主目录下 _config.yml 文件中 theme 参数，设置为tranquilpeak\n进入 Hexo 博客主目录下 themes\\tranquilpeak 文件夹中，执行命令：1npm install &amp;&amp; npm run prod\n\n配置  在themes\\tranquilpeak文件夹中也有一个 _config.yml，这个文件中的配置项会覆盖 Hexo 博客主目录下_config.yml 的同名配置项。\ntranquilpeak 主题的配置方法参考  仓库说明。\n本博客站点设置的一些 tranquilpeak 主题配置如下：\n\n\n\n配置项\n含义\n取值\n说明\n\n\n\nlocation\n位置信息\n中国\n中国\n\n\npicture\n个人头像\nphoto.jpg\n位于source\\assets\\images\n\n\ngithub\ngithub 用户名\n\n\n\n\nsidebar_behavior\n侧边栏的呈现\n2\n有 1-6 种方式可以选\n\n\ncover_image\n主题的背景图\ncover.png\n位于source\\assets\\images\n\n\n改造1. 添加 mermaid 支持mermaid 是一款使用文本来绘制图表的工具，可以与 markdown 集成，使用标记语言完成流程图、序列图、甘特图等图表绘制。\ntranquilpeak 主题不支持 mermaid 渲染，需要自己改造。\n\n安装插件1npm install hexo-filter-mermaid-diagrams\n修改配置：在 themes/tranquilpeak/_config.yml 中添加如下内容123456# Mermaid (markdwon to flow chart, seq chart, class chart ...)mermaid:  enable: true  version: 9.0.0  # Available themes: default | dark | forest | neutral  theme: default\n修改脚本：在 themes/tranquilpeak/layout/_partial/script.ejs 中添加如下内容12345678910111213141516&lt;% if (theme.mermaid.enable) &#123; %&gt;  &lt;script src=&#x27;https://unpkg.com/mermaid@&lt;%= theme.mermaid.version %&gt;/dist/mermaid.min.js&#x27;&gt;&lt;/script&gt;   &lt;script type=&quot;text/javascript&quot;&gt;      $(document).ready(function() &#123;          var mermaid_config = &#123;              startOnLoad: true,              theme: &#x27;&lt;%- theme.mermaid.theme %&gt;&#x27;,              flowchart:&#123;                  useMaxWidth: true,                  htmlLabels: true              &#125;                          &#125;          mermaid.initialize(mermaid_config);      &#125;);  &lt;/script&gt; &lt;% &#125; %&gt;\n","dateCreated":"2024-04-03T14:48:16+08:00","dateModified":"2024-06-03T16:59:58+08:00","datePublished":"2024-04-03T14:48:16+08:00","description":"记录用 Hexo 搭建此个人博客遇到的相关问题","headline":"Hexo 捣鼓札记","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss.github.io/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss.github.io/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/","keywords":"Hexo, 博客, 网站, tranquilpeak"}</script>
+    <meta name="description" content="记录用 Hexo 搭建此个人博客遇到的相关问题">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="Hexo 捣鼓札记">
+<meta property="og:url" content="https://jiliguluss.github.io/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="记录用 Hexo 搭建此个人博客遇到的相关问题">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2024-04-03T06:48:16.000Z">
+<meta property="article:modified_time" content="2024-06-03T08:59:58.069Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="Hexo">
+<meta property="article:tag" content="博客">
+<meta property="article:tag" content="网站">
+<meta property="article:tag" content="tranquilpeak">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss.github.io/assets/images/photo.jpg"/>
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/all.css">
+
+    
+<link rel="stylesheet" href="/assets/css/jquery.fancybox.css">
+
+    
+<link rel="stylesheet" href="/assets/css/thumbs.css">
+
+    
+<link rel="stylesheet" href="/assets/css/tranquilpeak.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a
+            class="header-title-link"
+            href="/"
+            aria-label=""
+        >
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a
+                class="header-right-icon "
+                href="#about"
+                aria-label="打开链接: /#about"
+            >
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a
+                    href="/#about"
+                    aria-label="阅读有关作者的更多信息"
+                >
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片"/>
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br />涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a
+                            class="sidebar-button-link "
+                            href="/"
+                            
+                            rel="noopener"
+                            title="首页"
+                        >
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a
+                            class="sidebar-button-link "
+                            href="/all-categories"
+                            
+                            rel="noopener"
+                            title="分类"
+                        >
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a
+                            class="sidebar-button-link "
+                            href="/all-tags"
+                            
+                            rel="noopener"
+                            title="标签"
+                        >
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a
+                            class="sidebar-button-link "
+                            href="/all-archives"
+                            
+                            rel="noopener"
+                            title="归档"
+                        >
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a
+                            class="sidebar-button-link "
+                            href="#about"
+                            
+                            rel="noopener"
+                            title="关于"
+                        >
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a
+                            class="sidebar-button-link "
+                            href="https://github.com/"
+                            
+                                target="_blank"
+                            
+                            rel="noopener"
+                            title="GitHub"
+                        >
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5"
+                 class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 4%;
+            width: 240px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <div id="post-toc" class="toc"></div>
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            Hexo 捣鼓札记
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-04-03T14:48:16+08:00">
+	
+		    2024 年 4 月 3 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/web/">web</a>, <a class="category-link" href="/categories/web/%E4%B8%AA%E4%BA%BA%E5%8D%9A%E5%AE%A2/">个人博客</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="Hexo 简介"><a href="#Hexo 简介" class="headerlink" title="Hexo 简介"></a>Hexo 简介 </h2><p><a target="_blank" rel="noopener external nofollow noreferrer" href="https://hexo.io/zh-cn/">Hexo</a> 是一个快速、简洁且强大的静态博客框架，基于 Node.js 开发，允许用户使用 <a target="_blank" rel="noopener external nofollow noreferrer" href="https://markdown.com.cn/basic-syntax/">Markdown 语法</a> 编写文章，并将其转换为 HTML 页面，部署后呈现为个人或企业的 web 站点。</p>
+<h3 id="建站"><a href="# 建站" class="headerlink" title="建站"></a>建站</h3><ol>
+<li>安装 Node.js：访问 <a target="_blank" rel="noopener external nofollow noreferrer" href="https://nodejs.org/en">Node.js</a> 官网，下载并安装</li>
+<li>安装 Hexo：在命令行中，通过 npm 命令安装 hexo<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install -g hexo-cli</span><br></pre></td></tr></table></figure></li>
+<li>初始化 Hexo 站点：在命令行中，使用 hexo 命令创建一个博客<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">hexo init blog</span><br><span class="line">cd blog</span><br><span class="line">npm install</span><br></pre></td></tr></table></figure></li>
+<li>启动 Hexo 站点：使用 hexo 命令启动本地预览，通过<a href="http://localhost:4000 即可访问" rel="external nofollow noreferrer">http://localhost:4000 即可访问</a><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo server</span><br></pre></td></tr></table></figure></li>
+<li>新建文章：使用 hexo 命令创建一篇名为 article.md 的文章<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new post article</span><br></pre></td></tr></table></figure></li>
+<li>生成静态文件：使用 hexo 命令生成静态 html 文件<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo generate</span><br></pre></td></tr></table></figure></li>
+<li>部署网站：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo deploy</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p>Hexo 支持的各条指令和使用方法，请参考 Hexo 官网的 <a target="_blank" rel="noopener external nofollow noreferrer" href="https://hexo.io/zh-cn/docs/commands"> 命令说明</a>。</p>
+<h3 id="配置"><a href="# 配置" class="headerlink" title="配置"></a>配置 </h3><p> 当初始化站点执行成功后，进入站点目录，可以看到如下内容：</p>
+<blockquote>
+<p>.<br><br>├── _config.yml&emsp;# 网站配置信息 <br><br>├── package.json&emsp;# 程序使用的工具和库文件信息 <br><br>├── scaffolds&emsp;# 存放网站使用的模版文件 <br><br>├── source&emsp;# 存放用户资源，如文章、图片等 <br><br>|   ├── _drafts&emsp;# 存放未发布的草稿 <br><br>|   └── _posts&emsp;# 存放正式发布的博文 <br><br>└── themes&emsp;# 博客使用的主题 <br></p>
+</blockquote>
+<p>网站配置项都包含在_config.yml 文件中，各配置项的含义，请参考 Hexo 官网的 <a target="_blank" rel="noopener external nofollow noreferrer" href="https://hexo.io/zh-cn/docs/configuration"> 配置说明</a>。</p>
+<p>常见的个性化定义的配置项包括：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>含义</th>
+<th>默认值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>title</td>
+<td>网站标题</td>
+<td></td>
+</tr>
+<tr>
+<td>description</td>
+<td>网站描述。主要用于 SEO</td>
+<td></td>
+</tr>
+<tr>
+<td>keywords</td>
+<td>网站关键词</td>
+<td></td>
+</tr>
+<tr>
+<td>author</td>
+<td>网站作者</td>
+<td></td>
+</tr>
+<tr>
+<td>language</td>
+<td>网站语言。中国大陆使用<code>zh-CN</code></td>
+<td></td>
+</tr>
+<tr>
+<td>timezone</td>
+<td>网站时区。中国大陆使用<code>Asia/Shanghai</code></td>
+<td></td>
+</tr>
+<tr>
+<td>permalink</td>
+<td>文章永久链接格式。为了优化 SEO，建议缩短长度</td>
+<td>:year&#x2F;:month&#x2F;:day&#x2F;:title&#x2F;</td>
+</tr>
+<tr>
+<td>theme</td>
+<td>使用的主题名称。为 false 表示禁用主题</td>
+<td></td>
+</tr>
+<tr>
+<td>deploy</td>
+<td>部署环境配置。常见的有 Github</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="Hexo 主题"><a href="#Hexo 主题" class="headerlink" title="Hexo 主题"></a>Hexo 主题 </h2><p> 对于前端零基础、审美也堪忧的人来说，从空白雕出一个漂亮的网页 UI，那是不可能的，好在 Hexo 提供了丰富的 <a target="_blank" rel="noopener external nofollow noreferrer" href="https://hexo.io/themes/"> 主题</a>。</p>
+<p>通过预览找到心仪的主题，记住主题的名称，然后到 github 上用 <code>hexo-theme- 主题名称</code> 搜索，即可找到主题对应的代码仓。想不通为什么 Hexo 主题预览不直接提供对应的 github 仓库链接 o(╯□╰)o。</p>
+<p>关于主题挑选，从审美上来说，萝卜青菜，各有所爱；从可用性来说，建议选使用者还算多的，代码仓还有人维护的。不同的主题切换，还是需要一些适配成本的。</p>
+<p>我选的<a target="_blank" rel="noopener external nofollow noreferrer" href="https://github.com/LouisBarranqueiro/hexo-theme-tranquilpeak">tranquilpeak</a>，用的人不算少，但是作者好像已经不怎么维护和更新了。导致有一些功能需要自己开发和改造，过程中免不了踩一些坑，这也是本篇博文诞生的主要原因。</p>
+<p>后续改动都是基于 tranquilpeak 主题，其他主题不一定能拿去即用，解决方案仅供参考。</p>
+<h3 id="安装"><a href="# 安装" class="headerlink" title="安装"></a>安装 </h3><p> 根据 tranquilpeak<a target="_blank" rel="noopener external nofollow noreferrer" href="https://github.com/LouisBarranqueiro/hexo-theme-tranquilpeak/blob/main/DOCUMENTATION.md">仓库说明</a>，tranquilpeak 的安装和启用包括以下步骤：</p>
+<ol>
+<li>下载 <a target="_blank" rel="noopener external nofollow noreferrer" href="https://github.com/LouisBarranqueiro/hexo-theme-tranquilpeak/archive/main.zip"> 最新版的 tranquilpeak</a></li>
+<li>解压后，放到 Hexo 博客主目录下 <code>themes</code> 文件夹中</li>
+<li>修改 Hexo 博客主目录下 <code>_config.yml</code> 文件中 <code>theme</code> 参数，设置为<code>tranquilpeak</code></li>
+<li>进入 Hexo 博客主目录下 <code>themes\tranquilpeak</code> 文件夹中，执行命令：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install &amp;&amp; npm run prod</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h3 id="配置 -1"><a href="# 配置 -1" class="headerlink" title="配置"></a>配置 </h3><p> 在<code>themes\tranquilpeak</code>文件夹中也有一个 <code>_config.yml</code>，这个文件中的配置项会覆盖 Hexo 博客主目录下<code>_config.yml</code> 的同名配置项。</p>
+<p>tranquilpeak 主题的配置方法参考 <a target="_blank" rel="noopener external nofollow noreferrer" href="https://github.com/LouisBarranqueiro/hexo-theme-tranquilpeak/blob/main/DOCUMENTATION.md"> 仓库说明</a>。</p>
+<p>本博客站点设置的一些 tranquilpeak 主题配置如下：</p>
+<table>
+<thead>
+<tr>
+<th>配置项</th>
+<th>含义</th>
+<th>取值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>location</td>
+<td>位置信息</td>
+<td>中国</td>
+<td>中国</td>
+</tr>
+<tr>
+<td>picture</td>
+<td>个人头像</td>
+<td>photo.jpg</td>
+<td>位于<code>source\assets\images</code></td>
+</tr>
+<tr>
+<td>github</td>
+<td>github 用户名</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>sidebar_behavior</td>
+<td>侧边栏的呈现</td>
+<td>2</td>
+<td>有 1-6 种方式可以选</td>
+</tr>
+<tr>
+<td>cover_image</td>
+<td>主题的背景图</td>
+<td>cover.png</td>
+<td>位于<code>source\assets\images</code></td>
+</tr>
+</tbody></table>
+<h3 id="改造"><a href="# 改造" class="headerlink" title="改造"></a>改造</h3><h4 id="1- 添加 mermaid 支持"><a href="#1- 添加 mermaid 支持" class="headerlink" title="1. 添加 mermaid 支持"></a>1. 添加 mermaid 支持</h4><p>mermaid 是一款使用文本来绘制图表的工具，可以与 markdown 集成，使用标记语言完成流程图、序列图、甘特图等图表绘制。</p>
+<p>tranquilpeak 主题不支持 mermaid 渲染，需要自己改造。</p>
+<ol>
+<li>安装插件<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install hexo-filter-mermaid-diagrams</span><br></pre></td></tr></table></figure></li>
+<li>修改配置：在 <code>themes/tranquilpeak/_config.yml</code> 中添加如下内容<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"># Mermaid (markdwon to flow chart, seq chart, class chart ...)</span><br><span class="line">mermaid:</span><br><span class="line">  enable: true</span><br><span class="line">  version: 9.0.0</span><br><span class="line">  # Available themes: default | dark | forest | neutral</span><br><span class="line">  theme: default</span><br></pre></td></tr></table></figure></li>
+<li>修改脚本：在 <code>themes/tranquilpeak/layout/_partial/script.ejs</code> 中添加如下内容<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">&lt;% if (theme.mermaid.enable) &#123; %&gt;</span><br><span class="line">  &lt;script src=&#x27;https://unpkg.com/mermaid@&lt;%= theme.mermaid.version %&gt;/dist/mermaid.min.js&#x27;&gt;&lt;/script&gt; </span><br><span class="line">  &lt;script type=&quot;text/javascript&quot;&gt;</span><br><span class="line">      $(document).ready(function() &#123;</span><br><span class="line">          var mermaid_config = &#123;</span><br><span class="line">              startOnLoad: true,</span><br><span class="line">              theme: &#x27;&lt;%- theme.mermaid.theme %&gt;&#x27;,</span><br><span class="line">              flowchart:&#123;</span><br><span class="line">                  useMaxWidth: true,</span><br><span class="line">                  htmlLabels: true</span><br><span class="line">              &#125;                </span><br><span class="line">          &#125;</span><br><span class="line">          mermaid.initialize(mermaid_config);</span><br><span class="line">      &#125;);</span><br><span class="line">  &lt;/script&gt; </span><br><span class="line">&lt;% &#125; %&gt;</span><br></pre></td></tr></table></figure></li>
+</ol>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br/>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/Hexo/" rel="tag">Hexo</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/tranquilpeak/" rel="tag">tranquilpeak</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E5%8D%9A%E5%AE%A2/" rel="tag">博客</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E7%BD%91%E7%AB%99/" rel="tag">网站</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a
+                    class="post-action-btn btn btn--default tooltip--top"
+                    href="/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/"
+                    data-tooltip="污点分析工具——libdft64"
+                    aria-label="上一篇: 污点分析工具——libdft64"
+                >
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a
+                    class="post-action-btn btn btn--default tooltip--top"
+                    href="/2024/Symbion%E5%88%9D%E6%8E%A2/"
+                    data-tooltip="交替符号执行工具——Symbion 初探"
+                    aria-label="下一篇: 交替符号执行工具——Symbion 初探"
+                >
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a
+                class="post-action-btn btn btn--default btn-open-shareoptions"
+                href="#btn-open-shareoptions"
+                aria-label="Diesen Beitrag teilen"
+            >
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+        
+            
+        
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2024 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a
+                    class="post-action-btn btn btn--default tooltip--top"
+                    href="/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/"
+                    data-tooltip="污点分析工具——libdft64"
+                    aria-label="上一篇: 污点分析工具——libdft64"
+                >
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a
+                    class="post-action-btn btn btn--default tooltip--top"
+                    href="/2024/Symbion%E5%88%9D%E6%8E%A2/"
+                    data-tooltip="交替符号执行工具——Symbion 初探"
+                    aria-label="下一篇: 交替符号执行工具——Symbion 初探"
+                >
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a
+                class="post-action-btn btn btn--default btn-open-shareoptions"
+                href="#btn-open-shareoptions"
+                aria-label="Diesen Beitrag teilen"
+            >
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+        
+            
+        
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片"/>
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br />涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br/>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br/>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/jquery.js"></script>
+
+
+<script src="/assets/js/jquery.fancybox.js"></script>
+
+
+<script src="/assets/js/thumbs.js"></script>
+
+
+<script src="/assets/js/tranquilpeak.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3', // 你想要包含在目录中的标题级别
+        collapseDepth: 3,
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src='https://unpkg.com/mermaid@9.0.0/dist/mermaid.min.js'></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+              flowchart:{
+                  useMaxWidth: true,
+                  htmlLabels: true
+              }
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>
