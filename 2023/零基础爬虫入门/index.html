@@ -14,7 +14,7 @@
     
     
     
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/"],"image":"photo.jpg"},"articleBody":"\n\n一、原理介绍  网络爬虫，是一种自动浏览网络的计算机程序，即通过指定 URL，直接返回对应网页的数据，而不需要人工点击浏览器链接来获取。不论是机器还是人工，从提交 URL 到看到网页，通常都包含以下步骤：\n\n查找域名对应的服务器地址，向服务器发送请求\n\n服务器响应请求，返回对应网页\n\n解析网页，存储或展示网页内容\n\n\n因此，一个爬虫应该具有抓取、解析、存储三大基本功能：\n\n抓取  是指爬虫需要模拟浏览器，向服务器发起访问请求，并获取服务器返回的响应。\n\n解析  是指爬虫对抓取到的响应体进行解析，从中提取出需要的数据。\n\n存储  是指爬虫将解析出来的数据保存到磁盘或数据库中。\n\n\n\n\nPython 是一种强大而易学的高级编程语言，因为其广泛的通用性，又被称为“万能的胶水语言”。在爬虫方面，Python 提供了丰富的工具库，利用这些工具库，我们可以快速地实现一些爬虫小程序。\n以下列举一些爬虫常用的 Python 库，后续爬虫实践中会用这些库中的部分功能，若要精通这些库的使用，请自行阅读相关文档 ^-^\n1. 请求库\n\nurllib（https://docs.python.org/3/library/urllib.html）\n\nrequests（http://docs.python-requests.org/en/master/）\n\n\n2. 解析库\n\nlxml（https://lxml.de/）\n\nBeautiful Soup（https://www.crummy.com/software/BeautifulSoup/bs4/doc/）\n\n\n3. 存储库\n\nPyMySQL（https://pymysql.readthedocs.io/en/latest/）\n\nPyMongo（https://api.mongodb.com/python/current/）\n\n\n4. 全栈框架\n\nScrapy（https://docs.scrapy.org/en/latest/）\n\n二、相关知识 1. HTTP 基本原理 在浏览器地址栏输入网址，按一下回车键，就可以跳转到我们想要浏览的页面。这是我们日常上网时最常见的操作，这一项看似简单的操作背后蕴含了 HTTP 的基本原理：\n\n\n任何网页在互联网上都有唯一的资源定位，即统一资源定位符（URL）。URL 与网页一一对应，也是访问网页的唯一方式。因此，当我们想在 PC 上浏览一个网页时，我们需要告诉浏览器目标网页的 URL。浏览器在根据我们提供的 URL 找出网页所在的服务器，并向服务器发起访问请求 Request。服务器在接收到请求后，对请求作出响应 Response，返回网页的 HTML 源代码。客户端浏览器接收到 HTML 源代码后，通过对代码进行解析得到我们在浏览器中看到的网页。\nChrome 浏览器提供了一套 Web 开发和调试的工具，通常称为 Chrome 开发者工具，在 Chrome 中打开网页，右键菜单中单击  检查，或者按下 F12 键，都可以进入开发者工具。关于 Chrome 开发者工具的使用见后续章节，这里只介绍利用开发者工具展示访问网页时的请求和响应。\n以 Google 首页为例，按 F12 进入开发者工具，点击 Network 后，在左侧 Name 列表中选取 www.google.com，右侧面板中Headers 栏目下列出了请求 Request 和响应 Response 的头信息。除了头信息，请求 Request 和响应 Response 还包含其他信息。\n\n\n2. 请求 Request请求由客户端发送给服务端，主要包含四部分内容：请求方式（Request Method）、请求链接（Request URL）、请求头（Request Headers）、请求体（Request Body）。\n(1) 请求方式  常见的请求方式有 GET 和 POST 两种：\n\nGET：从指定的资源请求数据\nPOST：向指定的资源提交要被处理的数据\n\n\n\n\nHTTP 方法：GET 对比 POST\n\n(2) 请求链接  请求网页的 URL\n(3) 请求头  请求头是客户端传递给服务器的请求相关的附加信息，常见信息列表如下：\n\n\n(4) 请求体  对于 GET 请求，Request Body 一般为空。对于 POST 请求，Request Body 通常以表单数据 Form Data 的形式提交给服务器。\n3. 响应 Response响应由服务器返回给客户端，主要包含三部分内容：响应状态码（Response Status Code）、响应头（Response Headers）、响应体（Response Body）。\n(1) 响应状态码  响应状态码表示服务器的响应状态。200 表示服务器正常响应，成功返回数据。常见状态码列举如下：\n \n\n(2) 响应头  响应头是服务器传递给客户端的响应相关的附加信息，常见信息列表如下：\n \n\n(3) 响应体  响应体是响应最重要的主体部分，服务器返回的网页数据都包含在响应体中。通过对响应体进行解析，就可以得到我们想要的网页内容。\n三、HTML 语言基础1. HTML 简介HTML（Hyper Text Markup Language）称为超文本标记语言，它使用一套标签来标识网页中文字、按钮、表格、图片、视频等复杂的元素，以及网页中各区块的层次、样式等丰富的格式。\nHTML 标签通常是由尖括号括起来的小写关键词，且成对出现，例如  和，第一个标签是开始标签，第二个标签是结束标签。从开始标签到结束标签构成一个元素，两个标签之间的内容称为元素的内容，HTML 的元素是可以嵌套的。\nHTML 标签定义了元素的类型，常见标签列举如下表：\n\n\n\n为了更丰富地表达元素，HTML 可以为标签设置多种属性。在 HTML 元素的开始标签中，通过 ** 属性名 &#x3D;”属性值”** 这种键值对的方式，为元素定义更多的附加信息。通用属性列举如下：\n\n\n\n注：完整的 HTML 标签和属性参见： HTML 参考手册\n2. HTML 选择器HTML 选择器用来从 HTML 源码中提取目标元素，常用的两种选择器为 CSS 选择器和 XPath 选择器。Chrome 开发者工具提供了定位目标元素以及测试选择器的功能。\n定位目标元素 ：首先点击左上角的小箭头，然后移动鼠标，指向网页上的目标元素，此时Elements 面板中将高亮该目标元素对应的 HTML 源码。\n\n\n\n测试选择器：点击Console，切换到控制台面板，在命令行输入选择器，即可查看提取结果：CSS 格式为 $(‘CSS 选择器’)，XPath 格式为 $x(‘XPath 选择器’)。\n\n\n\n(1) CSS 选择器  常见的 CSS 选择器如下：\n\n\n注：完整的 CSS 选择器参见： CSS 选择器参考手册\n(2) XPath 选择器XML(Extentsible Markup Language)，即可扩展标记语言，也采用一组标签来定义数据，形式与 HTML 非常相似，与 HTML 最大的区别在于 XML 的标签可以自定义。\n注：关于 XML 的更多内容参见：XML 教程\nXPath(XML Path Language)，即 XML 路径语言，最初设计是为了在 XML 文件中查找信息，现在也支持在 HTML 中进行搜索。XPath 定义了 7 种类型的文档节点：元素、属性、文本、命名空间、处理指令、注释以及文档节点，并使用路径表达式在文档中选取节点。\n常见的 Xpath 路径表达式如下：\n\n\n\n注：XPath 教程参见：XPath 教程\n(3) CSS 与 XPath 比较  对比 CSS 选择器与 XPath 选择器，CSS 选择器通常具有更简洁的表达，XPath 选择器则具有更强大的灵活性。\n\n\n\n[译]XPath 和 CSS 选择器 - 紫云飞 - 博客园\n","dateCreated":"2023-01-08T14:05:37+08:00","dateModified":"2024-05-09T13:28:24+08:00","datePublished":"2023-01-08T14:05:37+08:00","description":"从零开始学爬虫","headline":"零基础爬虫入门","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss.github.io/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss.github.io/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/","keywords":"Web, 爬虫, python"}</script>
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、原理介绍  网络爬虫，是一种自动浏览网络的计算机程序，即通过指定 URL，直接返回对应网页的数据，而不需要人工点击浏览器链接来获取。不论是机器还是人工，从提交 URL 到看到网页，通常都包含以下步骤：\n\n查找域名对应的服务器地址，向服务器发送请求\n\n服务器响应请求，返回对应网页\n\n解析网页，存储或展示网页内容\n\n\n因此，一个爬虫应该具有抓取、解析、存储三大基本功能：\n\n抓取  是指爬虫需要模拟浏览器，向服务器发起访问请求，并获取服务器返回的响应。\n\n解析  是指爬虫对抓取到的响应体进行解析，从中提取出需要的数据。\n\n存储  是指爬虫将解析出来的数据保存到磁盘或数据库中。\n\n\n\n\nPython 是一种强大而易学的高级编程语言，因为其广泛的通用性，又被称为“万能的胶水语言”。在爬虫方面，Python 提供了丰富的工具库，利用这些工具库，我们可以快速地实现一些爬虫小程序。\n以下列举一些爬虫常用的 Python 库，后续爬虫实践中会用这些库中的部分功能，若要精通这些库的使用，请自行阅读相关文档 ^-^\n1. 请求库\n\nurllib（https://docs.python.org/3/library/urllib.html）\n\nrequests（http://docs.python-requests.org/en/master/）\n\n\n2. 解析库\n\nlxml（https://lxml.de/）\n\nBeautiful Soup（https://www.crummy.com/software/BeautifulSoup/bs4/doc/）\n\n\n3. 存储库\n\nPyMySQL（https://pymysql.readthedocs.io/en/latest/）\n\nPyMongo（https://api.mongodb.com/python/current/）\n\n\n4. 全栈框架\n\nScrapy（https://docs.scrapy.org/en/latest/）\n\n二、相关知识 1. HTTP 基本原理 在浏览器地址栏输入网址，按一下回车键，就可以跳转到我们想要浏览的页面。这是我们日常上网时最常见的操作，这一项看似简单的操作背后蕴含了 HTTP 的基本原理：\n\n\n任何网页在互联网上都有唯一的资源定位，即统一资源定位符（URL）。URL 与网页一一对应，也是访问网页的唯一方式。因此，当我们想在 PC 上浏览一个网页时，我们需要告诉浏览器目标网页的 URL。浏览器在根据我们提供的 URL 找出网页所在的服务器，并向服务器发起访问请求 Request。服务器在接收到请求后，对请求作出响应 Response，返回网页的 HTML 源代码。客户端浏览器接收到 HTML 源代码后，通过对代码进行解析得到我们在浏览器中看到的网页。\nChrome 浏览器提供了一套 Web 开发和调试的工具，通常称为 Chrome 开发者工具，在 Chrome 中打开网页，右键菜单中单击  检查，或者按下 F12 键，都可以进入开发者工具。关于 Chrome 开发者工具的使用见后续章节，这里只介绍利用开发者工具展示访问网页时的请求和响应。\n以 Google 首页为例，按 F12 进入开发者工具，点击 Network 后，在左侧 Name 列表中选取 www.google.com，右侧面板中Headers 栏目下列出了请求 Request 和响应 Response 的头信息。除了头信息，请求 Request 和响应 Response 还包含其他信息。\n\n\n2. 请求 Request请求由客户端发送给服务端，主要包含四部分内容：请求方式（Request Method）、请求链接（Request URL）、请求头（Request Headers）、请求体（Request Body）。\n(1) 请求方式  常见的请求方式有 GET 和 POST 两种：\n\nGET：从指定的资源请求数据\nPOST：向指定的资源提交要被处理的数据\n\n\n\n\nHTTP 方法：GET 对比 POST\n\n(2) 请求链接  请求网页的 URL\n(3) 请求头  请求头是客户端传递给服务器的请求相关的附加信息，常见信息列表如下：\n\n\n(4) 请求体  对于 GET 请求，Request Body 一般为空。对于 POST 请求，Request Body 通常以表单数据 Form Data 的形式提交给服务器。\n3. 响应 Response响应由服务器返回给客户端，主要包含三部分内容：响应状态码（Response Status Code）、响应头（Response Headers）、响应体（Response Body）。\n(1) 响应状态码  响应状态码表示服务器的响应状态。200 表示服务器正常响应，成功返回数据。常见状态码列举如下：\n \n\n(2) 响应头  响应头是服务器传递给客户端的响应相关的附加信息，常见信息列表如下：\n \n\n(3) 响应体  响应体是响应最重要的主体部分，服务器返回的网页数据都包含在响应体中。通过对响应体进行解析，就可以得到我们想要的网页内容。\n三、HTML 语言基础1. HTML 简介HTML（Hyper Text Markup Language）称为超文本标记语言，它使用一套标签来标识网页中文字、按钮、表格、图片、视频等复杂的元素，以及网页中各区块的层次、样式等丰富的格式。\nHTML 标签通常是由尖括号括起来的小写关键词，且成对出现，例如  和，第一个标签是开始标签，第二个标签是结束标签。从开始标签到结束标签构成一个元素，两个标签之间的内容称为元素的内容，HTML 的元素是可以嵌套的。\nHTML 标签定义了元素的类型，常见标签列举如下表：\n\n\n\n为了更丰富地表达元素，HTML 可以为标签设置多种属性。在 HTML 元素的开始标签中，通过 ** 属性名 &#x3D;”属性值”** 这种键值对的方式，为元素定义更多的附加信息。通用属性列举如下：\n\n\n\n注：完整的 HTML 标签和属性参见： HTML 参考手册\n2. HTML 选择器HTML 选择器用来从 HTML 源码中提取目标元素，常用的两种选择器为 CSS 选择器和 XPath 选择器。Chrome 开发者工具提供了定位目标元素以及测试选择器的功能。\n定位目标元素 ：首先点击左上角的小箭头，然后移动鼠标，指向网页上的目标元素，此时Elements 面板中将高亮该目标元素对应的 HTML 源码。\n\n\n\n测试选择器：点击Console，切换到控制台面板，在命令行输入选择器，即可查看提取结果：CSS 格式为 $(‘CSS 选择器’)，XPath 格式为 $x(‘XPath 选择器’)。\n\n\n\n(1) CSS 选择器  常见的 CSS 选择器如下：\n\n\n注：完整的 CSS 选择器参见： CSS 选择器参考手册\n(2) XPath 选择器XML(Extentsible Markup Language)，即可扩展标记语言，也采用一组标签来定义数据，形式与 HTML 非常相似，与 HTML 最大的区别在于 XML 的标签可以自定义。\n注：关于 XML 的更多内容参见：XML 教程\nXPath(XML Path Language)，即 XML 路径语言，最初设计是为了在 XML 文件中查找信息，现在也支持在 HTML 中进行搜索。XPath 定义了 7 种类型的文档节点：元素、属性、文本、命名空间、处理指令、注释以及文档节点，并使用路径表达式在文档中选取节点。\n常见的 Xpath 路径表达式如下：\n\n\n\n注：XPath 教程参见：XPath 教程\n(3) CSS 与 XPath 比较  对比 CSS 选择器与 XPath 选择器，CSS 选择器通常具有更简洁的表达，XPath 选择器则具有更强大的灵活性。\n\n\n\n[译]XPath 和 CSS 选择器 - 紫云飞 - 博客园\n","dateCreated":"2023-01-08T14:05:37+08:00","dateModified":"2024-05-09T13:28:24+08:00","datePublished":"2023-01-08T14:05:37+08:00","description":"从零开始学爬虫","headline":"零基础爬虫入门","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss.github.io/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss.github.io/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/","keywords":"Web, 爬虫, python"}</script>
     <meta name="description" content="从零开始学爬虫">
 <meta property="og:type" content="blog">
 <meta property="og:title" content="零基础爬虫入门">
@@ -213,7 +213,7 @@
                     
                         <a
                             class="sidebar-button-link "
-                            href="https://github.com/"
+                            href="https://github.com/jiliguluss"
                             
                                 target="_blank"
                             
@@ -245,14 +245,46 @@
             z-index: 100;
             background-color: rgba(255,255,255,0);
             transform: translateX(0);
-            right: 4%;
-            width: 240px;
+            right: 3%;
+            width: 220px;
             height: auto;
             padding-top: 10px;
             padding-bottom: 10px;
         }
     </style>
-    <div id="post-toc" class="toc"></div>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
 
                 
 <article class="post">
@@ -456,18 +488,16 @@
             <a
                 class="post-action-btn btn btn--default btn-open-shareoptions"
                 href="#btn-open-shareoptions"
-                aria-label="Diesen Beitrag teilen"
+                aria-label="Share this post"
             >
                 <i class="fa fa-share-alt" aria-hidden="true"></i>
             </a>
         </li>
         
-        
-            
-        
+	
         <li class="post-action">
             
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
             
                 <i class="fa fa-list" aria-hidden="true"></i>
             </a>
@@ -529,18 +559,16 @@
             <a
                 class="post-action-btn btn btn--default btn-open-shareoptions"
                 href="#btn-open-shareoptions"
-                aria-label="Diesen Beitrag teilen"
+                aria-label="Share this post"
             >
                 <i class="fa fa-share-alt" aria-hidden="true"></i>
             </a>
         </li>
         
-        
-            
-        
+	
         <li class="post-action">
             
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
             
                 <i class="fa fa-list" aria-hidden="true"></i>
             </a>
@@ -622,7 +650,7 @@
       tocbot.init({
         tocSelector: '#post-toc', // 目录容器的 ID 或 class
         contentSelector: '.post-content', // 内容容器的 ID 或 class
-        headingSelector: 'h2,h3', // 你想要包含在目录中的标题级别
+        headingSelector: 'h2,h3', // 包含在目录中的标题级别
         collapseDepth: 3,
         scrollSmooth: true, 
         activeClass: 'active', 

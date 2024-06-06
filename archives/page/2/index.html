@@ -196,7 +196,7 @@
                     
                         <a
                             class="sidebar-button-link "
-                            href="https://github.com/"
+                            href="https://github.com/jiliguluss"
                             
                                 target="_blank"
                             
@@ -228,14 +228,46 @@
             z-index: 100;
             background-color: rgba(255,255,255,0);
             transform: translateX(0);
-            right: 4%;
-            width: 240px;
+            right: 3%;
+            width: 220px;
             height: auto;
             padding-top: 10px;
             padding-bottom: 10px;
         }
     </style>
-    <div id="post-toc" class="toc"></div>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
 
                 
     <section class="postShorten-group main-content-wrap">
@@ -491,7 +523,7 @@
       tocbot.init({
         tocSelector: '#post-toc', // 目录容器的 ID 或 class
         contentSelector: '.post-content', // 内容容器的 ID 或 class
-        headingSelector: 'h2,h3', // 你想要包含在目录中的标题级别
+        headingSelector: 'h2,h3', // 包含在目录中的标题级别
         collapseDepth: 3,
         scrollSmooth: true, 
         activeClass: 'active', 

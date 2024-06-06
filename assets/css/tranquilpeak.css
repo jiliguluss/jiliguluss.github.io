@@ -705,7 +705,7 @@ blockquote {
         padding-left: 23px;
         padding-top: 0; }
         #sidebar[data-behavior="1"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="2"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="4"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="5"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -743,7 +743,7 @@ blockquote {
         text-align: center;
         width: 100%; }
         #sidebar[data-behavior="3"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="6"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -775,7 +775,7 @@ blockquote {
         text-align: center;
         width: 100%; }
         #sidebar[data-behavior="1"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="2"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="3"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -811,7 +811,7 @@ blockquote {
         padding-left: 23px;
         padding-top: 0; }
         #sidebar[data-behavior="4"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="5"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -849,7 +849,7 @@ blockquote {
         text-align: center;
         width: 100%; }
         #sidebar[data-behavior="6"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -886,7 +886,7 @@ blockquote {
         padding-left: 23px;
         padding-top: 0; }
         #sidebar[data-behavior="1"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="2"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -923,7 +923,7 @@ blockquote {
         text-align: center;
         width: 100%; }
         #sidebar[data-behavior="3"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -959,7 +959,7 @@ blockquote {
         padding-left: 23px;
         padding-top: 0; }
         #sidebar[data-behavior="4"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon, #sidebar[data-behavior="5"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -997,7 +997,7 @@ blockquote {
         text-align: center;
         width: 100%; }
         #sidebar[data-behavior="6"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -1057,7 +1057,7 @@ blockquote {
           padding-top: 0;
           white-space: nowrap; }
           #sidebar[data-behavior="1"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-            font-size: 1.8rem;
+            font-size: 2rem;
             float: left;
             text-align: center;
             width: 30px;
@@ -1104,7 +1104,7 @@ blockquote {
         padding-left: 23px;
         padding-top: 0; }
         #sidebar[data-behavior="2"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -1141,7 +1141,7 @@ blockquote {
         text-align: center;
         width: 100%; }
         #sidebar[data-behavior="3"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -1200,7 +1200,7 @@ blockquote {
           padding-top: 0;
           white-space: nowrap; }
           #sidebar[data-behavior="4"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-            font-size: 1.8rem;
+            font-size: 2rem;
             float: left;
             text-align: center;
             width: 30px;
@@ -1248,7 +1248,7 @@ blockquote {
         padding-left: 23px;
         padding-top: 0; }
         #sidebar[data-behavior="5"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
@@ -1286,7 +1286,7 @@ blockquote {
         text-align: center;
         width: 100%; }
         #sidebar[data-behavior="6"] ul.sidebar-buttons li.sidebar-button .sidebar-button-link .sidebar-button-icon {
-          font-size: 1.8rem;
+          font-size: 2rem;
           display: inline-block;
           text-align: center;
           width: 30px;
