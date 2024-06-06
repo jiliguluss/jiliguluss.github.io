@@ -7,10 +7,6 @@ Allow: /tags/
 Allow: /20*/
 
 Disallow: /assets/
-Disallow: /js/
-Disallow: /css/
-Disallow: /fonts/
-Disallow: /music/
 
 Sitemap: https://stepbystep.asia/sitemap.xml
 
