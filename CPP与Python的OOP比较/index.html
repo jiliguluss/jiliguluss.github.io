@@ -3,7 +3,7 @@
 <html lang="zh-cn">
     
 <head>
-    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0" />
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="generator" content="千里之行，始于足下">
@@ -14,15 +14,15 @@
     
     
     
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n1. OOP 三特性  封装 ：将相关数据和操作数据的方法打包成一个类。不同的类相互隔离，也可以自由组合。 继承 ：从一个父类衍生出子类，子类可以自然地拥有与父类的相同的属性和行为。 多态 ：子类与父类或者兄弟类在某一种行为上有所区别，即同一函数不同实现。 个人理解，继承保持了类之间的共性，多态使得这些具有共性的类之间有各自的特性。\n2. 封装  类是一组数据以及操这组数据的函数（方法）的集合。类是对象的抽象模板，对象是类的具体实例，给类的数据取不同的值，同一个类就产成了不同的对象。\n数据  于是数据应该有两种：一种是与  类级别  的，同一个类取值都一样，与实例无关；另一种是  实例级别  的，同一个类的不同实例取值各不相同。\n\n\n\n数据类别\nC++\nPython\n\n\n\n类级别\n静态数据成员\n类变量\n\n\n实例级别\n非静态数据成员\n实例变量\n\n\n方法  既然数据有两种，方法至少也应该有两种，一种是类级别的，一种是实例级别的。类级别的数据在实例化之前就存在，在实例化之前操作类级别的数据，是一种方法。实例化之后产生了实例级别的数据，这时候的方法可以同时操作两类数据，是另一种方法。\n\n\n\n可操作数据\nC++\nPython\n\n\n\n类级别\n静态成员函数\n类方法\n\n\n类级别和实例级别\n非静态成员函数\n实例方法\n\n\nC++ 中还有一种重要方法是  虚函数，使用虚函数可以实现 C++ 中的多态。Python 中还有一种方法是静态方法。在 Python 中可以认为，实例方法传入了实例对象的指针，类方法传入了类的指针，而静态方法既不需要传入实例，也不需要传入类。\n3. 继承  子类继承父类，使子类拥有父类的数据和方法。\n单一继承  这种情况下，python 和 C++ 的最大区别应该在于继承方式。C++ 继承分为 public、private、protected 三种，Python 都是 public。\n多重继承  没有虚函数的情况下，区别主要有两点：(1) 假设函数名为 fun，当多个父类中定义方法 fun，而子类没有定义方法 fun，通过子类调用方法 fun，C++ 会  报错 ，Python 会使用MRO 来确定调用哪个父类的 fun。(2) 对菱形继承的情况，C++ 要使用  虚继承，Python 要使用super 结合 MRO。\n4. 多态  多态在代码上的表现为一个方法多个实现。C++ 的多态必须建立在继承基础上，现有继承，后有多态。Python 的多态没有继承关系的限制，只要实现了同名方法即可。\nC++ 多态  前文介绍了 C++ 对象的内存模型，这里只说最简单的单一继承情况。C++ 通过父类的指针或引用调用虚函数，在编译期间无法确定调用的是父类的实现还是子类的实现，只有在执行期间访问内存模型中的虚函数表才能确定。 假设 Derived 类继承 Base 类，Base 类中定义了虚函数 method，Derived 类重写了虚函数 method，此时 Base 类和 Derived 类的对象模型如图：\n\n\n执行如下代码：\n12Base *ptr = new Derived();ptr-&gt;method();\n\n编译器看到 ptr 是 Base 类型，如果 method 不是虚函数，那么执行的应该是 Base::method。现在 method 是虚函数，执行期调用 Base::method 还是 Derived::method，要看赋给 ptr 的是 Base 对象地址还是 Derived 对象地址。上面的代码是创建了一个 Derived 对象，并把地址传给 Base 类指针，但是内存模型中的 vptr 指向的仍然是 Derived 类实现的虚函数，所以最后调用的是 Derived::method。\nPython 多态  相比 C++ 复杂的内存模型，Python 的鸭子类型让多态更灵活（Python 内存模型跟多态的关系好像不大）。\n123456789101112class Cat:    @classmethod    def say(cls):        print(&quot;miao miao&quot;)class Dog:    @classmethod    def say(cls):        print(&quot;wang wang&quot;)def func(kls):    kls.say()\n\n这里 Cat 和 Dog 没有继承关系，say 也不是虚函数，调用 func(Cat)和 func(Dog)都能正确执行。要是再定义个 Person 类，只要定义了方法 say，就可以把 Person 传给 func 完成调用。\n5. 写在最后  虽然都是从 C 语言发展出来的 OOP 语言，C++ 和 Python 的区别还是挺大的，特别是多态的处理，所以对相同逻辑的多态执行结果也是有区别的：\nC++ 示例\n12345678910111213141516171819202122#include &lt;iostream&gt;class Base&#123;public:    int x = 1;    virtual void print() &#123; std::cout &lt;&lt; x &lt;&lt; std::endl; &#125;&#125;;class Derived : public Base&#123;public:    int x = 2;&#125;;int main() &#123;    Base *ptr = nullptr;    ptr = new Base();    ptr-&gt;print();  // 打印 1    ptr = new Derived();    ptr-&gt;print();  // 打印 1&#125;\n\nPython 示例\n12345678910111213141516class Base:    def __init__(self):        self.x = 1    def print(self):        print(self.x)class Derived(Base):    def __init__(self):        self.x = 2def func(Kls):    obj = Kls()    obj.print()func(Base)     // 打印1func(Derived)  // 打印2","dateCreated":"2023-05-10T13:08:21+08:00","dateModified":"2024-04-08T10:47:14+08:00","datePublished":"2023-05-10T13:08:21+08:00","description":"C++ 和 Python 都是从 C 语言演变出来的面向对象（OOP）的编程语言，本文基于 OOP 三特性，比较 C++ 和 Python 的异同点","headline":"C++ 与 Python 的 OOP 比较","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://www.stepbystep.asia/2023/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://www.stepbystep.asia/2023/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/","keywords":"C++, 编程, 开发"}</script>
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n1. OOP 三特性  封装 ：将相关数据和操作数据的方法打包成一个类。不同的类相互隔离，也可以自由组合。 继承 ：从一个父类衍生出子类，子类可以自然地拥有与父类的相同的属性和行为。 多态 ：子类与父类或者兄弟类在某一种行为上有所区别，即同一函数不同实现。 个人理解，继承保持了类之间的共性，多态使得这些具有共性的类之间有各自的特性。\n2. 封装  类是一组数据以及操这组数据的函数（方法）的集合。类是对象的抽象模板，对象是类的具体实例，给类的数据取不同的值，同一个类就产成了不同的对象。\n数据  于是数据应该有两种：一种是与  类级别  的，同一个类取值都一样，与实例无关；另一种是  实例级别  的，同一个类的不同实例取值各不相同。\n\n\n\n数据类别\nC++\nPython\n\n\n\n类级别\n静态数据成员\n类变量\n\n\n实例级别\n非静态数据成员\n实例变量\n\n\n方法  既然数据有两种，方法至少也应该有两种，一种是类级别的，一种是实例级别的。类级别的数据在实例化之前就存在，在实例化之前操作类级别的数据，是一种方法。实例化之后产生了实例级别的数据，这时候的方法可以同时操作两类数据，是另一种方法。\n\n\n\n可操作数据\nC++\nPython\n\n\n\n类级别\n静态成员函数\n类方法\n\n\n类级别和实例级别\n非静态成员函数\n实例方法\n\n\nC++ 中还有一种重要方法是  虚函数，使用虚函数可以实现 C++ 中的多态。Python 中还有一种方法是静态方法。在 Python 中可以认为，实例方法传入了实例对象的指针，类方法传入了类的指针，而静态方法既不需要传入实例，也不需要传入类。\n3. 继承  子类继承父类，使子类拥有父类的数据和方法。\n单一继承  这种情况下，python 和 C++ 的最大区别应该在于继承方式。C++ 继承分为 public、private、protected 三种，Python 都是 public。\n多重继承  没有虚函数的情况下，区别主要有两点：(1) 假设函数名为 fun，当多个父类中定义方法 fun，而子类没有定义方法 fun，通过子类调用方法 fun，C++ 会  报错 ，Python 会使用MRO 来确定调用哪个父类的 fun。(2) 对菱形继承的情况，C++ 要使用  虚继承，Python 要使用super 结合 MRO。\n4. 多态  多态在代码上的表现为一个方法多个实现。C++ 的多态必须建立在继承基础上，现有继承，后有多态。Python 的多态没有继承关系的限制，只要实现了同名方法即可。\nC++ 多态  前文介绍了 C++ 对象的内存模型，这里只说最简单的单一继承情况。C++ 通过父类的指针或引用调用虚函数，在编译期间无法确定调用的是父类的实现还是子类的实现，只有在执行期间访问内存模型中的虚函数表才能确定。 假设 Derived 类继承 Base 类，Base 类中定义了虚函数 method，Derived 类重写了虚函数 method，此时 Base 类和 Derived 类的对象模型如图：\n\n\n执行如下代码：\n12Base *ptr = new Derived();ptr-&gt;method();\n\n编译器看到 ptr 是 Base 类型，如果 method 不是虚函数，那么执行的应该是 Base::method。现在 method 是虚函数，执行期调用 Base::method 还是 Derived::method，要看赋给 ptr 的是 Base 对象地址还是 Derived 对象地址。上面的代码是创建了一个 Derived 对象，并把地址传给 Base 类指针，但是内存模型中的 vptr 指向的仍然是 Derived 类实现的虚函数，所以最后调用的是 Derived::method。\nPython 多态  相比 C++ 复杂的内存模型，Python 的鸭子类型让多态更灵活（Python 内存模型跟多态的关系好像不大）。\n123456789101112class Cat:    @classmethod    def say(cls):        print(&quot;miao miao&quot;)class Dog:    @classmethod    def say(cls):        print(&quot;wang wang&quot;)def func(kls):    kls.say()\n\n这里 Cat 和 Dog 没有继承关系，say 也不是虚函数，调用 func(Cat)和 func(Dog)都能正确执行。要是再定义个 Person 类，只要定义了方法 say，就可以把 Person 传给 func 完成调用。\n5. 写在最后  虽然都是从 C 语言发展出来的 OOP 语言，C++ 和 Python 的区别还是挺大的，特别是多态的处理，所以对相同逻辑的多态执行结果也是有区别的：\nC++ 示例\n12345678910111213141516171819202122#include &lt;iostream&gt;class Base&#123;public:    int x = 1;    virtual void print() &#123; std::cout &lt;&lt; x &lt;&lt; std::endl; &#125;&#125;;class Derived : public Base&#123;public:    int x = 2;&#125;;int main() &#123;    Base *ptr = nullptr;    ptr = new Base();    ptr-&gt;print();  // 打印 1    ptr = new Derived();    ptr-&gt;print();  // 打印 1&#125;\n\nPython 示例\n12345678910111213141516class Base:    def __init__(self):        self.x = 1    def print(self):        print(self.x)class Derived(Base):    def __init__(self):        self.x = 2def func(Kls):    obj = Kls()    obj.print()func(Base)     // 打印1func(Derived)  // 打印2","dateCreated":"2023-05-10T13:08:21+08:00","dateModified":"2024-04-08T10:47:14+08:00","datePublished":"2023-05-10T13:08:21+08:00","description":"C++ 和 Python 都是从 C 语言演变出来的面向对象（OOP）的编程语言，本文基于 OOP 三特性，比较 C++ 和 Python 的异同点","headline":"C++ 与 Python 的 OOP 比较","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://www.stepbystep.asia/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://www.stepbystep.asia/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/","keywords":"C++, 编程, 开发"}</script>
     <meta name="description" content="C++ 和 Python 都是从 C 语言演变出来的面向对象（OOP）的编程语言，本文基于 OOP 三特性，比较 C++ 和 Python 的异同点">
 <meta property="og:type" content="blog">
 <meta property="og:title" content="C++ 与 Python 的 OOP 比较">
-<meta property="og:url" content="https://www.stepbystep.asia/2023/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/index.html">
+<meta property="og:url" content="https://www.stepbystep.asia/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
 <meta property="og:description" content="C++ 和 Python 都是从 C 语言演变出来的面向对象（OOP）的编程语言，本文基于 OOP 三特性，比较 C++ 和 Python 的异同点">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="https://www.stepbystep.asia/2023/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/CPP%E5%A4%9A%E6%80%81.png">
+<meta property="og:image" content="https://www.stepbystep.asia/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/CPP%E5%A4%9A%E6%80%81.png">
 <meta property="article:published_time" content="2023-05-10T05:08:21.000Z">
 <meta property="article:modified_time" content="2024-04-08T02:47:14.361Z">
 <meta property="article:author" content="一瓢清浅">
@@ -30,13 +30,13 @@
 <meta property="article:tag" content="编程">
 <meta property="article:tag" content="开发">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://www.stepbystep.asia/2023/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/CPP%E5%A4%9A%E6%80%81.png">
+<meta name="twitter:image" content="https://www.stepbystep.asia/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/CPP%E5%A4%9A%E6%80%81.png">
     
     
         
     
     
-        <meta property="og:image" content="https://www.stepbystep.asia/assets/images/photo.jpg"/>
+        <meta property="og:image" content="https://www.stepbystep.asia/assets/images/photo.jpg">
     
     
     
@@ -72,21 +72,13 @@
 <header id="header" data-behavior="5">
     <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
     <div class="header-title">
-        <a
-            class="header-title-link"
-            href="/"
-            aria-label=""
-        >
+        <a class="header-title-link" href="/" aria-label>
             千里之行，始于足下
         </a>
     </div>
     
         
-            <a
-                class="header-right-icon "
-                href="#about"
-                aria-label="打开链接: /#about"
-            >
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
         
         
             <i class="fa fa-question fa-lg"></i>
@@ -106,15 +98,12 @@
     <div class="sidebar-container">
         
             <div class="sidebar-profile">
-                <a
-                    href="/#about"
-                    aria-label="阅读有关作者的更多信息"
-                >
-                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片"/>
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
                 </a>
                 <h4 class="sidebar-profile-name">一瓢清浅</h4>
                 
-                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br />涉猎开发、测试、数据、算法、安全等领域</p>
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
 </h5>
                 
             </div>
@@ -124,13 +113,7 @@
             
                 <li class="sidebar-button">
                     
-                        <a
-                            class="sidebar-button-link "
-                            href="/"
-                            
-                            rel="noopener"
-                            title="首页"
-                        >
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
                         <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
                         <span class="sidebar-button-desc">首页</span>
                     </a>
@@ -138,13 +121,7 @@
             
                 <li class="sidebar-button">
                     
-                        <a
-                            class="sidebar-button-link "
-                            href="/all-categories"
-                            
-                            rel="noopener"
-                            title="分类"
-                        >
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
                         <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
                         <span class="sidebar-button-desc">分类</span>
                     </a>
@@ -152,13 +129,7 @@
             
                 <li class="sidebar-button">
                     
-                        <a
-                            class="sidebar-button-link "
-                            href="/all-tags"
-                            
-                            rel="noopener"
-                            title="标签"
-                        >
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
                         <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
                         <span class="sidebar-button-desc">标签</span>
                     </a>
@@ -166,13 +137,7 @@
             
                 <li class="sidebar-button">
                     
-                        <a
-                            class="sidebar-button-link "
-                            href="/all-archives"
-                            
-                            rel="noopener"
-                            title="归档"
-                        >
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
                         <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
                         <span class="sidebar-button-desc">归档</span>
                     </a>
@@ -184,13 +149,7 @@
             
                 <li class="sidebar-button">
                     
-                        <a
-                            class="sidebar-button-link "
-                            href="#about"
-                            
-                            rel="noopener"
-                            title="关于"
-                        >
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
                         <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
                         <span class="sidebar-button-desc">关于</span>
                     </a>
@@ -198,15 +157,7 @@
             
                 <li class="sidebar-button">
                     
-                        <a
-                            class="sidebar-button-link "
-                            href="https://github.com/jiliguluss"
-                            
-                                target="_blank"
-                            
-                            rel="noopener"
-                            title="GitHub"
-                        >
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
                         <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
                         <span class="sidebar-button-desc">GitHub</span>
                     </a>
@@ -218,8 +169,7 @@
 </nav>
 
             
-            <div id="main" data-behavior="5"
-                 class="
+            <div id="main" data-behavior="5" class="
                         hasCoverMetaIn
                         ">
                 
@@ -354,8 +304,8 @@
 <h3 id="单一继承"><a href="# 单一继承" class="headerlink" title="单一继承"></a>单一继承 </h3><p> 这种情况下，python 和 C++ 的最大区别应该在于继承方式。C++ 继承分为 public、private、protected 三种，Python 都是 public。</p>
 <h3 id="多重继承"><a href="# 多重继承" class="headerlink" title="多重继承"></a>多重继承 </h3><p> 没有虚函数的情况下，区别主要有两点：<br>(1) 假设函数名为 fun，当多个父类中定义方法 fun，而子类没有定义方法 fun，通过子类调用方法 fun，C++ 会 <strong> 报错 </strong>，Python 会使用<strong>MRO</strong> 来确定调用哪个父类的 fun。<br>(2) 对菱形继承的情况，C++ 要使用 <strong> 虚继承</strong>，Python 要使用<strong>super 结合 MRO</strong>。</p>
 <h2 id="4- 多态"><a href="#4- 多态" class="headerlink" title="4. 多态"></a>4. 多态 </h2><p> 多态在代码上的表现为一个方法多个实现。C++ 的多态必须建立在继承基础上，现有继承，后有多态。Python 的多态没有继承关系的限制，只要实现了同名方法即可。</p>
-<h3 id="C- 多态"><a href="#C- 多态" class="headerlink" title="C++ 多态"></a>C++ 多态 </h3><p> 前文介绍了 <a href="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/" title="C++ 对象模型：对象内存布局">C++ 对象的内存模型</a>，这里只说最简单的单一继承情况。C++ 通过父类的指针或引用调用虚函数，在编译期间无法确定调用的是父类的实现还是子类的实现，只有在执行期间访问内存模型中的虚函数表才能确定。<br> 假设 Derived 类继承 Base 类，Base 类中定义了虚函数 method，Derived 类重写了虚函数 method，此时 Base 类和 Derived 类的对象模型如图：</p>
-<img src="/2023/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/CPP%E5%A4%9A%E6%80%81.png" class=""title="C++ 多态 ">
+<h3 id="C- 多态"><a href="#C- 多态" class="headerlink" title="C++ 多态"></a>C++ 多态 </h3><p> 前文介绍了 <a href="/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/" title="C++ 对象模型：对象内存布局">C++ 对象的内存模型</a>，这里只说最简单的单一继承情况。C++ 通过父类的指针或引用调用虚函数，在编译期间无法确定调用的是父类的实现还是子类的实现，只有在执行期间访问内存模型中的虚函数表才能确定。<br> 假设 Derived 类继承 Base 类，Base 类中定义了虚函数 method，Derived 类重写了虚函数 method，此时 Base 类和 Derived 类的对象模型如图：</p>
+<img src="/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/CPP%E5%A4%9A%E6%80%81.png" class title="C++ 多态 ">
 
 <p>执行如下代码：</p>
 <figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Base *ptr = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">ptr-&gt;<span class="built_in">method</span>();</span><br></pre></td></tr></table></figure>
@@ -380,7 +330,7 @@
     <div id="post-footer" class="post-footer main-content-wrap">
         
             <div class="post-footer-tags">
-                <span class="text-color-light text-small">标签</span><br/>
+                <span class="text-color-light text-small">标签</span><br>
                 
     <a class="tag tag--primary tag--small t-none-link" href="/tags/C/" rel="tag">C++</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E5%BC%80%E5%8F%91/" rel="tag">开发</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E7%BC%96%E7%A8%8B/" rel="tag">编程</a>
 
@@ -393,12 +343,7 @@
             <li class="post-action">
                 
                     
-                <a
-                    class="post-action-btn btn btn--default tooltip--top"
-                    href="/2023/Linux%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E7%86%9F%E7%BB%83/"
-                    data-tooltip="Linux 从入门到熟练"
-                    aria-label="上一篇: Linux 从入门到熟练"
-                >
+                <a class="post-action-btn btn btn--default tooltip--top" href="/Linux%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E7%86%9F%E7%BB%83/" data-tooltip="Linux 从入门到熟练" aria-label="上一篇: Linux 从入门到熟练">
                     
                         <i class="fa fa-angle-left" aria-hidden="true"></i>
                         <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
@@ -407,12 +352,7 @@
             <li class="post-action">
                 
                     
-                <a
-                    class="post-action-btn btn btn--default tooltip--top"
-                    href="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/"
-                    data-tooltip="C++ 对象模型：对象内存布局"
-                    aria-label="下一篇: C++ 对象模型：对象内存布局"
-                >
+                <a class="post-action-btn btn btn--default tooltip--top" href="/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/" data-tooltip="C++ 对象模型：对象内存布局" aria-label="下一篇: C++ 对象模型：对象内存布局">
                     
                         <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
                         <i class="fa fa-angle-right" aria-hidden="true"></i>
@@ -422,11 +362,7 @@
     </nav>
     <ul class="post-actions post-action-share">
         <li class="post-action hide-lg hide-md hide-sm">
-            <a
-                class="post-action-btn btn btn--default btn-open-shareoptions"
-                href="#btn-open-shareoptions"
-                aria-label="Share this post"
-            >
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
                 <i class="fa fa-share-alt" aria-hidden="true"></i>
             </a>
         </li>
@@ -434,7 +370,7 @@
 	
         <li class="post-action">
             
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
             
                 <i class="fa fa-list" aria-hidden="true"></i>
             </a>
@@ -467,12 +403,7 @@
             <li class="post-action">
                 
                     
-                <a
-                    class="post-action-btn btn btn--default tooltip--top"
-                    href="/2023/Linux%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E7%86%9F%E7%BB%83/"
-                    data-tooltip="Linux 从入门到熟练"
-                    aria-label="上一篇: Linux 从入门到熟练"
-                >
+                <a class="post-action-btn btn btn--default tooltip--top" href="/Linux%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E7%86%9F%E7%BB%83/" data-tooltip="Linux 从入门到熟练" aria-label="上一篇: Linux 从入门到熟练">
                     
                         <i class="fa fa-angle-left" aria-hidden="true"></i>
                         <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
@@ -481,12 +412,7 @@
             <li class="post-action">
                 
                     
-                <a
-                    class="post-action-btn btn btn--default tooltip--top"
-                    href="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/"
-                    data-tooltip="C++ 对象模型：对象内存布局"
-                    aria-label="下一篇: C++ 对象模型：对象内存布局"
-                >
+                <a class="post-action-btn btn btn--default tooltip--top" href="/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/" data-tooltip="C++ 对象模型：对象内存布局" aria-label="下一篇: C++ 对象模型：对象内存布局">
                     
                         <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
                         <i class="fa fa-angle-right" aria-hidden="true"></i>
@@ -496,11 +422,7 @@
     </nav>
     <ul class="post-actions post-action-share">
         <li class="post-action hide-lg hide-md hide-sm">
-            <a
-                class="post-action-btn btn btn--default btn-open-shareoptions"
-                href="#btn-open-shareoptions"
-                aria-label="Share this post"
-            >
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
                 <i class="fa fa-share-alt" aria-hidden="true"></i>
             </a>
         </li>
@@ -508,7 +430,7 @@
 	
         <li class="post-action">
             
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
             
                 <i class="fa fa-list" aria-hidden="true"></i>
             </a>
@@ -535,17 +457,17 @@
             <i class="fa fa-times"></i>
         </div>
         
-            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片"/>
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
         
             <h4 id="about-card-name">一瓢清浅</h4>
         
-            <div id="about-card-bio"><p>个人技术博客<br />涉猎开发、测试、数据、算法、安全等领域</p>
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
 </div>
         
         
             <div id="about-card-job">
                 <i class="fa fa-briefcase"></i>
-                <br/>
+                <br>
                 <p>IT工程师</p>
 
             </div>
@@ -553,7 +475,7 @@
         
             <div id="about-card-location">
                 <i class="fa fa-map-marker-alt"></i>
-                <br/>
+                <br>
                 中国
             </div>
         
@@ -600,7 +522,7 @@
 
 
 
-  <script src='https://unpkg.com/mermaid@9.0.0/dist/mermaid.min.js'></script>
+  <script src="https://unpkg.com/mermaid@9.0.0/dist/mermaid.min.js"></script>
   <script type="text/javascript">
       $(document).ready(function() {
           var mermaid_config = {
