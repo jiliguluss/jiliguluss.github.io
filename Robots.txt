@@ -8,5 +8,5 @@ Allow: /20*/
 
 Disallow: /assets/
 
-Sitemap: https://stepbystep.asia/sitemap.xml
+Sitemap: https://www.stepbystep.asia/sitemap.xml
 
