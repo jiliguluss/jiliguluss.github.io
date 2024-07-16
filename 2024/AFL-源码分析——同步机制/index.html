@@ -7,29 +7,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="generator" content="千里之行，始于足下">
-    <title>Page Not Found - 千里之行，始于足下</title>
+    <title>AFL++ 源码分析——同步机制 - 千里之行，始于足下</title>
     <meta name="author" content="一瓢清浅">
     
         <meta name="keywords" content="python,AI,安全,算法,编程,">
     
     
     
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"Website","@id":"https://www.stepbystep.asia","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"name":"千里之行，始于足下","description":"个人技术博客，涉及编程(python，c++)、安全测试、Web开发、AI算法等IT领域","url":"https://www.stepbystep.asia","keywords":"python, AI, 安全, 算法, 编程"}</script>
-    <meta name="description" content="对不起，您所访问的页面不存在。  预计将在约 5 秒后返回首页。  当然，你可以  点这里  直接返回首页。  let countTime &#x3D; 5;  function count() {document.getElementById(&#39;timeout&#39;).textContent &#x3D; countTime;   countTime -&#x3D; 1;   if(countTime &#x3D;&#x3D;&#x3D; 0){locat">
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n最近遇到 AFL++ 同步 interesting corpus 失败的问题，不得不嗑一嗑 AFL++ 的源码了，该来的躲不掉，虽然 C 代码让我十分头大……\n同步机制  源码分析 AFL++ 的源码入口为afl_fuzz.c 的main函数。AFL++ 从其他 fuzzer 中同步 corpus，是通过 sync_fuzzers 函数来实现的。\n在 main 函数中，可以看到对 sync_fuzzers 函数的调用。一路跟踪下来，代码调用关系参考如下时序图：\nsequenceDiagram\n    participant main\n    participant sync_fuzzers\n    participant read_foreign_testcases\n    participant update_sync_time\n    participant scandir\n    participant fuzz_run_target\n    participant save_if_interesting\n    participant has_new_bits\n    participant add_to_queue\n\n    main->>sync_fuzzers: 开始同步\n    loop 遍历 AFL++ 的 out 目录中的子目录 d_name\n        sync_fuzzers->>update_sync_time: 更新同步时间\n        sync_fuzzers->>scandir: 读取 d_name/queue 目录中的 corpus 列表\n        loop 遍历新增的 corpus（通过 corpus 的 id 号来识别）\n            sync_fuzzers->>fuzz_run_target: 用 corpus 作为输入运行一次 target\n            fuzz_run_target-->>sync_fuzzers: 返回 target 运行结果\n            sync_fuzzers->>save_if_interesting: 检查并保存 corpus\n            save_if_interesting->>has_new_bits: 检查 corpus 是否为 interesting\n            has_new_bits-->>save_if_interesting: 返回检查结果\n            alt 如果 corpus 是 interesting\n                save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中\n            end\n        end\n    end\n    alt 如果指定了外来目录\n        sync_fuzzers->>read_foreign_testcases: 从外来目录中同步 corpus\n        loop 遍历外来目录 dir\n            read_foreign_testcases->>scandir: 读取外来目录中的 corpus 列表\n            loop 遍历外来目录中的 corpus\n                read_foreign_testcases->>fuzz_run_target: 用 corpus 作为输入运行一次 target\n                fuzz_run_target-->>read_foreign_testcases: 返回 target 运行结果\n                read_foreign_testcases->>save_if_interesting: 检查 corpus 是否为 interesting\n                save_if_interesting->>has_new_bits: 检查 corpus 是否为 interesting\n                has_new_bits-->>save_if_interesting: 返回检查结果\n                alt 如果 corpus 是 interesting\n                    save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中\n                end\n            end\n        end\n        read_foreign_testcases-->>sync_fuzzers: 外来目录同步结束\n    end\n    sync_fuzzers-->>main: 同步完毕","dateCreated":"2024-07-16T09:02:06+08:00","dateModified":"2024-07-16T13:40:29+08:00","datePublished":"2024-07-16T09:02:06+08:00","description":"分析 AFL++ 同步机制的相关源码","headline":"AFL++ 源码分析——同步机制","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://www.stepbystep.asia/2024/AFL-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://www.stepbystep.asia/2024/AFL-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/","keywords":"AFL, Fuzz, 安全, 工具"}</script>
+    <meta name="description" content="分析 AFL++ 同步机制的相关源码">
 <meta property="og:type" content="blog">
-<meta property="og:title" content="Page Not Found">
-<meta property="og:url" content="https://www.stepbystep.asia/404.html">
+<meta property="og:title" content="AFL++ 源码分析——同步机制">
+<meta property="og:url" content="https://www.stepbystep.asia/2024/AFL-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
-<meta property="og:description" content="对不起，您所访问的页面不存在。  预计将在约 5 秒后返回首页。  当然，你可以  点这里  直接返回首页。  let countTime &#x3D; 5;  function count() {document.getElementById(&#39;timeout&#39;).textContent &#x3D; countTime;   countTime -&#x3D; 1;   if(countTime &#x3D;&#x3D;&#x3D; 0){locat">
+<meta property="og:description" content="分析 AFL++ 同步机制的相关源码">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2024-05-30T09:29:31.130Z">
-<meta property="article:modified_time" content="2024-05-30T09:29:31.130Z">
+<meta property="article:published_time" content="2024-07-16T01:02:06.000Z">
+<meta property="article:modified_time" content="2024-07-16T05:40:29.924Z">
 <meta property="article:author" content="一瓢清浅">
-<meta property="article:tag" content="python">
-<meta property="article:tag" content="AI">
+<meta property="article:tag" content="AFL">
+<meta property="article:tag" content="Fuzz">
 <meta property="article:tag" content="安全">
-<meta property="article:tag" content="算法">
-<meta property="article:tag" content="编程">
+<meta property="article:tag" content="工具">
 <meta name="twitter:card" content="summary">
     
     
@@ -60,6 +59,8 @@
     
 
     
+        
+    
 </head>
 
     <body>
@@ -67,7 +68,7 @@
             <!-- Define author's picture -->
 
 
-<header id="header" data-behavior="2">
+<header id="header" data-behavior="5">
     <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
     <div class="header-title">
         <a class="header-title-link" href="/" aria-label>
@@ -92,7 +93,7 @@
         
     
 
-<nav id="sidebar" data-behavior="2">
+<nav id="sidebar" data-behavior="5">
     <div class="sidebar-container">
         
             <div class="sidebar-profile">
@@ -167,7 +168,7 @@
 </nav>
 
             
-            <div id="main" data-behavior="2" class="
+            <div id="main" data-behavior="5" class="
                         hasCoverMetaIn
                         ">
                 
@@ -228,16 +229,22 @@
         <div class="post-header main-content-wrap text-left">
     
         <h1 class="post-title">
-            Page Not Found
+            AFL++ 源码分析——同步机制
         </h1>
     
     
         <div class="post-meta">
-    <time datetime="2024-05-30T17:29:31+08:00">
+    <time datetime="2024-07-16T09:02:06+08:00">
 	
-		    2024 年 5 月 30 日
+		    2024 年 7 月 16 日
     	
     </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/">模糊测试</a>
+
+
     
 </div>
 
@@ -247,21 +254,55 @@
     
     <div class="post-content markdown">
         <div class="main-content-wrap">
-            <p> 对不起，您所访问的页面不存在。</p>
-<p> 预计将在约 <span id="timeout">5</span> 秒后返回首页。</p>
-<p> 当然，你可以 <strong><a href="/"> 点这里 </a></strong> 直接返回首页。</p>
-<script>
-let countTime = 5;
+            <!--excerpt-->
 
-function count() {document.getElementById('timeout').textContent = countTime;
-  countTime -= 1;
-  if(countTime === 0){location.href = '/';}
-  setTimeout(() => {count();
-  }, 1000);
-}
+<p>最近遇到 AFL++ 同步 interesting corpus 失败的问题，不得不嗑一嗑 AFL++ 的源码了，该来的躲不掉，虽然 C 代码让我十分头大……</p>
+<h1 id="同步机制"><a href="# 同步机制" class="headerlink" title="同步机制"></a>同步机制 </h1><h1 id="源码分析"><a href="# 源码分析" class="headerlink" title="源码分析"></a> 源码分析 </h1><p>AFL++ 的源码入口为<code>afl_fuzz.c</code> 的<code>main</code>函数。AFL++ 从其他 fuzzer 中同步 corpus，是通过 <code>sync_fuzzers</code> 函数来实现的。</p>
+<p>在 <code>main</code> 函数中，可以看到对 <code>sync_fuzzers</code> 函数的调用。一路跟踪下来，代码调用关系参考如下时序图：</p>
+<pre class="mermaid">sequenceDiagram
+    participant main
+    participant sync_fuzzers
+    participant read_foreign_testcases
+    participant update_sync_time
+    participant scandir
+    participant fuzz_run_target
+    participant save_if_interesting
+    participant has_new_bits
+    participant add_to_queue
 
-count();
-</script>
+    main->>sync_fuzzers: 开始同步
+    loop 遍历 AFL++ 的 out 目录中的子目录 d_name
+        sync_fuzzers->>update_sync_time: 更新同步时间
+        sync_fuzzers->>scandir: 读取 d_name/queue 目录中的 corpus 列表
+        loop 遍历新增的 corpus（通过 corpus 的 id 号来识别）
+            sync_fuzzers->>fuzz_run_target: 用 corpus 作为输入运行一次 target
+            fuzz_run_target-->>sync_fuzzers: 返回 target 运行结果
+            sync_fuzzers->>save_if_interesting: 检查并保存 corpus
+            save_if_interesting->>has_new_bits: 检查 corpus 是否为 interesting
+            has_new_bits-->>save_if_interesting: 返回检查结果
+            alt 如果 corpus 是 interesting
+                save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中
+            end
+        end
+    end
+    alt 如果指定了外来目录
+        sync_fuzzers->>read_foreign_testcases: 从外来目录中同步 corpus
+        loop 遍历外来目录 dir
+            read_foreign_testcases->>scandir: 读取外来目录中的 corpus 列表
+            loop 遍历外来目录中的 corpus
+                read_foreign_testcases->>fuzz_run_target: 用 corpus 作为输入运行一次 target
+                fuzz_run_target-->>read_foreign_testcases: 返回 target 运行结果
+                read_foreign_testcases->>save_if_interesting: 检查 corpus 是否为 interesting
+                save_if_interesting->>has_new_bits: 检查 corpus 是否为 interesting
+                has_new_bits-->>save_if_interesting: 返回检查结果
+                alt 如果 corpus 是 interesting
+                    save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中
+                end
+            end
+        end
+        read_foreign_testcases-->>sync_fuzzers: 外来目录同步结束
+    end
+    sync_fuzzers-->>main: 同步完毕</pre>
             
 
 
@@ -269,6 +310,13 @@ count();
         </div>
     </div>
     <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/AFL/" rel="tag">AFL</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/Fuzz/" rel="tag">Fuzz</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E5%AE%89%E5%85%A8/" rel="tag">安全</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E5%B7%A5%E5%85%B7/" rel="tag">工具</a>
+
+            </div>
         
         
             <div class="post-actions-wrap">
@@ -284,8 +332,9 @@ count();
             </li>
             <li class="post-action">
                 
-                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
-                        
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Python%E8%BF%9B%E9%98%B6%E2%80%94%E2%80%94%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" data-tooltip="Python 进阶——并发编程" aria-label="下一篇: Python 进阶——并发编程">
+                    
                         <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
                         <i class="fa fa-angle-right" aria-hidden="true"></i>
                     </a>
@@ -313,6 +362,8 @@ count();
 
         
         
+            
+        
     </div>
 </article>
 
@@ -325,6 +376,52 @@ count();
 </footer>
 
             </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Python%E8%BF%9B%E9%98%B6%E2%80%94%E2%80%94%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" data-tooltip="Python 进阶——并发编程" aria-label="下一篇: Python 进阶——并发编程">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
             
         </div>
         
@@ -383,6 +480,8 @@ count();
 
 <!--SCRIPTS END-->
 
+
+    
 
 
 
