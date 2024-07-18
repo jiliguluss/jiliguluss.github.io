@@ -7,25 +7,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="generator" content="千里之行，始于足下">
-    <title>AFL++ 源码分析——同步机制 - 千里之行，始于足下</title>
+    <title>AFLplusplus 源码分析——同步机制 - 千里之行，始于足下</title>
     <meta name="author" content="一瓢清浅">
     
         <meta name="keywords" content="python,AI,安全,算法,编程,">
     
     
     
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n最近遇到 AFL++ 同步 interesting corpus 失败的问题，不得不嗑一嗑 AFL++ 的源码了，该来的躲不掉，虽然 C 代码让我十分头大……\n同步机制  源码分析 AFL++ 的源码入口为afl_fuzz.c 的main函数。AFL++ 从其他 fuzzer 中同步 corpus，是通过 sync_fuzzers 函数来实现的。\n在 main 函数中，可以看到对 sync_fuzzers 函数的调用。一路跟踪下来，代码调用关系参考如下时序图：\nsequenceDiagram\n    participant main\n    participant sync_fuzzers\n    participant read_foreign_testcases\n    participant update_sync_time\n    participant scandir\n    participant fuzz_run_target\n    participant save_if_interesting\n    participant has_new_bits\n    participant describe_op\n    participant add_to_queue\n\n    main->>sync_fuzzers: 开始同步\n    loop 遍历 AFL++ 的 out 目录中的子目录 d_name\n        sync_fuzzers->>update_sync_time: 更新同步时间\n        sync_fuzzers->>scandir: 读取 d_name/queue 目录中的 corpus 列表\n        loop 遍历新增的 corpus（通过 corpus 的 id 号来识别）\n            sync_fuzzers->>fuzz_run_target: 用 corpus 作为输入运行一次 target\n            fuzz_run_target-->>sync_fuzzers: 返回 target 运行结果\n            sync_fuzzers->>save_if_interesting: 检查并保存 corpus\n            save_if_interesting->>has_new_bits: 检查 corpus 是否为 interesting\n            has_new_bits-->>save_if_interesting: 返回检查结果\n            alt 如果 corpus 是 interesting\n                save_if_interesting->>describe_op: 为 corpus 创建文件名\n                describe_op-->>save_if_interesting: 返回文件名\n                save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中\n            end\n        end\n    end\n    alt 如果指定了外来目录\n        sync_fuzzers->>read_foreign_testcases: 从外来目录中同步 corpus\n        loop 遍历外来目录 dir\n            read_foreign_testcases->>scandir: 读取外来目录中的 corpus 列表\n            loop 遍历外来目录中的 corpus\n                read_foreign_testcases->>fuzz_run_target: 用 corpus 作为输入运行一次 target\n                fuzz_run_target-->>read_foreign_testcases: 返回 target 运行结果\n                read_foreign_testcases->>save_if_interesting: 检查 corpus 是否为 interesting\n                save_if_interesting->>has_new_bits: 检查 corpus 是否为 interesting\n                has_new_bits-->>save_if_interesting: 返回检查结果\n                alt 如果 corpus 是 interesting\n                    save_if_interesting->>describe_op: 为 corpus 创建文件名\n                    describe_op-->>save_if_interesting: 返回文件名\n                    save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中\n                end\n            end\n        end\n        read_foreign_testcases-->>sync_fuzzers: 外来目录同步结束\n    end\n    sync_fuzzers-->>main: 同步完毕","dateCreated":"2024-07-16T09:02:06+08:00","dateModified":"2024-07-16T13:43:53+08:00","datePublished":"2024-07-16T09:02:06+08:00","description":"分析 AFL++ 同步机制的相关源码","headline":"AFL++ 源码分析——同步机制","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://www.stepbystep.asia/2024/AFL-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://www.stepbystep.asia/2024/AFL-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/","keywords":"AFL, Fuzz, 安全, 工具"}</script>
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n最近遇到 AFL++ 同步 interesting corpus 失败的问题，不得不嗑一嗑 AFL++ 的源码了，该来的躲不掉，虽然 C 代码让我十分头大……\n同步机制  源码分析 AFL++ 的源码入口为afl_fuzz.c 的main函数。AFL++ 从其他 fuzzer 中同步 corpus，是通过 sync_fuzzers 函数来实现的。\n在 main 函数中，可以看到对 sync_fuzzers 函数的调用。一路跟踪下来，代码调用关系参考如下时序图：\nsequenceDiagram\n    participant main\n    participant sync_fuzzers\n    participant read_foreign_testcases\n    participant update_sync_time\n    participant scandir\n    participant fuzz_run_target\n    participant save_if_interesting\n    participant has_new_bits\n    participant describe_op\n    participant ck_write\n    participant add_to_queue\n\n    main->>sync_fuzzers: 开始同步\n    loop 遍历 AFL++ 的 out 目录中的子目录 d_name\n        sync_fuzzers->>update_sync_time: 更新同步时间\n        sync_fuzzers->>scandir: 读取 d_name/queue 目录中的 corpus 列表\n        loop 遍历新增的 corpus（通过 corpus 的 id 号来识别）\n            sync_fuzzers->>fuzz_run_target: 用 corpus 作为输入运行一次 target\n            fuzz_run_target-->>sync_fuzzers: 返回 target 运行结果\n            sync_fuzzers->>save_if_interesting: 检查并保存 corpus\n            save_if_interesting->>has_new_bits: 检查 corpus 是否为 interesting\n            has_new_bits-->>save_if_interesting: 返回检查结果\n            alt 如果 corpus 是 interesting\n                save_if_interesting->>describe_op: 为 corpus 创建文件名\n                describe_op-->>save_if_interesting: 返回文件名\n                save_if_interesting-->>ck_write: 将 interesting 的 corpus 保存到 AFL++ 的 queue 目录中\n                save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中\n            end\n        end\n    end\n    alt 如果指定了外来目录\n        sync_fuzzers->>read_foreign_testcases: 从外来目录中同步 corpus\n        loop 遍历外来目录 dir\n            read_foreign_testcases->>scandir: 读取外来目录中的 corpus 列表\n            loop 遍历外来目录中的 corpus\n                read_foreign_testcases->>fuzz_run_target: 用 corpus 作为输入运行一次 target\n                fuzz_run_target-->>read_foreign_testcases: 返回 target 运行结果\n                read_foreign_testcases->>save_if_interesting: 检查 corpus 是否为 interesting\n                save_if_interesting->>has_new_bits: 检查 corpus 是否为 interesting\n                has_new_bits-->>save_if_interesting: 返回检查结果\n                alt 如果 corpus 是 interesting\n                    save_if_interesting->>describe_op: 为 corpus 创建文件名\n                    describe_op-->>save_if_interesting: 返回文件名\n                    save_if_interesting-->>ck_write: 将 interesting 的 corpus 保存到 AFL++ 的 queue 目录中\n                    save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中\n                end\n            end\n        end\n        read_foreign_testcases-->>sync_fuzzers: 外来目录同步结束\n    end\n    sync_fuzzers-->>main: 同步完毕","dateCreated":"2024-07-16T09:02:06+08:00","dateModified":"2024-07-16T17:09:00+08:00","datePublished":"2024-07-16T09:02:06+08:00","description":"分析 AFL++ 同步机制的相关源码","headline":"AFLplusplus 源码分析——同步机制","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://www.stepbystep.asia/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://www.stepbystep.asia/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/","keywords":"AFL++, Fuzz, 安全, 工具"}</script>
     <meta name="description" content="分析 AFL++ 同步机制的相关源码">
 <meta property="og:type" content="blog">
-<meta property="og:title" content="AFL++ 源码分析——同步机制">
-<meta property="og:url" content="https://www.stepbystep.asia/2024/AFL-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/index.html">
+<meta property="og:title" content="AFLplusplus 源码分析——同步机制">
+<meta property="og:url" content="https://www.stepbystep.asia/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
 <meta property="og:description" content="分析 AFL++ 同步机制的相关源码">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2024-07-16T01:02:06.000Z">
-<meta property="article:modified_time" content="2024-07-16T05:43:53.857Z">
+<meta property="article:modified_time" content="2024-07-16T09:09:00.943Z">
 <meta property="article:author" content="一瓢清浅">
-<meta property="article:tag" content="AFL">
+<meta property="article:tag" content="AFL++">
 <meta property="article:tag" content="Fuzz">
 <meta property="article:tag" content="安全">
 <meta property="article:tag" content="工具">
@@ -42,16 +42,7 @@
     
     <!--STYLES-->
     
-<link rel="stylesheet" href="/assets/css/all.css">
-
-    
-<link rel="stylesheet" href="/assets/css/jquery.fancybox.css">
-
-    
-<link rel="stylesheet" href="/assets/css/thumbs.css">
-
-    
-<link rel="stylesheet" href="/assets/css/tranquilpeak.css">
+<link rel="stylesheet" href="/assets/css/style-sdm5wkzlte0605brfyeacpy20aldrqezwbjcfigvfdzerhmv57dn6woeognt.min.css">
 
     <!--STYLES END-->
     
@@ -229,7 +220,7 @@
         <div class="post-header main-content-wrap text-left">
     
         <h1 class="post-title">
-            AFL++ 源码分析——同步机制
+            AFLplusplus 源码分析——同步机制
         </h1>
     
     
@@ -269,6 +260,7 @@
     participant save_if_interesting
     participant has_new_bits
     participant describe_op
+    participant ck_write
     participant add_to_queue
 
     main->>sync_fuzzers: 开始同步
@@ -284,6 +276,7 @@
             alt 如果 corpus 是 interesting
                 save_if_interesting->>describe_op: 为 corpus 创建文件名
                 describe_op-->>save_if_interesting: 返回文件名
+                save_if_interesting-->>ck_write: 将 interesting 的 corpus 保存到 AFL++ 的 queue 目录中
                 save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中
             end
         end
@@ -301,6 +294,7 @@
                 alt 如果 corpus 是 interesting
                     save_if_interesting->>describe_op: 为 corpus 创建文件名
                     describe_op-->>save_if_interesting: 返回文件名
+                    save_if_interesting-->>ck_write: 将 interesting 的 corpus 保存到 AFL++ 的 queue 目录中
                     save_if_interesting->>add_to_queue: 将 interesting 的 corpus 添加到 AFL++ 的队列中
                 end
             end
@@ -319,7 +313,7 @@
             <div class="post-footer-tags">
                 <span class="text-color-light text-small">标签</span><br>
                 
-    <a class="tag tag--primary tag--small t-none-link" href="/tags/AFL/" rel="tag">AFL</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/Fuzz/" rel="tag">Fuzz</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E5%AE%89%E5%85%A8/" rel="tag">安全</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E5%B7%A5%E5%85%B7/" rel="tag">工具</a>
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/AFL/" rel="tag">AFL++</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/Fuzz/" rel="tag">Fuzz</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E5%AE%89%E5%85%A8/" rel="tag">安全</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E5%B7%A5%E5%85%B7/" rel="tag">工具</a>
 
             </div>
         
@@ -472,16 +466,7 @@
 <div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
         <!--SCRIPTS-->
 
-<script src="/assets/js/jquery.js"></script>
-
-
-<script src="/assets/js/jquery.fancybox.js"></script>
-
-
-<script src="/assets/js/thumbs.js"></script>
-
-
-<script src="/assets/js/tranquilpeak.js"></script>
+<script src="/assets/js/script-byeaohfmaly5ruyzmqtkwpk2hlu2kunzqbivcuitw3nn4ndqbednfymkfjew.min.js"></script>
 
 <!--SCRIPTS END-->
 
@@ -513,10 +498,6 @@
           var mermaid_config = {
               startOnLoad: true,
               theme: 'default',
-              flowchart:{
-                  useMaxWidth: true,
-                  htmlLabels: true
-              }
           }
           mermaid.initialize(mermaid_config);
       });
