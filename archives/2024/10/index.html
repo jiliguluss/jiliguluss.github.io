@@ -214,7 +214,7 @@
     <section class="postShorten-group main-content-wrap">
     
     
-    <article class="postShorten postShorten--thumbnailimg-bottom">
+    <article class="postShorten postShorten--thumbnailimg-right">
         <div class="postShorten-wrap">
             
             <div class="postShorten-header">
@@ -242,131 +242,10 @@
 
             </div>
             
-                <div class="postShorten-content">
-                    <h2 id="一、数据库结构"><a href="# 一、数据库结构" class="headerlink" title="一、数据库结构"></a>一、数据库结构 </h2><p> 典型的数据库结构可归纳为“<strong>三级模式，两级映射</strong>”：</p>
-<img src="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg" class title=" 数据库结构 ">
-
-<ul>
-<li><p>三级模式：</p>
-<ul>
-<li><strong>外模式</strong>：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。</li>
-<li><strong>概念（逻辑）模式</strong>：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。</li>
-<li><strong>内模式</strong>：是数据物理结构和存储方式的描述，数据在数据库内部的表示方式。对应物理文件，面向系统程序员。</li>
-</ul>
-</li>
-<li><p>两级映射：保证两类独立性，逻辑独立比物理独立更难实现</p>
-<ul>
-<li>外模式 - 模式映射：保证 <strong> 逻辑独立性</strong>，即当逻辑模式发生改变时，应用程序不用修改。</li>
-<li>模式 - 内模式映射：保证 <strong> 物理独立性</strong>，即当内模式发生改变时，应用程序不用修改。</li>
-</ul>
-</li>
-</ul>
-<h2 id="二、数据库设计"><a href="# 二、数据库设计" class="headerlink" title="二、数据库设计"></a>二、数据库设计 </h2><p> 数据库设计通常分为需求分析阶段、概念设计阶段、逻辑设计阶段和物理设计阶段：</p>
-
-
-<ol>
-<li><strong>需求分析阶段</strong>：通过结构化分析，得到数据流图和数据字典</li>
-<li><strong>概念设计阶段</strong>：根据功能模型，创建局部 ER 图，并合并为全局 ER 图（建立外模式）</li>
-<li><strong>逻辑设计阶段</strong>：将 ER 图转换为数据库的关系模型（建立逻辑模式）</li>
-<li><strong>物理设计阶段</strong>：根据数据逻辑模式，选择高效的存储结构和存储方法（建立内模式）</li>
-</ol>
-<h3 id="（一）概念设计"><a href="#（一）概念设计" class="headerlink" title="（一）概念设计"></a>（一）概念设计 </h3><p> 在结构化分析阶段，我们通过自顶向下的方式建立的系统的功能模型，以数据流图和数据字典表示。数据库的概念设计阶段，实际上就是建立系统的数据模型。</p>
-<p>数据库的概念设计采用 <strong> 自底向上 </strong> 的方式，目的是获取系统的数据模型（通常以 ER 图表示）。主要步骤为：</p>
-<ol>
-<li>选择局部应用</li>
-<li>设计局部 ER 图</li>
-<li>合并得到全局 ER 图</li>
-<li>优化全局 ER 图</li>
-</ol>
-<h4 id="1-ER 图元素"><a href="#1-ER 图元素" class="headerlink" title="1. ER 图元素"></a>1. ER 图元素</h4><p>ER 图用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：</p>
-<ul>
-<li><strong>实体</strong>：系统中的对象或概念，用矩形框表示。</li>
-<li><strong>属性</strong>：实体具有的特性，用椭圆形表示。</li>
-<li><strong>联系</strong>：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系<ul>
-<li><strong>1:1</strong> 表示一对一关系</li>
-<li><strong>1:n</strong> 表示一对多关系</li>
-<li><strong>m:n</strong> 表示多对多关系</li>
-</ul>
-</li>
-</ul>
-<img src="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/ERD.png" class title="ER 图 ">
-
-<h4 id="2-ER 图合并"><a href="#2-ER 图合并" class="headerlink" title="2. ER 图合并"></a>2. ER 图合并 </h4><p> 在合并 ER 图时，需要解决局部 ER 图之间的冲突问题。冲突有三种类型：</p>
-<ol>
-<li><strong>属性冲突</strong>：属性名和属性含义相同，但属性的取值类型或取值范围不同。</li>
-<li><strong>命名冲突 </strong>：<strong> 异名同义 </strong>（不同属性名表示同一种属性含义），或是<strong> 同名异义</strong>（同一属性名表示不同的属性含义）。</li>
-<li><strong>结构冲突</strong>：<ol>
-<li>同一对象在不同 ER 图中具有不同的抽象。例如某个对象在一个 ER 图中是实体，在另一个 ER 图中是属性。</li>
-<li>同一实体在不同 ER 图中所包含的属性个数和属性排列次序不完全相同。</li>
-<li>实体之间的关系在不同 ER 图中呈现为不同的联系。<br>解决冲突通常是结合业务需求，通过讨论与协商来处理。</li>
-</ol>
-</li>
-</ol>
-<p>在解决冲突得到全局 ER 图后，还要从全局 ER 图中消除冗余。冗余有两种类型：</p>
-<ol>
-<li>冗余属性：可由基本数据导出的属性</li>
-<li>冗余联系：可由其他联系导出的联系 <br> 消除冗余通常是以数据流图和数据字典为依据，通过分析数据项之间的逻辑关系来处理。</li>
-</ol>
-<h3 id="（二）逻辑设计"><a href="#（二）逻辑设计" class="headerlink" title="（二）逻辑设计"></a>（二）逻辑设计 </h3><p> 关系型数据库中的 <strong> 关系 </strong> 是指由行列组成的二维表文件，每行表示一条记录，每列表示一个属性。<strong>关系模型 </strong> 是关系的逻辑描述，可以表示为：关系名(属性 1, 属性 2, …, 属性 N)。</p>
-<p>数据库的逻辑设计是指将 ER 图中的实体、属性、联系转换为数据库的关系模型。</p>
-<h4 id="1- 关系模型"><a href="#1- 关系模型" class="headerlink" title="1. 关系模型"></a>1. 关系模型</h4><table>
-<thead>
-<tr>
-<th>术语</th>
-<th>描述</th>
-</tr>
-</thead>
-<tbody><tr>
-<td></td>
-<td>关系（表文件）</td>
-</tr>
-</tbody></table>
-<h4 id="2- 设计范式"><a href="#2- 设计范式" class="headerlink" title="2. 设计范式"></a>2. 设计范式</h4>
-                    
-                        
-
-
-                    
-                    
-                        <p>
-                            <a href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/#post-footer" class="postShorten-excerpt_link link" aria-label>
-                                评论和共享
-                            </a>
-                        </p>
-                    
-                </div>
-            
-        </div>
-        
-    </article>
-    
-    
-    <article class="postShorten postShorten--thumbnailimg-right">
-        <div class="postShorten-wrap">
-            
-            <div class="postShorten-header">
-                <h1 class="postShorten-title">
-                    
-                        <a class="link-unstyled" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%B3%95%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" aria-label=": 系统分析与设计方法：结构化与面向对象">
-                            系统分析与设计方法：结构化与面向对象
-                        </a>
-                    
-                </h1>
-                <div class="postShorten-meta">
-    <time datetime="2024-10-11T16:37:02+08:00">
-	
-		    2024 年 10 月 11 日
-    	
-    </time>
-    
-</div>
-
-            </div>
-            
                 <div class="postShorten-excerpt">
-                    <p>结构化方法和面向对象方法，是系统分析与设计的两种主要方法</p>
+                    <p>数据库的概念设计和逻辑设计</p>
                     
-                        <a href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%B3%95%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" class="postShorten-excerpt_link link" aria-label=": 系统分析与设计方法：结构化与面向对象">
+                        <a href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" class="postShorten-excerpt_link link" aria-label=": 软考架构——数据库设计与建模.md">
                             阅读全文
                         </a>
                         
