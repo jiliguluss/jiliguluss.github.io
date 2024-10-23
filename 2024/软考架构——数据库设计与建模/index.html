@@ -7,28 +7,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="generator" content="千里之行，始于足下">
-    <title>归档: 2024/10 - 千里之行，始于足下</title>
+    <title>软考架构——数据库设计与建模.md - 千里之行，始于足下</title>
     <meta name="author" content="一瓢清浅">
     
         <meta name="keywords" content="python,AI,安全,算法,编程,">
     
     
     
-    <script type="application/ld+json">{}</script>
-    <meta name="description" content="个人技术博客，涉及编程(python，c++)、安全测试、Web开发、AI算法等IT领域">
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"一、数据库结构  典型的数据库结构可归纳为“三级模式，两级映射”：\n\n\n\n三级模式：\n\n外模式：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。\n概念（逻辑）模式：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。\n内模式：是数据物理结构和存储方式的描述，数据在数据库内部的表示方式。对应物理文件，面向系统程序员。\n\n\n两级映射：保证两类独立性，逻辑独立比物理独立更难实现\n\n外模式 - 模式映射：保证  逻辑独立性，即当逻辑模式发生改变时，应用程序不用修改。\n模式 - 内模式映射：保证  物理独立性，即当内模式发生改变时，应用程序不用修改。\n\n\n\n二、数据库设计  数据库设计通常分为需求分析阶段、概念设计阶段、逻辑设计阶段和物理设计阶段：\n\n\n\n需求分析阶段：通过结构化分析，得到数据流图和数据字典\n概念设计阶段：根据功能模型，创建局部 ER 图，并合并为全局 ER 图（建立外模式）\n逻辑设计阶段：将 ER 图转换为数据库的关系模型（建立逻辑模式）\n物理设计阶段：根据数据逻辑模式，选择高效的存储结构和存储方法（建立内模式）\n\n（一）概念设计  在结构化分析阶段，我们通过自顶向下的方式建立的系统的功能模型，以数据流图和数据字典表示。数据库的概念设计阶段，实际上就是建立系统的数据模型。\n数据库的概念设计采用  自底向上  的方式，目的是获取系统的数据模型（通常以 ER 图表示）。主要步骤为：\n\n选择局部应用\n设计局部 ER 图\n合并得到全局 ER 图\n优化全局 ER 图\n\n1. ER 图元素ER 图用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：\n\n实体：系统中的对象或概念，用矩形框表示。\n属性：实体具有的特性，用椭圆形表示。\n联系：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系\n1:1 表示一对一关系\n1:n 表示一对多关系\nm:n 表示多对多关系\n\n\n\n\n\n2. ER 图合并  在合并 ER 图时，需要解决局部 ER 图之间的冲突问题。冲突有三种类型：\n\n属性冲突：属性名和属性含义相同，但属性的取值类型或取值范围不同。\n命名冲突 ： 异名同义 （不同属性名表示同一种属性含义），或是 同名异义（同一属性名表示不同的属性含义）。\n结构冲突：\n同一对象在不同 ER 图中具有不同的抽象。例如某个对象在一个 ER 图中是实体，在另一个 ER 图中是属性。\n同一实体在不同 ER 图中所包含的属性个数和属性排列次序不完全相同。\n实体之间的关系在不同 ER 图中呈现为不同的联系。解决冲突通常是结合业务需求，通过讨论与协商来处理。\n\n\n\n在解决冲突得到全局 ER 图后，还要从全局 ER 图中消除冗余。冗余有两种类型：\n\n冗余属性：可由基本数据导出的属性\n冗余联系：可由其他联系导出的联系  消除冗余通常是以数据流图和数据字典为依据，通过分析数据项之间的逻辑关系来处理。\n\n（二）逻辑设计  关系型数据库中的  关系  是指由行列组成的二维表文件，每行表示一条记录，每列表示一个属性。关系模型  是关系的逻辑描述，可以表示为：关系名(属性 1, 属性 2, …, 属性 N)。\n数据库的逻辑设计是指将 ER 图中的实体、属性、联系转换为数据库的关系模型。\n1. 关系模型\n\n\n术语\n描述\n\n\n\n\n关系（表文件）\n\n\n2. 设计范式","dateCreated":"2024-10-23T09:27:29+08:00","dateModified":"2024-10-23T09:36:57+08:00","datePublished":"2024-10-23T09:27:29+08:00","description":"","headline":"软考架构——数据库设计与建模.md","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/","keywords":"软件工程, 数据库设计, 数据库范式"}</script>
+    <meta name="description" content="一、数据库结构  典型的数据库结构可归纳为“三级模式，两级映射”：    三级模式：  外模式：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。 概念（逻辑）模式：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。 内模式：是数据物理结构和存储方式的描述，数据在数据库内部的表示方式。对应物理文">
 <meta property="og:type" content="blog">
-<meta property="og:title" content="千里之行，始于足下">
-<meta property="og:url" content="https://www.stepbystep.asia/archives/2024/10/index.html">
+<meta property="og:title" content="软考架构——数据库设计与建模.md">
+<meta property="og:url" content="https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
-<meta property="og:description" content="个人技术博客，涉及编程(python，c++)、安全测试、Web开发、AI算法等IT领域">
+<meta property="og:description" content="一、数据库结构  典型的数据库结构可归纳为“三级模式，两级映射”：    三级模式：  外模式：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。 概念（逻辑）模式：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。 内模式：是数据物理结构和存储方式的描述，数据在数据库内部的表示方式。对应物理文">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg">
+<meta property="og:image" content="https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/ERD.png">
+<meta property="article:published_time" content="2024-10-23T01:27:29.000Z">
+<meta property="article:modified_time" content="2024-10-23T01:36:57.215Z">
 <meta property="article:author" content="一瓢清浅">
-<meta property="article:tag" content="python">
-<meta property="article:tag" content="AI">
-<meta property="article:tag" content="安全">
-<meta property="article:tag" content="算法">
-<meta property="article:tag" content="编程">
+<meta property="article:tag" content="软件工程">
+<meta property="article:tag" content="数据库设计">
+<meta property="article:tag" content="数据库范式">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg">
     
     
         
@@ -49,6 +52,12 @@
     
 
     
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
 </head>
 
     <body>
@@ -56,7 +65,7 @@
             <!-- Define author's picture -->
 
 
-<header id="header" data-behavior="2">
+<header id="header" data-behavior="5">
     <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
     <div class="header-title">
         <a class="header-title-link" href="/" aria-label>
@@ -81,7 +90,7 @@
         
     
 
-<nav id="sidebar" data-behavior="2">
+<nav id="sidebar" data-behavior="5">
     <div class="sidebar-container">
         
             <div class="sidebar-profile">
@@ -156,7 +165,7 @@
 </nav>
 
             
-            <div id="main" data-behavior="2" class="
+            <div id="main" data-behavior="5" class="
                         hasCoverMetaIn
                         ">
                 
@@ -211,21 +220,17 @@
     <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
 
                 
-    <section class="postShorten-group main-content-wrap">
+<article class="post">
     
     
-    <article class="postShorten postShorten--thumbnailimg-bottom">
-        <div class="postShorten-wrap">
-            
-            <div class="postShorten-header">
-                <h1 class="postShorten-title">
-                    
-                        <a class="link-unstyled" href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" aria-label=": 软考架构——数据库设计与建模.md">
-                            软考架构——数据库设计与建模.md
-                        </a>
-                    
-                </h1>
-                <div class="postShorten-meta">
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            软考架构——数据库设计与建模.md
+        </h1>
+    
+    
+        <div class="post-meta">
     <time datetime="2024-10-23T09:27:29+08:00">
 	
 		    2024 年 10 月 23 日
@@ -240,10 +245,13 @@
     
 </div>
 
-            </div>
-            
-                <div class="postShorten-content">
-                    <h2 id="一、数据库结构"><a href="# 一、数据库结构" class="headerlink" title="一、数据库结构"></a>一、数据库结构 </h2><p> 典型的数据库结构可归纳为“<strong>三级模式，两级映射</strong>”：</p>
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <h2 id="一、数据库结构"><a href="# 一、数据库结构" class="headerlink" title="一、数据库结构"></a>一、数据库结构 </h2><p> 典型的数据库结构可归纳为“<strong>三级模式，两级映射</strong>”：</p>
 <img src="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg" class title=" 数据库结构 ">
 
 <ul>
@@ -322,156 +330,72 @@
 </tr>
 </tbody></table>
 <h4 id="2- 设计范式"><a href="#2- 设计范式" class="headerlink" title="2. 设计范式"></a>2. 设计范式</h4>
-                    
-                        
+            
 
 
-                    
-                    
-                        <p>
-                            <a href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/#post-footer" class="postShorten-excerpt_link link" aria-label>
-                                评论和共享
-                            </a>
-                        </p>
-                    
-                </div>
             
         </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
         
-    </article>
-    
-    
-    <article class="postShorten postShorten--thumbnailimg-right">
-        <div class="postShorten-wrap">
-            
-            <div class="postShorten-header">
-                <h1 class="postShorten-title">
-                    
-                        <a class="link-unstyled" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%B3%95%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" aria-label=": 系统分析与设计方法：结构化与面向对象">
-                            系统分析与设计方法：结构化与面向对象
-                        </a>
-                    
-                </h1>
-                <div class="postShorten-meta">
-    <time datetime="2024-10-11T16:37:02+08:00">
-	
-		    2024 年 10 月 11 日
-    	
-    </time>
-    
-</div>
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%8C%83%E5%BC%8F/" rel="tag">数据库范式</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1/" rel="tag">数据库设计</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/" rel="tag">软件工程</a>
 
             </div>
-            
-                <div class="postShorten-excerpt">
-                    <p>结构化方法和面向对象方法，是系统分析与设计的两种主要方法</p>
-                    
-                        <a href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%B3%95%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" class="postShorten-excerpt_link link" aria-label=": 系统分析与设计方法：结构化与面向对象">
-                            阅读全文
-                        </a>
-                        
-                    
-                </div>
-            
-        </div>
         
-    </article>
-    
-    
-    <article class="postShorten postShorten--thumbnailimg-right">
-        <div class="postShorten-wrap">
-            
-            <div class="postShorten-header">
-                <h1 class="postShorten-title">
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
                     
-                        <a class="link-unstyled" href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" aria-label=": 软考架构——系统分析与设计：结构化与面向对象">
-                            软考架构——系统分析与设计：结构化与面向对象
-                        </a>
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%B3%95%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" data-tooltip="系统分析与设计方法：结构化与面向对象" aria-label="下一篇: 系统分析与设计方法：结构化与面向对象">
                     
-                </h1>
-                <div class="postShorten-meta">
-    <time datetime="2024-10-11T16:37:02+08:00">
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
 	
-		    2024 年 10 月 11 日
-    	
-    </time>
-    
-        <span>发布在 </span>
-        
-    <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/">软考</a>, <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a>
-
-
-    
-</div>
-
-            </div>
+        <li class="post-action">
             
-                <div class="postShorten-excerpt">
-                    <p>结构化方法和面向对象方法，是系统分析与设计的两种主要方法</p>
-                    
-                        <a href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" class="postShorten-excerpt_link link" aria-label=": 软考架构——系统分析与设计：结构化与面向对象">
-                            阅读全文
-                        </a>
-                        
-                    
-                </div>
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
             
-        </div>
-        
-    </article>
-    
-    
-    <article class="postShorten postShorten--thumbnailimg-right">
-        <div class="postShorten-wrap">
-            
-            <div class="postShorten-header">
-                <h1 class="postShorten-title">
-                    
-                        <a class="link-unstyled" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/" aria-label=": ClusterFuzz 源码分析（二）">
-                            ClusterFuzz 源码分析（二）
-                        </a>
-                    
-                </h1>
-                <div class="postShorten-meta">
-    <time datetime="2024-10-10T13:25:07+08:00">
-	
-		    2024 年 10 月 10 日
-    	
-    </time>
-    
-        <span>发布在 </span>
-        
-    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/">模糊测试</a>
-
-
-    
-</div>
-
-            </div>
-            
-                <div class="postShorten-excerpt">
-                    <p>ClusterFuzz 启动 server 和 bot 的源码分析</p>
-                    
-                        <a href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/" class="postShorten-excerpt_link link" aria-label=": ClusterFuzz 源码分析（二）">
-                            阅读全文
-                        </a>
-                        
-                    
-                </div>
-            
-        </div>
-        
-    </article>
-    
-    <div class="pagination-bar">
-    <ul class="pagination">
-        
-        
-        <li class="pagination-number">第 1 页 共 1 页</li>
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
     </ul>
 </div>
 
-</section>
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
 
 
 
@@ -482,6 +406,52 @@
 </footer>
 
             </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%B3%95%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" data-tooltip="系统分析与设计方法：结构化与面向对象" aria-label="下一篇: 系统分析与设计方法：结构化与面向对象">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
             
         </div>
         
@@ -531,6 +501,25 @@
 
 <!--SCRIPTS END-->
 
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/软考架构——数据库设计与建模/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
 
 
 
