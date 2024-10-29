@@ -7,27 +7,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="generator" content="千里之行，始于足下">
-    <title>标签: 数据库范式 - 千里之行，始于足下</title>
+    <title>软考架构——数据库的控制功能 - 千里之行，始于足下</title>
     <meta name="author" content="一瓢清浅">
     
         <meta name="keywords" content="python,AI,安全,算法,编程,">
     
     
     
-    <script type="application/ld+json">{}</script>
-    <meta name="description" content="个人技术博客，涉及编程(python，c++)、安全测试、Web开发、AI算法等IT领域">
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"","dateCreated":"2024-10-28T16:27:57+08:00","dateModified":"2024-10-28T16:28:56+08:00","datePublished":"2024-10-28T16:27:57+08:00","description":" 数据库的并发控制、性能优化、以及备份和恢复 ","headline":"软考架构——数据库的控制功能","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/","keywords":"软件工程, 数据库设计, 数据库范式"}</script>
+    <meta name="description" content="数据库的并发控制、性能优化、以及备份和恢复">
 <meta property="og:type" content="blog">
-<meta property="og:title" content="千里之行，始于足下">
-<meta property="og:url" content="https://www.stepbystep.asia/tags/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%8C%83%E5%BC%8F/index.html">
+<meta property="og:title" content="软考架构——数据库的控制功能">
+<meta property="og:url" content="https://www.stepbystep.asia/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
-<meta property="og:description" content="个人技术博客，涉及编程(python，c++)、安全测试、Web开发、AI算法等IT领域">
+<meta property="og:description" content="数据库的并发控制、性能优化、以及备份和恢复">
 <meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2024-10-28T08:27:57.000Z">
+<meta property="article:modified_time" content="2024-10-28T08:28:56.481Z">
 <meta property="article:author" content="一瓢清浅">
-<meta property="article:tag" content="python">
-<meta property="article:tag" content="AI">
-<meta property="article:tag" content="安全">
-<meta property="article:tag" content="算法">
-<meta property="article:tag" content="编程">
+<meta property="article:tag" content="软件工程">
+<meta property="article:tag" content="数据库设计">
+<meta property="article:tag" content="数据库范式">
 <meta name="twitter:card" content="summary">
     
     
@@ -49,6 +49,12 @@
     
 
     
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
 </head>
 
     <body>
@@ -56,7 +62,7 @@
             <!-- Define author's picture -->
 
 
-<header id="header" data-behavior="2">
+<header id="header" data-behavior="5">
     <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
     <div class="header-title">
         <a class="header-title-link" href="/" aria-label>
@@ -81,7 +87,7 @@
         
     
 
-<nav id="sidebar" data-behavior="2">
+<nav id="sidebar" data-behavior="5">
     <div class="sidebar-container">
         
             <div class="sidebar-profile">
@@ -156,7 +162,7 @@
 </nav>
 
             
-            <div id="main" data-behavior="2" class="
+            <div id="main" data-behavior="5" class="
                         hasCoverMetaIn
                         ">
                 
@@ -211,21 +217,17 @@
     <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
 
                 
-    <section class="postShorten-group main-content-wrap">
+<article class="post">
     
     
-    <article class="postShorten postShorten--thumbnailimg-right">
-        <div class="postShorten-wrap">
-            
-            <div class="postShorten-header">
-                <h1 class="postShorten-title">
-                    
-                        <a class="link-unstyled" href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" aria-label=": 软考架构——数据库的控制功能">
-                            软考架构——数据库的控制功能
-                        </a>
-                    
-                </h1>
-                <div class="postShorten-meta">
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            软考架构——数据库的控制功能
+        </h1>
+    
+    
+        <div class="post-meta">
     <time datetime="2024-10-28T16:27:57+08:00">
 	
 		    2024 年 10 月 28 日
@@ -240,74 +242,80 @@
     
 </div>
 
-            </div>
-            
-                <div class="postShorten-excerpt">
-                    <p> 数据库的并发控制、性能优化、以及备份和恢复 </p>
-                    
-                        <a href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" class="postShorten-excerpt_link link" aria-label=": 软考架构——数据库的控制功能">
-                            阅读全文
-                        </a>
-                        
-                    
-                </div>
-            
-        </div>
-        
-    </article>
-    
-    
-    <article class="postShorten postShorten--thumbnailimg-right">
-        <div class="postShorten-wrap">
-            
-            <div class="postShorten-header">
-                <h1 class="postShorten-title">
-                    
-                        <a class="link-unstyled" href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" aria-label=": 软考架构——数据库设计与建模">
-                            软考架构——数据库设计与建模
-                        </a>
-                    
-                </h1>
-                <div class="postShorten-meta">
-    <time datetime="2024-10-23T09:27:29+08:00">
-	
-		    2024 年 10 月 23 日
-    	
-    </time>
-    
-        <span>发布在 </span>
-        
-    <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/">软考</a>, <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a>
-
-
     
 </div>
 
-            </div>
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
             
-                <div class="postShorten-excerpt">
-                    <p>数据库的概念设计和逻辑设计</p>
-                    
-                        <a href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" class="postShorten-excerpt_link link" aria-label=": 软考架构——数据库设计与建模">
-                            阅读全文
-                        </a>
-                        
-                    
-                </div>
+
+
             
         </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
         
-    </article>
-    
-    <div class="pagination-bar">
-    <ul class="pagination">
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%8C%83%E5%BC%8F/" rel="tag">数据库范式</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1/" rel="tag">数据库设计</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/" rel="tag">软件工程</a>
+
+            </div>
         
         
-        <li class="pagination-number">第 1 页 共 1 页</li>
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" data-tooltip="软考架构——数据库设计与建模" aria-label="下一篇: 软考架构——数据库设计与建模">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
     </ul>
 </div>
 
-</section>
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
 
 
                 <footer id="footer" class="main-content-wrap">
@@ -317,6 +325,52 @@
 </footer>
 
             </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E8%BD%AF%E8%80%83%E6%9E%B6%E6%9E%84%E2%80%94%E2%80%94%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" data-tooltip="软考架构——数据库设计与建模" aria-label="下一篇: 软考架构——数据库设计与建模">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
             
         </div>
         
@@ -366,6 +420,25 @@
 
 <!--SCRIPTS END-->
 
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/软考架构——数据库的控制功能/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
 
 
 
