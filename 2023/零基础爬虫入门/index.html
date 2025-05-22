@@ -1,0 +1,608 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>零基础爬虫入门 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、原理介绍  网络爬虫，是一种自动浏览网络的计算机程序，即通过指定 URL，直接返回对应网页的数据，而不需要人工点击浏览器链接来获取。不论是机器还是人工，从提交 URL 到看到网页，通常都包含以下步骤：\n\n查找域名对应的服务器地址，向服务器发送请求\n\n服务器响应请求，返回对应网页\n\n解析网页，存储或展示网页内容\n\n\n因此，一个爬虫应该具有抓取、解析、存储三大基本功能：\n\n抓取  是指爬虫需要模拟浏览器，向服务器发起访问请求，并获取服务器返回的响应。\n\n解析  是指爬虫对抓取到的响应体进行解析，从中提取出需要的数据。\n\n存储  是指爬虫将解析出来的数据保存到磁盘或数据库中。\n\n\n\n\nPython 是一种强大而易学的高级编程语言，因为其广泛的通用性，又被称为“万能的胶水语言”。在爬虫方面，Python 提供了丰富的工具库，利用这些工具库，我们可以快速地实现一些爬虫小程序。\n以下列举一些爬虫常用的 Python 库，后续爬虫实践中会用这些库中的部分功能，若要精通这些库的使用，请自行阅读相关文档 ^-^\n1. 请求库\n\nurllib（https://docs.python.org/3/library/urllib.html）\n\nrequests（http://docs.python-requests.org/en/master/）\n\n\n2. 解析库\n\nlxml（https://lxml.de/）\n\nBeautiful Soup（https://www.crummy.com/software/BeautifulSoup/bs4/doc/）\n\n\n3. 存储库\n\nPyMySQL（https://pymysql.readthedocs.io/en/latest/）\n\nPyMongo（https://api.mongodb.com/python/current/）\n\n\n4. 全栈框架\n\nScrapy（https://docs.scrapy.org/en/latest/）\n\n二、相关知识 1. HTTP 基本原理 在浏览器地址栏输入网址，按一下回车键，就可以跳转到我们想要浏览的页面。这是我们日常上网时最常见的操作，这一项看似简单的操作背后蕴含了 HTTP 的基本原理：\n\n\n任何网页在互联网上都有唯一的资源定位，即统一资源定位符（URL）。URL 与网页一一对应，也是访问网页的唯一方式。因此，当我们想在 PC 上浏览一个网页时，我们需要告诉浏览器目标网页的 URL。浏览器在根据我们提供的 URL 找出网页所在的服务器，并向服务器发起访问请求 Request。服务器在接收到请求后，对请求作出响应 Response，返回网页的 HTML 源代码。客户端浏览器接收到 HTML 源代码后，通过对代码进行解析得到我们在浏览器中看到的网页。\nChrome 浏览器提供了一套 Web 开发和调试的工具，通常称为 Chrome 开发者工具，在 Chrome 中打开网页，右键菜单中单击  检查，或者按下 F12 键，都可以进入开发者工具。关于 Chrome 开发者工具的使用见后续章节，这里只介绍利用开发者工具展示访问网页时的请求和响应。\n以 Google 首页为例，按 F12 进入开发者工具，点击 Network 后，在左侧 Name 列表中选取 www.google.com，右侧面板中Headers 栏目下列出了请求 Request 和响应 Response 的头信息。除了头信息，请求 Request 和响应 Response 还包含其他信息。\n\n\n2. 请求 Request请求由客户端发送给服务端，主要包含四部分内容：请求方式（Request Method）、请求链接（Request URL）、请求头（Request Headers）、请求体（Request Body）。\n(1) 请求方式  常见的请求方式有 GET 和 POST 两种：\n\nGET：从指定的资源请求数据\nPOST：向指定的资源提交要被处理的数据\n\n\n\n\nHTTP 方法：GET 对比 POST\n\n(2) 请求链接  请求网页的 URL\n(3) 请求头  请求头是客户端传递给服务器的请求相关的附加信息，常见信息列表如下：\n\n\n(4) 请求体  对于 GET 请求，Request Body 一般为空。对于 POST 请求，Request Body 通常以表单数据 Form Data 的形式提交给服务器。\n3. 响应 Response响应由服务器返回给客户端，主要包含三部分内容：响应状态码（Response Status Code）、响应头（Response Headers）、响应体（Response Body）。\n(1) 响应状态码  响应状态码表示服务器的响应状态。200 表示服务器正常响应，成功返回数据。常见状态码列举如下：\n \n\n(2) 响应头  响应头是服务器传递给客户端的响应相关的附加信息，常见信息列表如下：\n \n\n(3) 响应体  响应体是响应最重要的主体部分，服务器返回的网页数据都包含在响应体中。通过对响应体进行解析，就可以得到我们想要的网页内容。\n三、HTML 语言基础1. HTML 简介HTML（Hyper Text Markup Language）称为超文本标记语言，它使用一套标签来标识网页中文字、按钮、表格、图片、视频等复杂的元素，以及网页中各区块的层次、样式等丰富的格式。\nHTML 标签通常是由尖括号括起来的小写关键词，且成对出现，例如  和，第一个标签是开始标签，第二个标签是结束标签。从开始标签到结束标签构成一个元素，两个标签之间的内容称为元素的内容，HTML 的元素是可以嵌套的。\nHTML 标签定义了元素的类型，常见标签列举如下表：\n\n\n\n为了更丰富地表达元素，HTML 可以为标签设置多种属性。在 HTML 元素的开始标签中，通过 ** 属性名 &#x3D;”属性值”** 这种键值对的方式，为元素定义更多的附加信息。通用属性列举如下：\n\n\n\n注：完整的 HTML 标签和属性参见： HTML 参考手册\n2. HTML 选择器HTML 选择器用来从 HTML 源码中提取目标元素，常用的两种选择器为 CSS 选择器和 XPath 选择器。Chrome 开发者工具提供了定位目标元素以及测试选择器的功能。\n定位目标元素 ：首先点击左上角的小箭头，然后移动鼠标，指向网页上的目标元素，此时Elements 面板中将高亮该目标元素对应的 HTML 源码。\n\n\n\n测试选择器：点击Console，切换到控制台面板，在命令行输入选择器，即可查看提取结果：CSS 格式为 $(‘CSS 选择器’)，XPath 格式为 $x(‘XPath 选择器’)。\n\n\n\n(1) CSS 选择器  常见的 CSS 选择器如下：\n\n\n注：完整的 CSS 选择器参见： CSS 选择器参考手册\n(2) XPath 选择器XML(Extentsible Markup Language)，即可扩展标记语言，也采用一组标签来定义数据，形式与 HTML 非常相似，与 HTML 最大的区别在于 XML 的标签可以自定义。\n注：关于 XML 的更多内容参见：XML 教程\nXPath(XML Path Language)，即 XML 路径语言，最初设计是为了在 XML 文件中查找信息，现在也支持在 HTML 中进行搜索。XPath 定义了 7 种类型的文档节点：元素、属性、文本、命名空间、处理指令、注释以及文档节点，并使用路径表达式在文档中选取节点。\n常见的 Xpath 路径表达式如下：\n\n\n\n注：XPath 教程参见：XPath 教程\n(3) CSS 与 XPath 比较  对比 CSS 选择器与 XPath 选择器，CSS 选择器通常具有更简洁的表达，XPath 选择器则具有更强大的灵活性。\n\n\n\n[译]XPath 和 CSS 选择器 - 紫云飞 - 博客园\n","dateCreated":"2023-01-08T14:05:37+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2023-01-08T14:05:37+08:00","description":"从零开始学爬虫","headline":"零基础爬虫入门","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/","keywords":"Python, Web, 爬虫"}</script>
+    <meta name="description" content="从零开始学爬虫">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="零基础爬虫入门">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="从零开始学爬虫">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E7%88%AC%E8%99%AB%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/HTTP%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/Chrome%E5%BC%80%E5%8F%91%E8%80%85%E5%B7%A5%E5%85%B7.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/GET%E5%92%8CPOST%E5%AF%B9%E6%AF%94.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E8%AF%B7%E6%B1%82%E5%A4%B4.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81%E7%A0%81.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E5%93%8D%E5%BA%94%E5%A4%B4.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/HTML%E5%B8%B8%E8%A7%81%E6%A0%87%E7%AD%BE.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/HTML%E9%80%9A%E7%94%A8%E5%B1%9E%E6%80%A7.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/Chrome%E5%AE%9A%E4%BD%8D%E5%85%83%E7%B4%A0.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/Chrome%E6%B5%8B%E8%AF%95%E9%80%89%E6%8B%A9%E5%99%A8.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/CSS%E5%B8%B8%E7%94%A8%E9%80%89%E6%8B%A9%E5%99%A8.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/XPath%E5%B8%B8%E7%94%A8%E8%B7%AF%E5%BE%84.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/CSS%E4%B8%8EXPath%E6%AF%94%E8%BE%83.png">
+<meta property="article:published_time" content="2023-01-08T06:05:37.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.879Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Web">
+<meta property="article:tag" content="爬虫">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E7%88%AC%E8%99%AB%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86.png">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            零基础爬虫入门
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2023-01-08T14:05:37+08:00">
+	
+		    2023 年 1 月 8 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/">开发</a>, <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/%E7%88%AC%E8%99%AB/">爬虫</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="一、原理介绍"><a href="# 一、原理介绍" class="headerlink" title="一、原理介绍"></a>一、原理介绍 </h2><p> 网络爬虫，是一种自动浏览网络的计算机程序，即通过指定 URL，直接返回对应网页的数据，而不需要人工点击浏览器链接来获取。不论是机器还是人工，从提交 URL 到看到网页，通常都包含以下步骤：</p>
+<ol>
+<li><p>查找域名对应的服务器地址，向服务器发送请求</p>
+</li>
+<li><p>服务器响应请求，返回对应网页</p>
+</li>
+<li><p>解析网页，存储或展示网页内容</p>
+</li>
+</ol>
+<p>因此，一个爬虫应该具有抓取、解析、存储三大基本功能：</p>
+<ul>
+<li><p><strong>抓取 </strong> 是指爬虫需要模拟浏览器，向服务器发起访问请求，并获取服务器返回的响应。</p>
+</li>
+<li><p><strong>解析 </strong> 是指爬虫对抓取到的响应体进行解析，从中提取出需要的数据。</p>
+</li>
+<li><p><strong>存储 </strong> 是指爬虫将解析出来的数据保存到磁盘或数据库中。</p>
+</li>
+</ul>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E7%88%AC%E8%99%AB%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86.png" class title=" 爬虫基本原理 ">
+
+<p>Python 是一种强大而易学的高级编程语言，因为其广泛的通用性，又被称为“万能的胶水语言”。在爬虫方面，Python 提供了丰富的工具库，利用这些工具库，我们可以快速地实现一些爬虫小程序。</p>
+<p>以下列举一些爬虫常用的 Python 库，后续爬虫实践中会用这些库中的部分功能，若要精通这些库的使用，请自行阅读相关文档 ^-^</p>
+<p><strong>1. 请求库</strong></p>
+<ul>
+<li><p>urllib（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://docs.python.org/3/library/urllib.html">https://docs.python.org/3/library/urllib.html</a>）</p>
+</li>
+<li><p>requests（<a target="_blank" rel="external nofollow noopener noreferrer" href="http://docs.python-requests.org/en/master/">http://docs.python-requests.org/en/master/</a>）</p>
+</li>
+</ul>
+<p><strong>2. 解析库</strong></p>
+<ul>
+<li><p>lxml（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://lxml.de/">https://lxml.de/</a>）</p>
+</li>
+<li><p>Beautiful Soup（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.crummy.com/software/BeautifulSoup/bs4/doc/">https://www.crummy.com/software/BeautifulSoup/bs4/doc/</a>）</p>
+</li>
+</ul>
+<p><strong>3. 存储库</strong></p>
+<ul>
+<li><p>PyMySQL（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://pymysql.readthedocs.io/en/latest/">https://pymysql.readthedocs.io/en/latest/</a>）</p>
+</li>
+<li><p>PyMongo（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://api.mongodb.com/python/current/">https://api.mongodb.com/python/current/</a>）</p>
+</li>
+</ul>
+<p><strong>4. 全栈框架</strong></p>
+<ul>
+<li>Scrapy（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://docs.scrapy.org/en/latest/">https://docs.scrapy.org/en/latest/</a>）</li>
+</ul>
+<h2 id="二、相关知识"><a href="# 二、相关知识" class="headerlink" title="二、相关知识"></a>二、相关知识 </h2><h3 id="1-HTTP 基本原理"><a href="#1-HTTP 基本原理" class="headerlink" title="1. HTTP 基本原理"></a>1. HTTP 基本原理</h3><p> 在浏览器地址栏输入网址，按一下回车键，就可以跳转到我们想要浏览的页面。这是我们日常上网时最常见的操作，这一项看似简单的操作背后蕴含了 HTTP 的基本原理：</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/HTTP%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86.png" class title="HTTP 基本原理 ">
+
+<p>任何网页在互联网上都有唯一的资源定位，即统一资源定位符（URL）。URL 与网页一一对应，也是访问网页的唯一方式。因此，当我们想在 PC 上浏览一个网页时，我们需要告诉浏览器目标网页的 URL。浏览器在根据我们提供的 URL 找出网页所在的服务器，并向服务器发起访问请求 Request。服务器在接收到请求后，对请求作出响应 Response，返回网页的 HTML 源代码。客户端浏览器接收到 HTML 源代码后，通过对代码进行解析得到我们在浏览器中看到的网页。</p>
+<p>Chrome 浏览器提供了一套 Web 开发和调试的工具，通常称为 Chrome 开发者工具，在 Chrome 中打开网页，右键菜单中单击 <code> 检查</code>，或者按下 F12 键，都可以进入开发者工具。关于 Chrome 开发者工具的使用见后续章节，这里只介绍利用开发者工具展示访问网页时的请求和响应。</p>
+<p>以 Google 首页为例，按 F12 进入开发者工具，点击 <code>Network</code> 后，在左侧 <code>Name</code> 列表中选取 <code>www.google.com</code>，右侧面板中<code>Headers</code> 栏目下列出了请求 Request 和响应 Response 的头信息。除了头信息，请求 Request 和响应 Response 还包含其他信息。</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/Chrome%E5%BC%80%E5%8F%91%E8%80%85%E5%B7%A5%E5%85%B7.png" class title="Chrome 开发者工具 ">
+
+<h3 id="2- 请求 -Request"><a href="#2- 请求 -Request" class="headerlink" title="2. 请求 Request"></a>2. 请求 Request</h3><p>请求由客户端发送给服务端，主要包含四部分内容：请求方式（Request Method）、请求链接（Request URL）、请求头（Request Headers）、请求体（Request Body）。</p>
+<h4 id="1- 请求方式"><a href="#1- 请求方式" class="headerlink" title="(1) 请求方式"></a>(1) 请求方式 </h4><p> 常见的请求方式有 GET 和 POST 两种：</p>
+<ul>
+<li>GET：从指定的资源请求数据</li>
+<li>POST：向指定的资源提交要被处理的数据</li>
+</ul>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/GET%E5%92%8CPOST%E5%AF%B9%E6%AF%94.png" class title="GET 和 POST 对比 ">
+
+<blockquote>
+<p><a target="_blank" rel="external nofollow noopener noreferrer" href="http://www.w3school.com.cn/tags/html_ref_httpmethods.asp">HTTP 方法：GET 对比 POST</a></p>
+</blockquote>
+<h4 id="2- 请求链接"><a href="#2- 请求链接" class="headerlink" title="(2) 请求链接"></a>(2) 请求链接 </h4><p> 请求网页的 URL</p>
+<h4 id="3- 请求头"><a href="#3- 请求头" class="headerlink" title="(3) 请求头"></a>(3) 请求头 </h4><p> 请求头是客户端传递给服务器的请求相关的附加信息，常见信息列表如下：</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E8%AF%B7%E6%B1%82%E5%A4%B4.png" class title=" 请求头 ">
+
+<h4 id="4- 请求体"><a href="#4- 请求体" class="headerlink" title="(4) 请求体"></a>(4) 请求体 </h4><p> 对于 GET 请求，Request Body 一般为空。对于 POST 请求，Request Body 通常以表单数据 Form Data 的形式提交给服务器。</p>
+<h3 id="3- 响应 -Response"><a href="#3- 响应 -Response" class="headerlink" title="3. 响应 Response"></a>3. 响应 Response</h3><p>响应由服务器返回给客户端，主要包含三部分内容：响应状态码（Response Status Code）、响应头（Response Headers）、响应体（Response Body）。</p>
+<h4 id="1- 响应状态码"><a href="#1- 响应状态码" class="headerlink" title="(1) 响应状态码"></a>(1) 响应状态码 </h4><p> 响应状态码表示服务器的响应状态。200 表示服务器正常响应，成功返回数据。常见状态码列举如下：</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81%E7%A0%81.png" class title=" 响应状态码 "> 
+
+<h4 id="2- 响应头"><a href="#2- 响应头" class="headerlink" title="(2) 响应头"></a>(2) 响应头 </h4><p> 响应头是服务器传递给客户端的响应相关的附加信息，常见信息列表如下：</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/%E5%93%8D%E5%BA%94%E5%A4%B4.png" class title=" 响应头 "> 
+
+<h4 id="3- 响应体"><a href="#3- 响应体" class="headerlink" title="(3) 响应体"></a>(3) 响应体 </h4><p> 响应体是响应最重要的主体部分，服务器返回的网页数据都包含在响应体中。通过对响应体进行解析，就可以得到我们想要的网页内容。</p>
+<h2 id="三、HTML 语言基础"><a href="# 三、HTML 语言基础" class="headerlink" title="三、HTML 语言基础"></a>三、HTML 语言基础</h2><h3 id="1-HTML 简介"><a href="#1-HTML 简介" class="headerlink" title="1. HTML 简介"></a>1. HTML 简介</h3><p>HTML（Hyper Text Markup Language）称为超文本标记语言，它使用一套标签来标识网页中文字、按钮、表格、图片、视频等复杂的元素，以及网页中各区块的层次、样式等丰富的格式。</p>
+<p>HTML 标签通常是由尖括号括起来的小写关键词，且成对出现，例如 <html> 和</html>，第一个标签是开始标签，第二个标签是结束标签。从开始标签到结束标签构成一个元素，两个标签之间的内容称为元素的内容，HTML 的元素是可以嵌套的。</p>
+<p>HTML 标签定义了元素的类型，常见标签列举如下表：</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/HTML%E5%B8%B8%E8%A7%81%E6%A0%87%E7%AD%BE.png" class title="HTML 常见标签 ">
+
+
+<p>为了更丰富地表达元素，HTML 可以为标签设置多种属性。在 HTML 元素的开始标签中，通过 ** 属性名 &#x3D;”属性值”** 这种键值对的方式，为元素定义更多的附加信息。通用属性列举如下：</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/HTML%E9%80%9A%E7%94%A8%E5%B1%9E%E6%80%A7.png" class title="HTML 通用属性 ">
+
+
+<p>注：完整的 HTML 标签和属性参见： <a target="_blank" rel="external nofollow noopener noreferrer" href="http://www.w3school.com.cn/tags/index.asp">HTML 参考手册</a></p>
+<h3 id="2-HTML 选择器"><a href="#2-HTML 选择器" class="headerlink" title="2. HTML 选择器"></a>2. HTML 选择器</h3><p>HTML 选择器用来从 HTML 源码中提取目标元素，常用的两种选择器为 CSS 选择器和 XPath 选择器。Chrome 开发者工具提供了定位目标元素以及测试选择器的功能。</p>
+<p><strong>定位目标元素 </strong>：首先点击左上角的小箭头，然后移动鼠标，指向网页上的目标元素，此时<code>Elements</code> 面板中将高亮该目标元素对应的 HTML 源码。</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/Chrome%E5%AE%9A%E4%BD%8D%E5%85%83%E7%B4%A0.png" class title="Chrome 定位元素 ">
+
+
+<p><strong>测试选择器</strong>：点击<code>Console</code>，切换到控制台面板，在命令行输入选择器，即可查看提取结果：CSS 格式为 $(‘CSS 选择器’)，XPath 格式为 $x(‘XPath 选择器’)。</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/Chrome%E6%B5%8B%E8%AF%95%E9%80%89%E6%8B%A9%E5%99%A8.png" class title="Chrome 测试选择器 ">
+
+
+<h4 id="1-CSS 选择器"><a href="#1-CSS 选择器" class="headerlink" title="(1) CSS 选择器"></a>(1) CSS 选择器 </h4><p> 常见的 CSS 选择器如下：</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/CSS%E5%B8%B8%E7%94%A8%E9%80%89%E6%8B%A9%E5%99%A8.png" class title="CSS 常用选择器 ">
+
+<p>注：完整的 CSS 选择器参见： <a target="_blank" rel="external nofollow noopener noreferrer" href="http://www.w3school.com.cn/cssref/css_selectors.asp">CSS 选择器参考手册</a></p>
+<h4 id="2-XPath 选择器"><a href="#2-XPath 选择器" class="headerlink" title="(2) XPath 选择器"></a>(2) XPath 选择器</h4><p>XML(Extentsible Markup Language)，即可扩展标记语言，也采用一组标签来定义数据，形式与 HTML 非常相似，与 HTML 最大的区别在于 XML 的标签可以自定义。</p>
+<p>注：关于 XML 的更多内容参见：<a target="_blank" rel="external nofollow noopener noreferrer" href="http://www.w3school.com.cn/xml/index.asp">XML 教程</a></p>
+<p>XPath(XML Path Language)，即 XML 路径语言，最初设计是为了在 XML 文件中查找信息，现在也支持在 HTML 中进行搜索。XPath 定义了 7 种类型的文档节点：元素、属性、文本、命名空间、处理指令、注释以及文档节点，并使用路径表达式在文档中选取节点。</p>
+<p>常见的 Xpath 路径表达式如下：</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/XPath%E5%B8%B8%E7%94%A8%E8%B7%AF%E5%BE%84.png" class title="XPath 常用路径 ">
+
+
+<p>注：XPath 教程参见：<a target="_blank" rel="external nofollow noopener noreferrer" href="http://www.w3school.com.cn/xpath/index.asp">XPath 教程</a></p>
+<h4 id="3-CSS 与 XPath 比较"><a href="#3-CSS 与 XPath 比较" class="headerlink" title="(3) CSS 与 XPath 比较"></a>(3) CSS 与 XPath 比较 </h4><p> 对比 CSS 选择器与 XPath 选择器，CSS 选择器通常具有更简洁的表达，XPath 选择器则具有更强大的灵活性。</p>
+<img src="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/CSS%E4%B8%8EXPath%E6%AF%94%E8%BE%83.png" class title="CSS 与 XPath 比较 ">
+
+<blockquote>
+<p><a target="_blank" rel="external nofollow noopener noreferrer" href="http://www.cnblogs.com/ziyunfei/archive/2012/10/05/2710631.html">[译]XPath 和 CSS 选择器 - 紫云飞 - 博客园</a></p>
+</blockquote>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/Python/" rel="tag">Python</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/Web/" rel="tag">Web</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E7%88%AC%E8%99%AB/" rel="tag">爬虫</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E6%99%BA%E8%83%BD%E6%8C%87%E9%92%88/" data-tooltip="C++ 智能指针：shared_ptr 和 weak_ptr" aria-label="上一篇: C++ 智能指针：shared_ptr 和 weak_ptr">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E6%99%BA%E8%83%BD%E6%8C%87%E9%92%88/" data-tooltip="C++ 智能指针：shared_ptr 和 weak_ptr" aria-label="上一篇: C++ 智能指针：shared_ptr 和 weak_ptr">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2023/零基础爬虫入门/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

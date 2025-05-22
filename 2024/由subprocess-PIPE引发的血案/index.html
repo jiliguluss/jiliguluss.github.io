@@ -1,0 +1,522 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>由 subprocess.PIPE 引发的血案 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、案发现场  事情是酱滴：\n我写了个 python 脚本，在脚本中通过 subprocess 启动了 AFL++ 的子进程，对 binary 进行测试。\n然后我还在这个 python 脚本中，使用其他的工具生成针对 binary 有效的 corpus。\n参考前文AFL++ 同步机制，正常情况下 AFL++ 会将其他工具生成的 corpus（已确认能覆盖新的代码分支），同步到 AFL++ 的 queue 目录下。\n但是诡异的事情出现了：AFL++ 没有同步！\n二、破案过程 1. 还原现场 这个 AFL++ 不同步的情况不是必现的，非必现的问题真 TM 难调。\n我换了好几个机器，在 host 和 docker 上分别进行了多轮实验，前前后后跑了一两周的时间，排除了环境问题。虽然有的环境概率高，有的环境概率低，但只要跑的次数够多，都会出现 AFL++ 不同步的问题。\n2. 埋 log在反复跑实验的过程中，也有在 AFL++ 源码中埋 log。\n我在 sync_fuzzers 函数体内，以及调用之处加了很多 log。sync_fuzzers在 afl-fuzz.c 的main函数中有四处调用，编号 1~4 表示在代码中的先后顺序，实际调用流程大概如下：\nflowchart TD\n    A[main] --> B[stop_fuzzing]\n    B --> C[sync_fuzzers 4]\n    A --> D[while loop]\n    D --> E[sync_fuzzers 1]\n    E --> F[do-while loop]\n    F --> G[sync_fuzzers 2]\n    F --> H[sync_fuzzers 3]\n    H --> D\n    G --> D\n通过 log 发现，AFL++ 在同步 corpus 时，主要使用过 sync_fuzzers 1 来完成的。而在未同步的场景中，log 会在 do-while loop 里面中断，后续再也没有打印出sync_fuzzers 1。\n3. gdb 追踪  当 log 也印不出来的时候，gdb 看起来是唯一能用的工具了。\n于是我找了个复现概率高的机器，在启动 python 脚本后，用 gdb attach 脚本所启动的 AFL++ 子进程，并在 sync_fuzzers 的 1~4 处调用都打了断点，接着让 AFL++ 继续跑。\n神奇的事情出现了，AFL++ 正常同步的时候，sync_fuzzers 1总是会命中。然而当跑一阵后，sync_fuzzers 1就再也到不了了。此时 ctrl+c 暂停程序，查看调用栈如下：\n\n\n其中 afl-fuzz-one.c 的 420 行的代码如下，只是调用了 flush 库函数而已：\n\n\n我将此行注释掉，重新 gdb 一次，结果发现会在另一个 flush 处卡住。\n在库函数面前，我们要质疑的是自己的代码。\n三、罪魁祸首  我回头检查了自己的 Python 脚本，启动 AFL++ 的代码如下：\n12345678910111213self.fuzzer_popen = sp.Popen(    cmd,    shell=False,    stdout=sp.PIPE,    stderr=sp.PIPE,    env=env,    preexec_fn=os.setsid,)time.sleep(5)if self.fuzzer_popen.poll() is not None:    raise Exception(f&#x27;start fuzz process failed with error: &#123;self.fuzzer_popen.stderr.read().decode(&quot;utf-8&quot;)&#125;&#x27;)else:    logger.info(f&#x27;start fuzz process whose pid is &#123;self.fuzzer_popen.pid&#125;&#x27;)\n\n我又去查了一下 subprocess 的官方文档，赫然写着 注意事项：\n\nNote This will deadlock when using stdout&#x3D;PIPE or stderr&#x3D;PIPE and the child process generates enough output to a pipe such that it blocks waiting for the OS pipe buffer to accept more data. Use Popen.communicate() when using pipes to avoid that.\n\n破案了破案了，我用了 PIPE 来接受 AFL++ 的 stdout 和 stderr，但是我没有通过 communicate 来读取 PIPE，导致PIPE 中积压了大量的数据，阻碍了 AFL++ 继续flush。\n我被自己蠢哭了，也被 subprocess 坑惨了，修改后的代码如下：\n12345678self.fuzzer_popen = sp.Popen(    cmd,    shell=False,    stdout=sp.DEVNULL,    stderr=sp.DEVNULL,    env=env,    preexec_fn=os.setsid,)\n\n去他娘的 stdout 和 stderr，改完后 AFL++ 同步都正常了~~","dateCreated":"2024-07-30T16:19:00+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-07-30T16:19:00+08:00","description":"找了大半个月 AFL++ 不同步的原因，到头来都是 subprocess 的锅","headline":"由 subprocess.PIPE 引发的血案","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/","keywords":"AFL++, Python"}</script>
+    <meta name="description" content="找了大半个月 AFL++ 不同步的原因，到头来都是 subprocess 的锅">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="由 subprocess.PIPE 引发的血案">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="找了大半个月 AFL++ 不同步的原因，到头来都是 subprocess 的锅">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/gdb%E8%B0%83%E8%AF%95afl.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/afl-fuzz-one%E6%BA%90%E7%A0%81.png">
+<meta property="article:published_time" content="2024-07-30T08:19:00.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.726Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="AFL++">
+<meta property="article:tag" content="Python">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/gdb%E8%B0%83%E8%AF%95afl.png">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            由 subprocess.PIPE 引发的血案
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-07-30T16:19:00+08:00">
+	
+		    2024 年 7 月 30 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/">开发</a>, <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/">编程语言</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="一、案发现场"><a href="# 一、案发现场" class="headerlink" title="一、案发现场"></a>一、案发现场 </h2><p> 事情是酱滴：</p>
+<p>我写了个 python 脚本，在脚本中通过 subprocess 启动了 AFL++ 的子进程，对 binary 进行测试。</p>
+<p>然后我还在这个 python 脚本中，使用其他的工具生成针对 binary 有效的 corpus。</p>
+<p>参考前文<a href="../AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/index.html">AFL++ 同步机制</a>，正常情况下 AFL++ 会将其他工具生成的 corpus（已确认能覆盖新的代码分支），同步到 AFL++ 的 queue 目录下。</p>
+<p>但是诡异的事情出现了：AFL++ 没有同步！</p>
+<h2 id="二、破案过程"><a href="# 二、破案过程" class="headerlink" title="二、破案过程"></a>二、破案过程 </h2><p><strong>1. 还原现场</strong><br> 这个 AFL++ 不同步的情况不是必现的，非必现的问题真 TM 难调。</p>
+<p>我换了好几个机器，在 host 和 docker 上分别进行了多轮实验，前前后后跑了一两周的时间，排除了环境问题。虽然有的环境概率高，有的环境概率低，但只要跑的次数够多，都会出现 AFL++ 不同步的问题。</p>
+<p><strong>2. 埋 log</strong><br>在反复跑实验的过程中，也有在 AFL++ 源码中埋 log。</p>
+<p>我在 <code>sync_fuzzers</code> 函数体内，以及调用之处加了很多 log。<code>sync_fuzzers</code>在 <code>afl-fuzz.c</code> 的<code>main</code>函数中有四处调用，编号 1~4 表示在代码中的先后顺序，实际调用流程大概如下：</p>
+<pre class="mermaid">flowchart TD
+    A[main] --> B[stop_fuzzing]
+    B --> C[sync_fuzzers 4]
+    A --> D[while loop]
+    D --> E[sync_fuzzers 1]
+    E --> F[do-while loop]
+    F --> G[sync_fuzzers 2]
+    F --> H[sync_fuzzers 3]
+    H --> D
+    G --> D</pre>
+<p>通过 log 发现，AFL++ 在同步 corpus 时，主要使用过 <code>sync_fuzzers 1</code> 来完成的。而在未同步的场景中，log 会在 <code>do-while loop</code> 里面中断，后续再也没有打印出<code>sync_fuzzers 1</code>。</p>
+<p><strong>3. gdb 追踪 </strong><br> 当 log 也印不出来的时候，gdb 看起来是唯一能用的工具了。</p>
+<p>于是我找了个复现概率高的机器，在启动 python 脚本后，用 <code>gdb attach</code> 脚本所启动的 AFL++ 子进程，并在 <code>sync_fuzzers</code> 的 1~4 处调用都打了断点，接着让 AFL++ 继续跑。</p>
+<p>神奇的事情出现了，AFL++ 正常同步的时候，<code>sync_fuzzers 1</code>总是会命中。然而当跑一阵后，<code>sync_fuzzers 1</code>就再也到不了了。此时 <code>ctrl+c</code> 暂停程序，查看调用栈如下：</p>
+<img src="/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/gdb%E8%B0%83%E8%AF%95afl.png" class title="gdb 调试 afl">
+
+<p>其中 <code>afl-fuzz-one.c</code> 的 420 行的代码如下，只是调用了 <code>flush</code> 库函数而已：</p>
+<img src="/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/afl-fuzz-one%E6%BA%90%E7%A0%81.png" class title="afl-fuzz-one 源码 ">
+
+<p>我将此行注释掉，重新 gdb 一次，结果发现会在另一个 <code>flush</code> 处卡住。</p>
+<p>在库函数面前，我们要质疑的是自己的代码。</p>
+<h2 id="三、罪魁祸首"><a href="# 三、罪魁祸首" class="headerlink" title="三、罪魁祸首"></a>三、罪魁祸首 </h2><p> 我回头检查了自己的 Python 脚本，启动 AFL++ 的代码如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable language_">self</span>.fuzzer_popen = sp.Popen(</span><br><span class="line">    cmd,</span><br><span class="line">    shell=<span class="literal">False</span>,</span><br><span class="line">    stdout=sp.PIPE,</span><br><span class="line">    stderr=sp.PIPE,</span><br><span class="line">    env=env,</span><br><span class="line">    preexec_fn=os.setsid,</span><br><span class="line">)</span><br><span class="line">time.sleep(<span class="number">5</span>)</span><br><span class="line"><span class="keyword">if</span> <span class="variable language_">self</span>.fuzzer_popen.poll() <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span>:</span><br><span class="line">    <span class="keyword">raise</span> Exception(<span class="string">f&#x27;start fuzz process failed with error: <span class="subst">&#123;self.fuzzer_popen.stderr.read().decode(<span class="string">&quot;utf-8&quot;</span>)&#125;</span>&#x27;</span>)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    logger.info(<span class="string">f&#x27;start fuzz process whose pid is <span class="subst">&#123;self.fuzzer_popen.pid&#125;</span>&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>我又去查了一下 <a target="_blank" rel="external nofollow noopener noreferrer" href="https://docs.python.org/3/library/subprocess.html">subprocess 的官方文档</a>，赫然写着<strong> 注意事项</strong>：</p>
+<blockquote>
+<p>Note This will deadlock when using stdout&#x3D;PIPE or stderr&#x3D;PIPE and the child process generates enough output to a pipe such that it blocks waiting for the OS pipe buffer to accept more data. Use Popen.communicate() when using pipes to avoid that.</p>
+</blockquote>
+<p>破案了破案了，我用了 <code>PIPE</code> 来接受 AFL++ 的 stdout 和 stderr，但是我没有通过 <code>communicate</code> 来读取 <code>PIPE</code>，导致<code>PIPE</code> 中积压了大量的数据，阻碍了 AFL++ 继续<code>flush</code>。</p>
+<p>我被自己蠢哭了，也被 subprocess 坑惨了，修改后的代码如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable language_">self</span>.fuzzer_popen = sp.Popen(</span><br><span class="line">    cmd,</span><br><span class="line">    shell=<span class="literal">False</span>,</span><br><span class="line">    stdout=sp.DEVNULL,</span><br><span class="line">    stderr=sp.DEVNULL,</span><br><span class="line">    env=env,</span><br><span class="line">    preexec_fn=os.setsid,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>去他娘的 stdout 和 stderr，改完后 AFL++ 同步都正常了~~</p>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/AFL/" rel="tag">AFL++</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/Python/" rel="tag">Python</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E8%A6%86%E7%9B%96%E7%8E%87/" data-tooltip="AFL++ 源码分析——覆盖率" aria-label="上一篇: AFL++ 源码分析——覆盖率">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/" data-tooltip="AFL++ 源码分析——同步机制" aria-label="下一篇: AFL++ 源码分析——同步机制">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E8%A6%86%E7%9B%96%E7%8E%87/" data-tooltip="AFL++ 源码分析——覆盖率" aria-label="上一篇: AFL++ 源码分析——覆盖率">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/" data-tooltip="AFL++ 源码分析——同步机制" aria-label="下一篇: AFL++ 源码分析——同步机制">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/由subprocess-PIPE引发的血案/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

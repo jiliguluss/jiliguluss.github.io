@@ -1,0 +1,546 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>C++ 智能指针：shared_ptr 和 weak_ptr - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n引言C++ 中经常需要 new 一个对象，开辟一个内存空间，返回一个指针来操作这个内存。使用完毕之后，需要通过 delete 来释放内存空间。如果内存没有释放，那这块内存将无法再利用，导致内存泄漏。为降低人为疏忽，C++ 11 的新特性中引入了三种智能指针，来自动化地管理内存资源：\nunique_ptr: 管理的资源唯一的属于一个对象，但是支持将资源移动给其他 unique_ptr 对象。当拥有所有权的 unique_ptr 对象析构时，资源即被释放。\nshared_ptr: 管理的资源被多个对象共享，内部采用引用计数跟踪所有者的个数。当最后一个所有者被析构时，资源即被释放。\nweak_ptr: 与 shared_ptr 配合使用，虽然能访问资源但却不享有资源的所有权，不影响资源的引用计数。有可能资源已被释放，但 weak_ptr 仍然存在。因此每次访问资源时都需要判断资源是否有效。\n本文主要在循环引用的场景下探讨 shard_ptr 和 weak_ptr 原理。\n循环引用shared_ptr 通过引用计数的方式管理内存，当进行拷贝或赋值操作时，每个 shared_ptr 都会记录有多少个其他的 shared_ptr 指向相同的对象，当引用计数为 0 时，内存将被自动释放。\n12auto p = make_shared&lt;int&gt;(10); // 创建一个名为 p 的 shared_ptr，指向一个取值为 10 的 int 型对象，这个数值 10 的引用计数为 1，只有 pauto q(p); // 创建一个名为 q 的 shared_ptr，并用 p 初始化，此时 p 和 q 指向同一个对象，此时数值 10 的引用计数为 2\n当对 shared_ptr 赋予新值，或被销毁时，引用计数会递减。\n12auto r = make_shared&lt;int&gt;(20); // 创建一个名为 r 的 shared_ptr，指向一个取值为 20 的 int 型对象，这个数值 20 的引用计数为 1，只有 rr = q; // 对 r 赋值，让 r 指向数值 10。此时数值 10 的引用计数加 1 为 3，数值 20 的引用计数减 1 位 0，数值 20 的内存将被自动释放\n\n通常情况下 shared_ptr 可以正常运转，但是在循环引用的场景下，shared_ptr 无法正确释放内存。循环引用，顾名思义，A 指向 B，B 指向 A，在表示双向关系时，是很可能出现这种情况的，例如：\n1234567891011121314151617181920212223242526272829303132333435363738#include &lt;iostream&gt;#include &lt;memory&gt;using namespace std;class Son;class Father &#123;public:    shared_ptr&lt;Son&gt; son_;    Father() &#123;        cout &lt;&lt; __FUNCTION__ &lt;&lt; endl;    &#125;    ~Father() &#123;        cout &lt;&lt; __FUNCTION__ &lt;&lt; endl;    &#125;&#125;;class Son &#123;public:    shared_ptr&lt;Father&gt; father_;    Son() &#123;        cout &lt;&lt; __FUNCTION__ &lt;&lt; endl;    &#125;    ~Son() &#123;        cout &lt;&lt; __FUNCTION__ &lt;&lt; endl;    &#125;&#125;;int main()&#123;    auto son = make_shared&lt;Son&gt;();    auto father = make_shared&lt;Father&gt;();    son-&gt;father_ = father;    father-&gt;son_ = son;    cout &lt;&lt; &quot;son: &quot; &lt;&lt; son.use_count() &lt;&lt; endl;    cout &lt;&lt; &quot;father: &quot; &lt;&lt; father.use_count() &lt;&lt; endl;    return 0;&#125;\n\n程序的执行结果如下：\n\nSon\nFather\nson: 2\nfather: 2\n\n可以看到，程序分别执行了 Son 和 Father 的构造函数，但是没有执行析构函数，出现了内存泄漏。\nshared_ptr 原理shared_ptr 实际上是对裸指针进行了一层封装，成员变量除了裸指针外，还有一个引用计数，它记录裸指针被引用的次数（有多少个 shared_ptr 指向这同一个裸指针），当引用计数为 0 时，自动释放裸指针指向的资源。影响引用次数的场景包括：构造、赋值、析构。基于三个最简单的场景，实现一个 demo 版 shared_ptr 如下（实现既不严谨也不安全，仅用于阐述原理）：\n12345678910111213141516171819202122232425262728293031323334353637383940414243444546474849#include &lt;iostream&gt;#include &lt;memory&gt;using namespace std;template&lt;typename T&gt;class SharedPtr &#123;public:    int* counter;  // 引用计数，用指针表示，多个 SharedPtr 之间可以同步修改    T* resource;  // 裸指针    SharedPtr(T* resc = nullptr) &#123;  // 构造函数        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        counter = new int(1);        resource = resc;    &#125;    SharedPtr(const SharedPtr&amp; rhs) &#123;  // 拷贝构造函数        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        resource = rhs.resource;        counter = rhs.counter;        ++*counter;    &#125;    SharedPtr&amp; operator=(const SharedPtr&amp; rhs) &#123;  // 拷贝赋值函数        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        --*counter;  // 原来指向的资源的引用计数减 1        if (*counter == 0) &#123;            delete counter;            delete resource;        &#125;        resource = rhs.resource;        counter = rhs.counter;        ++*counter;  // 新指向的资源的引用计数加 1    &#125;    ~SharedPtr() &#123;  // 析构函数        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        --*counter;        if (*counter == 0) &#123;            delete counter;            delete resource;        &#125;    &#125;    int use_count() &#123;        return *counter;    &#125;&#125;;\n\n在循环引用示例中，用到了 make_shared 函数：\n1auto son = make_shared&lt;Son&gt;();  // 新建一个 Son 对象，返回指向这个 Son 对象的指针\n\n此用法等价于：\n12auto son_ = new Son();  // 新建一个 Son 对象，返回指向这个对象的指针 son_shared_ptr&lt;Son&gt; son(son_);  // 创建一个管理 son_的 shared_ptr\n\n代入 SharedPtr 的实现来分析示例中 main 函数的执行过程，可以得到：\n1234auto son = make_shared&lt;Son&gt;();  // 调用构造函数，son.counter=1auto father = make_shared&lt;Father&gt;();  // 调用构造函数，father.counter=1son-&gt;father_ = father;  // 调用赋值函数，son.counter=2father-&gt;son_ = son;  // 调用赋值函数，father.counter=2\n\n当 main 函数执行完时，执行析构函数，此时由于 son.counter&#x3D;1，father.couter&#x3D;1，不满足 if 条件，不会实行 delete 命令完成资源释放，导致内存泄漏。\nweak_ptr 原理  为解决循环引用的问题，仅使用 shared_ptr 是无法实现的。堡垒无法从内部攻破的时候，需要借助外力，于是有了 weak_ptr，字面意思是弱指针。为啥叫弱呢？shared_ptr A 被赋值给 shared_ptr B 时，A 的引用计数加 1；shared_ptr A 被赋值给 weak_ptr C 时，A 的引用计数不变。引用力度不够强，不足以改变引用计数，所以就弱了（个人理解，有误请指正）。\nweak_ptr 在使用时，是与 shared_ptr 绑定的。基于 SharedPtr 实现来实现 demo 版的 WeakPtr，并解决循环引用的问题，全部代码如下：\n123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899100101102103104105106107108109#include &lt;iostream&gt;#include &lt;memory&gt;using namespace std;template&lt;typename T&gt;class SharedPtr &#123;public:    int* counter;    int* weakref;    T* resource;    SharedPtr(T* resc = nullptr) &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        counter = new int(1);        weakref = new int(0);        resource = resc;    &#125;    SharedPtr(const SharedPtr&amp; rhs) &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        resource = rhs.resource;        counter = rhs.counter;        ++*counter;    &#125;    SharedPtr&amp; operator=(const SharedPtr&amp; rhs) &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        --*counter;        if (*counter == 0) &#123;            delete counter;            delete resource;        &#125;        resource = rhs.resource;        counter = rhs.counter;        ++*counter;    &#125;    ~SharedPtr() &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        --*counter;        if (*counter == 0) &#123;            delete counter;            delete resource;        &#125;    &#125;    int use_count() &#123;        return *counter;    &#125;&#125;;template&lt;typename T&gt;class WeakPtr &#123;public:    T* resource;    WeakPtr(T* resc = nullptr) &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        resource = resc;    &#125;    WeakPtr&amp; operator=(SharedPtr&lt;T&gt;&amp; ptr) &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;        resource = ptr.resource;        ++*ptr.weakref;  // 赋值时引用计数 counter 不变，改变弱引用计数 weakref    &#125;    ~WeakPtr() &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;    &#125;&#125;;class Son;class Father &#123;public:    SharedPtr&lt;Son&gt; son_;    Father() &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;    &#125;    ~Father() &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;    &#125;&#125;;class Son &#123;public:    WeakPtr&lt;Father&gt; father_;  // 将 SharedPtr 改为 WeakPtr    Son() &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;    &#125;    ~Son() &#123;        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;    &#125;&#125;;int main()&#123;    auto son_ = new Son();  // 创建一个 Son 对象，返回指向 Son 对象的指针 son_    auto father_ = new Father();  // 创建一个 Father 对象，返回指向 Father 对象的指针 father_    SharedPtr&lt;Son&gt; son(son_);  // 调用 SharedPtr 构造函数：son.counter=1, son.weakref=0    SharedPtr&lt;Father&gt; father(father_);  // 调用 SharedPtr 构造函数：father.counter=1, father.weakref=0    son.resource-&gt;father_ = father;  // 调用 WeakPtr 赋值函数：father.counter=1, father.weakref=1    father.resource-&gt;son_ = son;  // 调用 SharedPtr 赋值函数：son.counter=2, son.weakref=0    cout &lt;&lt; &quot;son: &quot; &lt;&lt; son.use_count() &lt;&lt; endl;    cout &lt;&lt; &quot;father: &quot; &lt;&lt; father.use_count() &lt;&lt; endl;    return 0;&#125;\n\n代码执行结果如下：\n\nWeakPtr::WeakPtr(T*) [with T &#x3D; Father]\nSon::Son()\nSharedPtr::SharedPtr(T*) [with T &#x3D; Son]\nFather::Father()\nSharedPtr::SharedPtr(T*) [with T &#x3D; Son]\nSharedPtr::SharedPtr(T*) [with T &#x3D; Father]\nWeakPtr&amp; WeakPtr::operator&#x3D;(SharedPtr&amp;) [with T &#x3D; Father]\nSharedPtr&amp; SharedPtr::operator&#x3D;(const SharedPtr&amp;) [with T &#x3D; Son]\nson: 2\nfather: 1\nSharedPtr::~SharedPtr() [with T &#x3D; Father]\nFather::~Father()\nSharedPtr::~SharedPtr() [with T &#x3D; Son]\nSharedPtr::~SharedPtr() [with T &#x3D; Son]\nSon::~Son()\nWeakPtr::~WeakPtr() [with T &#x3D; Father]\n\n可以看到 Son 对象和 Father 对象均被析构，内存泄漏的问题得到解决。析构过程解读如下：\n\nSharedPtr::~SharedPtr() [with T &#x3D; Father]  # 析构 father，由于 father.couter&#x3D;1，减 1 后执行 delete father_\nFather::~Father()  # 析构 father_，执行~Father()，进一步析构成员变量\nSharedPtr::~SharedPtr() [with T &#x3D; Son]  # 析构 SharedPtr，此时 son.couter 减 1，son.counter&#x3D;1\nSharedPtr::~SharedPtr() [with T &#x3D; Son]  # 析构 son，由于 son.counter&#x3D;1，减 1 后执行 delete son_\nSon::~Son()  # 析构 son_，执行~Son()，进一步析构成员变量\nWeakPtr::~WeakPtr() [with T &#x3D; Father]  # 析构 WeakPtr\n\n总结\n尽量使用智能指针管理资源申请与释放，减少人为 new 和 delete 误操作和考虑不周的问题。\n使用 make_shared 来创建 shared_ptr，如果先 new 一个对象，再用这个对象的裸指针构造一个 shared_ptr 指针，可能出现问题。shared_ptr 会自动释放资源，如果再手动 delete，释放两次那就挂了。\n","dateCreated":"2023-04-23T10:25:10+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2023-04-23T10:25:10+08:00","description":"在循环引用的场景下探讨 C++ 中 shard_ptr 和 weak_ptr 原理","headline":"C++ 智能指针：shared_ptr 和 weak_ptr","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2023/CPP%E6%99%BA%E8%83%BD%E6%8C%87%E9%92%88/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2023/CPP%E6%99%BA%E8%83%BD%E6%8C%87%E9%92%88/","keywords":"C++"}</script>
+    <meta name="description" content="在循环引用的场景下探讨 C++ 中 shard_ptr 和 weak_ptr 原理">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="C++ 智能指针：shared_ptr 和 weak_ptr">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E6%99%BA%E8%83%BD%E6%8C%87%E9%92%88/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="在循环引用的场景下探讨 C++ 中 shard_ptr 和 weak_ptr 原理">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-04-23T02:25:10.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.358Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            C++ 智能指针：shared_ptr 和 weak_ptr
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2023-04-23T10:25:10+08:00">
+	
+		    2023 年 4 月 23 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/">开发</a>, <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/">编程语言</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="引言"><a href="# 引言" class="headerlink" title="引言"></a>引言</h2><p>C++ 中经常需要 new 一个对象，开辟一个内存空间，返回一个指针来操作这个内存。使用完毕之后，需要通过 delete 来释放内存空间。如果内存没有释放，那这块内存将无法再利用，导致内存泄漏。为降低人为疏忽，C++ 11 的新特性中引入了三种智能指针，来自动化地管理内存资源：</p>
+<p><strong>unique_ptr:</strong> 管理的资源唯一的属于一个对象，但是支持将资源移动给其他 unique_ptr 对象。当拥有所有权的 unique_ptr 对象析构时，资源即被释放。</p>
+<p><strong>shared_ptr:</strong> 管理的资源被多个对象共享，内部采用引用计数跟踪所有者的个数。当最后一个所有者被析构时，资源即被释放。</p>
+<p><strong>weak_ptr:</strong> 与 shared_ptr 配合使用，虽然能访问资源但却不享有资源的所有权，不影响资源的引用计数。有可能资源已被释放，但 weak_ptr 仍然存在。因此每次访问资源时都需要判断资源是否有效。</p>
+<p>本文主要在循环引用的场景下探讨 shard_ptr 和 weak_ptr 原理。</p>
+<h2 id="循环引用"><a href="# 循环引用" class="headerlink" title="循环引用"></a>循环引用</h2><p>shared_ptr 通过引用计数的方式管理内存，当进行拷贝或赋值操作时，每个 shared_ptr 都会记录有多少个其他的 shared_ptr 指向相同的对象，当引用计数为 0 时，内存将被自动释放。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> p = <span class="built_in">make_shared</span>&lt;<span class="type">int</span>&gt;(<span class="number">10</span>); <span class="comment">// 创建一个名为 p 的 shared_ptr，指向一个取值为 10 的 int 型对象，这个数值 10 的引用计数为 1，只有 p</span></span><br><span class="line"><span class="function"><span class="keyword">auto</span> <span class="title">q</span><span class="params">(p)</span></span>; <span class="comment">// 创建一个名为 q 的 shared_ptr，并用 p 初始化，此时 p 和 q 指向同一个对象，此时数值 10 的引用计数为 2</span></span><br></pre></td></tr></table></figure>
+<p>当对 shared_ptr 赋予新值，或被销毁时，引用计数会递减。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> r = <span class="built_in">make_shared</span>&lt;<span class="type">int</span>&gt;(<span class="number">20</span>); <span class="comment">// 创建一个名为 r 的 shared_ptr，指向一个取值为 20 的 int 型对象，这个数值 20 的引用计数为 1，只有 r</span></span><br><span class="line">r = q; <span class="comment">// 对 r 赋值，让 r 指向数值 10。此时数值 10 的引用计数加 1 为 3，数值 20 的引用计数减 1 位 0，数值 20 的内存将被自动释放</span></span><br></pre></td></tr></table></figure>
+
+<p>通常情况下 shared_ptr 可以正常运转，但是在循环引用的场景下，shared_ptr 无法正确释放内存。循环引用，顾名思义，A 指向 B，B 指向 A，在表示双向关系时，是很可能出现这种情况的，例如：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;memory&gt;</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Son</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Father</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    shared_ptr&lt;Son&gt; son_;</span><br><span class="line">    <span class="built_in">Father</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">    ~<span class="built_in">Father</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Son</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    shared_ptr&lt;Father&gt; father_;</span><br><span class="line">    <span class="built_in">Son</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">    ~<span class="built_in">Son</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> son = <span class="built_in">make_shared</span>&lt;Son&gt;();</span><br><span class="line">    <span class="keyword">auto</span> father = <span class="built_in">make_shared</span>&lt;Father&gt;();</span><br><span class="line">    son-&gt;father_ = father;</span><br><span class="line">    father-&gt;son_ = son;</span><br><span class="line">    cout &lt;&lt; <span class="string">&quot;son: &quot;</span> &lt;&lt; son.<span class="built_in">use_count</span>() &lt;&lt; endl;</span><br><span class="line">    cout &lt;&lt; <span class="string">&quot;father: &quot;</span> &lt;&lt; father.<span class="built_in">use_count</span>() &lt;&lt; endl;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>程序的执行结果如下：</p>
+<blockquote>
+<p>Son</p>
+<p>Father</p>
+<p>son: 2</p>
+<p>father: 2</p>
+</blockquote>
+<p>可以看到，程序分别执行了 Son 和 Father 的构造函数，但是没有执行析构函数，出现了内存泄漏。</p>
+<h2 id="shared-ptr 原理"><a href="#shared-ptr 原理" class="headerlink" title="shared_ptr 原理"></a>shared_ptr 原理</h2><p>shared_ptr 实际上是对裸指针进行了一层封装，成员变量除了裸指针外，还有一个引用计数，它记录裸指针被引用的次数（有多少个 shared_ptr 指向这同一个裸指针），当引用计数为 0 时，自动释放裸指针指向的资源。影响引用次数的场景包括：构造、赋值、析构。基于三个最简单的场景，实现一个 demo 版 shared_ptr 如下（实现既不严谨也不安全，仅用于阐述原理）：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;memory&gt;</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">SharedPtr</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">int</span>* counter;  <span class="comment">// 引用计数，用指针表示，多个 SharedPtr 之间可以同步修改</span></span><br><span class="line">    T* resource;  <span class="comment">// 裸指针</span></span><br><span class="line"></span><br><span class="line">    <span class="built_in">SharedPtr</span>(T* resc = <span class="literal">nullptr</span>) &#123;  <span class="comment">// 构造函数</span></span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        counter = <span class="keyword">new</span> <span class="built_in">int</span>(<span class="number">1</span>);</span><br><span class="line">        resource = resc;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">SharedPtr</span>(<span class="type">const</span> SharedPtr&amp; rhs) &#123;  <span class="comment">// 拷贝构造函数</span></span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        resource = rhs.resource;</span><br><span class="line">        counter = rhs.counter;</span><br><span class="line">        ++*counter;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    SharedPtr&amp; <span class="keyword">operator</span>=(<span class="type">const</span> SharedPtr&amp; rhs) &#123;  <span class="comment">// 拷贝赋值函数</span></span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        --*counter;  <span class="comment">// 原来指向的资源的引用计数减 1</span></span><br><span class="line">        <span class="keyword">if</span> (*counter == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">delete</span> counter;</span><br><span class="line">            <span class="keyword">delete</span> resource;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        resource = rhs.resource;</span><br><span class="line">        counter = rhs.counter;</span><br><span class="line">        ++*counter;  <span class="comment">// 新指向的资源的引用计数加 1</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ~<span class="built_in">SharedPtr</span>() &#123;  <span class="comment">// 析构函数</span></span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        --*counter;</span><br><span class="line">        <span class="keyword">if</span> (*counter == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">delete</span> counter;</span><br><span class="line">            <span class="keyword">delete</span> resource;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">use_count</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> *counter;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>在循环引用示例中，用到了 make_shared 函数：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> son = <span class="built_in">make_shared</span>&lt;Son&gt;();  <span class="comment">// 新建一个 Son 对象，返回指向这个 Son 对象的指针</span></span><br></pre></td></tr></table></figure>
+
+<p>此用法等价于：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> son_ = <span class="keyword">new</span> <span class="built_in">Son</span>();  <span class="comment">// 新建一个 Son 对象，返回指向这个对象的指针 son_</span></span><br><span class="line"><span class="function">shared_ptr&lt;Son&gt; <span class="title">son</span><span class="params">(son_)</span></span>;  <span class="comment">// 创建一个管理 son_的 shared_ptr</span></span><br></pre></td></tr></table></figure>
+
+<p>代入 SharedPtr 的实现来分析示例中 main 函数的执行过程，可以得到：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> son = <span class="built_in">make_shared</span>&lt;Son&gt;();  <span class="comment">// 调用构造函数，son.counter=1</span></span><br><span class="line"><span class="keyword">auto</span> father = <span class="built_in">make_shared</span>&lt;Father&gt;();  <span class="comment">// 调用构造函数，father.counter=1</span></span><br><span class="line">son-&gt;father_ = father;  <span class="comment">// 调用赋值函数，son.counter=2</span></span><br><span class="line">father-&gt;son_ = son;  <span class="comment">// 调用赋值函数，father.counter=2</span></span><br></pre></td></tr></table></figure>
+
+<p>当 main 函数执行完时，执行析构函数，此时由于 son.counter&#x3D;1，father.couter&#x3D;1，不满足 if 条件，不会实行 delete 命令完成资源释放，导致内存泄漏。</p>
+<h2 id="weak-ptr 原理"><a href="#weak-ptr 原理" class="headerlink" title="weak_ptr 原理"></a><strong>weak_ptr 原理 </strong></h2><p> 为解决循环引用的问题，仅使用 shared_ptr 是无法实现的。堡垒无法从内部攻破的时候，需要借助外力，于是有了 weak_ptr，字面意思是弱指针。为啥叫弱呢？shared_ptr A 被赋值给 shared_ptr B 时，A 的引用计数加 1；shared_ptr A 被赋值给 weak_ptr C 时，A 的引用计数不变。引用力度不够强，不足以改变引用计数，所以就弱了（个人理解，有误请指正）。</p>
+<p>weak_ptr 在使用时，是与 shared_ptr 绑定的。基于 SharedPtr 实现来实现 demo 版的 WeakPtr，并解决循环引用的问题，全部代码如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;memory&gt;</span></span></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">SharedPtr</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">int</span>* counter;</span><br><span class="line">    <span class="type">int</span>* weakref;</span><br><span class="line">    T* resource;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">SharedPtr</span>(T* resc = <span class="literal">nullptr</span>) &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        counter = <span class="keyword">new</span> <span class="built_in">int</span>(<span class="number">1</span>);</span><br><span class="line">        weakref = <span class="keyword">new</span> <span class="built_in">int</span>(<span class="number">0</span>);</span><br><span class="line">        resource = resc;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">SharedPtr</span>(<span class="type">const</span> SharedPtr&amp; rhs) &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        resource = rhs.resource;</span><br><span class="line">        counter = rhs.counter;</span><br><span class="line">        ++*counter;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    SharedPtr&amp; <span class="keyword">operator</span>=(<span class="type">const</span> SharedPtr&amp; rhs) &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        --*counter;</span><br><span class="line">        <span class="keyword">if</span> (*counter == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">delete</span> counter;</span><br><span class="line">            <span class="keyword">delete</span> resource;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        resource = rhs.resource;</span><br><span class="line">        counter = rhs.counter;</span><br><span class="line">        ++*counter;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ~<span class="built_in">SharedPtr</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        --*counter;</span><br><span class="line">        <span class="keyword">if</span> (*counter == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">delete</span> counter;</span><br><span class="line">            <span class="keyword">delete</span> resource;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">use_count</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> *counter;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">WeakPtr</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    T* resource;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">WeakPtr</span>(T* resc = <span class="literal">nullptr</span>) &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        resource = resc;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    WeakPtr&amp; <span class="keyword">operator</span>=(SharedPtr&lt;T&gt;&amp; ptr) &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">        resource = ptr.resource;</span><br><span class="line">        ++*ptr.weakref;  <span class="comment">// 赋值时引用计数 counter 不变，改变弱引用计数 weakref</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ~<span class="built_in">WeakPtr</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Son</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Father</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    SharedPtr&lt;Son&gt; son_;</span><br><span class="line">    <span class="built_in">Father</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">    ~<span class="built_in">Father</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Son</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    WeakPtr&lt;Father&gt; father_;  <span class="comment">// 将 SharedPtr 改为 WeakPtr</span></span><br><span class="line">    <span class="built_in">Son</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">    ~<span class="built_in">Son</span>() &#123;</span><br><span class="line">        cout &lt;&lt; __PRETTY_FUNCTION__ &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> son_ = <span class="keyword">new</span> <span class="built_in">Son</span>();  <span class="comment">// 创建一个 Son 对象，返回指向 Son 对象的指针 son_</span></span><br><span class="line">    <span class="keyword">auto</span> father_ = <span class="keyword">new</span> <span class="built_in">Father</span>();  <span class="comment">// 创建一个 Father 对象，返回指向 Father 对象的指针 father_</span></span><br><span class="line">    <span class="function">SharedPtr&lt;Son&gt; <span class="title">son</span><span class="params">(son_)</span></span>;  <span class="comment">// 调用 SharedPtr 构造函数：son.counter=1, son.weakref=0</span></span><br><span class="line">    <span class="function">SharedPtr&lt;Father&gt; <span class="title">father</span><span class="params">(father_)</span></span>;  <span class="comment">// 调用 SharedPtr 构造函数：father.counter=1, father.weakref=0</span></span><br><span class="line">    son.resource-&gt;father_ = father;  <span class="comment">// 调用 WeakPtr 赋值函数：father.counter=1, father.weakref=1</span></span><br><span class="line">    father.resource-&gt;son_ = son;  <span class="comment">// 调用 SharedPtr 赋值函数：son.counter=2, son.weakref=0</span></span><br><span class="line">    cout &lt;&lt; <span class="string">&quot;son: &quot;</span> &lt;&lt; son.<span class="built_in">use_count</span>() &lt;&lt; endl;</span><br><span class="line">    cout &lt;&lt; <span class="string">&quot;father: &quot;</span> &lt;&lt; father.<span class="built_in">use_count</span>() &lt;&lt; endl;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>代码执行结果如下：</p>
+<blockquote>
+<p>WeakPtr<t>::WeakPtr(T*) [with T &#x3D; Father]</t></p>
+<p>Son::Son()</p>
+<p>SharedPtr<t>::SharedPtr(T*) [with T &#x3D; Son]</t></p>
+<p>Father::Father()</p>
+<p>SharedPtr<t>::SharedPtr(T*) [with T &#x3D; Son]</t></p>
+<p>SharedPtr<t>::SharedPtr(T*) [with T &#x3D; Father]</t></p>
+<p>WeakPtr<t>&amp; WeakPtr<t>::operator&#x3D;(SharedPtr<t>&amp;) [with T &#x3D; Father]</t></t></t></p>
+<p>SharedPtr<t>&amp; SharedPtr<t>::operator&#x3D;(const SharedPtr<t>&amp;) [with T &#x3D; Son]</t></t></t></p>
+<p>son: 2</p>
+<p>father: 1</p>
+<p>SharedPtr<t>::~SharedPtr() [with T &#x3D; Father]</t></p>
+<p>Father::~Father()</p>
+<p>SharedPtr<t>::~SharedPtr() [with T &#x3D; Son]</t></p>
+<p>SharedPtr<t>::~SharedPtr() [with T &#x3D; Son]</t></p>
+<p>Son::~Son()</p>
+<p>WeakPtr<t>::~WeakPtr() [with T &#x3D; Father]</t></p>
+</blockquote>
+<p>可以看到 Son 对象和 Father 对象均被析构，内存泄漏的问题得到解决。析构过程解读如下：</p>
+<blockquote>
+<p>SharedPtr<t>::~SharedPtr() [with T &#x3D; Father]  # 析构 father，由于 father.couter&#x3D;1，减 1 后执行 delete father_</t></p>
+<p>Father::~Father()  # 析构 father_，执行~Father()，进一步析构成员变量</p>
+<p>SharedPtr<t>::~SharedPtr() [with T &#x3D; Son]  # 析构 SharedPtr<son>，此时 son.couter 减 1，son.counter&#x3D;1</son></t></p>
+<p>SharedPtr<t>::~SharedPtr() [with T &#x3D; Son]  # 析构 son，由于 son.counter&#x3D;1，减 1 后执行 delete son_</t></p>
+<p>Son::~Son()  # 析构 son_，执行~Son()，进一步析构成员变量</p>
+<p>WeakPtr<t>::~WeakPtr() [with T &#x3D; Father]  # 析构 WeakPtr<father></father></t></p>
+</blockquote>
+<h2 id="总结"><a href="# 总结" class="headerlink" title="总结"></a>总结</h2><ol>
+<li>尽量使用智能指针管理资源申请与释放，减少人为 new 和 delete 误操作和考虑不周的问题。</li>
+<li>使用 make_shared 来创建 shared_ptr，如果先 new 一个对象，再用这个对象的裸指针构造一个 shared_ptr 指针，可能出现问题。shared_ptr 会自动释放资源，如果再手动 delete，释放两次那就挂了。</li>
+</ol>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/C/" rel="tag">C++</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0/" data-tooltip="C++ 构造函数：默认构造和拷贝构造" aria-label="上一篇: C++ 构造函数：默认构造和拷贝构造">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/" data-tooltip="零基础爬虫入门" aria-label="下一篇: 零基础爬虫入门">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0/" data-tooltip="C++ 构造函数：默认构造和拷贝构造" aria-label="上一篇: C++ 构造函数：默认构造和拷贝构造">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/%E9%9B%B6%E5%9F%BA%E7%A1%80%E7%88%AC%E8%99%AB%E5%85%A5%E9%97%A8/" data-tooltip="零基础爬虫入门" aria-label="下一篇: 零基础爬虫入门">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2023/CPP智能指针/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

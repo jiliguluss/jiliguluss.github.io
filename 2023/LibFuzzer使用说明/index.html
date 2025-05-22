@@ -1,0 +1,910 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>LibFuzzer 使用说明 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n按照  官方定义，LibFuzzer 是一个in-process（进程内的），coverage-guided（以覆盖率为引导的），evolutionary（进化的） 的 fuzz 引擎，是 LLVM 项目的一部分，主要用于对 C&#x2F;C++ 程序进行 Fuzz 测试。LibFuzzer 三个特性的具体含义为：\n\nin-process：不会为每个测试用例启动一个进程，而是将所有的测试数据投放在同一个进程的内存空间中\n\ncoverage-guided：对每一个测试输入都进行代码覆盖率计算，不断累积测试用例使得代码覆盖率最大化\n\nevolutionary：结合了变异和生成两种形势的 Fuzz 引擎\n\n变异：基于已有的数据样本，通过一些变异规则，产生新的测试用例\n\n生成：通过对目标协议或接口规范进行建模，从零开始产生测试用例\n\n\n\n\nLibFuzzer 与待测的 library 进行链接，通过向指定的 fuzzing 入口（即target 函数）发送测试数据，并跟踪被触达的代码区域，然后对输入的数据进行变异，以达到代码覆盖率最大的目的，其中代码覆盖率的信息由 LLVM 的 SanitizerCoverage 工具提供。\n一、使用方法 1. 安装环境Clang 是一个类似 GCC 的 C&#x2F;C++ 语言编译工具，此处 简介。LibFuzzer 现在已被集成到 Clang 6.0 之后的版本中，在 Linux 环境下，只需直接安装 Clang 即可：\n1apt install clang\n\n安装完毕之后，可以通过如下命令查看 clang 版本：\n1clang --version\n\n2. 构建 target使用 LibFuzzer 时，第一步就是要实现 target 函数——LLVMFuzzerTestOneInput，该函数以 bytes 数组作为输入，函数体内使用待测 API 对这个 bytes 数组进行处理：\n12345// fuzz_target.ccextern &quot;C&quot; int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) &#123;  DoSomethingInterestingWithMyAPI(Data, Size);  return 0;  // Values other than 0 and -1 are reserved for future use.&#125;\n\ntarget 函数的名称、参数类型、返回值类型都不能改变。此外，官方文档中还有如下说明：\n\ntarget 函数在同一个进程中被多次执行，被不同的输入循环调用；\n\ntarget 函数需要容忍任何形势的输入，比如空数据、很长的数据、格式错误的数据等；\n\ntarget 函数不允许调用 exit 函数，否则将导致 Fuzz 终止执行；\n\ntarget 函数中可以使用线程，但是子线程要在函数体结束前 join，即进入下一次循环前，结束上一次循环的子线程；\n\ntarget 函数的结果必须是确定性的，即两次的 Data 如果一致，两次的执行结果也必须一致；\n\ntarget 函数执行速度必须快，避免三阶及以上的复杂度、日志记录和过多的内存消耗；\n\ntarget 函数应尽量避免修改全局状态，因为在同一个进程中修改全局变量，会导致下一次运行与上一次运行的上下文不同，可能影响程序确定性；\n\ntarget 函数的处理范围越窄越好，如果函数要处理多种数据格式，那最好拆分成多个子函数，每个子函数处理一种格式。\n\n\ntarget 函数编写完成后，通过以下命令编译成可执行文件：\n1234clang -g -O1 -fsanitize=fuzzer                         fuzz_target.cc # Builds the fuzz target w/o sanitizersclang -g -O1 -fsanitize=fuzzer,address                 fuzz_target.cc # Builds the fuzz target with ASANclang -g -O1 -fsanitize=fuzzer,signed-integer-overflow fuzz_target.cc # Builds the fuzz target with a part of UBSANclang -g -O1 -fsanitize=fuzzer,memory                  fuzz_target.cc # Builds the fuzz target with MSAN\n\nClang 支持的编译选项可以  参考文档  或者通过–help 查看，构建 LibFuzzer target 时常用的  编译选项  如下：\n\n-g：生成调试信息\n\n-O：设置编译器优化等级，可以是 1&#x2F;2&#x2F;3，默认为 1，数字越大，优化越多，注意2 和 3 有可能导致 Fuzz 找不到 crash\n\n-o：指定输出文件名\n\n-I：uppercase i，添加头文件搜索路径\n\n-L：添加库文件搜索路径\n\n-l：lowercase L，指定库文件名称，动态库和静态库同时存在时，动态库优先\n\n-fsanitize：启用 LibFuzzer，对源码进行插桩，并添加各种  消毒器 sanitizer，对程序进行运行时检查。\n\n-fsanitize&#x3D;fuzzer  编译时对源码插桩，链接 libFuzzer 库文件（使用 libFuzzer 的 main 函数）\n\n-fsanitize&#x3D;fuzzer-no-link  编译时对源码插桩，不链接 libFuzzer，适用于拥有 main 函数的源码。对大型项目来说，构建效率更高\n\n-fsanitize&#x3D;address  地址消毒器（AddressSanitizer），用于检测缓冲区溢出、UAF、Double Free、内存泄漏等内存问题\n\n-fsanitize&#x3D;memory  内存消毒器（MemorySanitizer），用于检测未初始化的内存访问\n\n-fsanitize&#x3D;undefined  未定义行为消毒器（UndefinedBehaviorSanitizer），用于检测程序运行中未定义行为，如越界访问、整数溢出、空指针解引用等\n\n\n\n-fsanitize-coverage：启用代码覆盖率的统计，包括 function 级别，basic block 级别和 edge 级别，详情可  参考文档 。但需要注意的是， 高版本的 clang 中，已经取消了对 -fsanitize-coverage&#x3D;trace-pc-guard 的支持，建议改用 -fsanitize&#x3D;fuzzer 替代，否则会出现报错，参见第二章节使用示例。\n\n-fsanitize-coverage&#x3D;trace-pc-guard,edge  使用 edge 级别代码覆盖率，edge 为默认级别，可省略\n\n-fsanitize-coverage&#x3D;trace-pc-guard,func  使用 function 级别代码覆盖率\n\n-fsanitize-coverage&#x3D;trace-pc-guard,bb  使用 basic block 级别代码覆盖率\n\n\n\n\n关于添加 LibFuzzer 相关选项后的详细构建过程，有兴趣可以参考libFuzzer 编译链接。\n关于 LibFuzzer 通过插桩统计代码覆盖率的具体实现，有兴趣可以参考Coverage Control in libFuzzer。\n3. 执行 fuzz在 target 函数构建成功后，会生成一个可执行的 fuzz 二进制文件，该文件通过命令行方式执行，可以接受指定的参数选项。执行格式为：\n1./fuzz-target -flag1=val1 -flag2=val2 ... path1 path2 ...\n\n在不限制运行时长的情况下，Fuzz 将会一直执行下去，直到出现 crash（通常是因为触发 sanitizer 异常）才会终止。导致 crash 的输入将会作为能触发 bug 的 testcase 保存到磁盘上，并根据 crash 的类型，用不同的文件名前缀进行区分，比如 crash-XXX，leak-XXX，timeout-XXX 等。\n(1) 参数说明  常见的 flag 选项及作用列举如下，使用 flag 时必须以 -flag&#x3D;val 的格式：\n\n\n\nflag\n默认值\n作用\n\n\n\nverbosity\n1\n运行时输出详细日志\n\n\nseed\n0\n随机种子。如果为 0，则自动生成随机种子\n\n\nruns\n-1\n测试运行的次数（-1 表示无限）\n\n\nmax_len\n0\n测试输入的最大长度。若为 0，libFuzzer 会自行猜测\n\n\nshuffle\n1\n为 1 表示启动时打乱初始语料库\n\n\nprefer_small\n1\n为 1 表示打乱语料库时，较小输入更优先\n\n\ntimeout\n1200\n超时时长，单位为秒。如果单次运行超过时长，Fuzz 将被终止\n\n\nmax_total_time\n0\n最大运行时长，单位为秒。若为正，表示 Fuzz 最长运行时间\n\n\nhelp\n0\n为 1 表示打印帮助信息\n\n\nmerge\n0\n为 1 表示在不损失代码覆盖率的情况下，进行语料库合并\n\n\nmerge_control_file\n0\n指定合并进程的控制文件，用于恢复合并状态\n\n\nminimize_crash\n0\n为 1 表示将提供的崩溃输入进行最小化。与 -runs &#x3D; N 或 -max_total_time &#x3D; N 一起使用以限制尝试次数\n\n\njobs\n0\njob 的数量，多个 job 将被分配到 workers 上执行，每个 job 的 stdout&#x2F;stderr 被重定向到 fuzz-&lt;JOB&gt;.log\n\n\nworkers\n0\nworker 的数量，为 0 将使用 min(jobs, number_of_cpu_cores&#x2F;2)\n\n\nreload\n1\n设置重新加载主语料库的间隔秒数。在并行模式下，在多个 job 中同步语料集。为 0 表示禁止\n\n\nreduce_inputs\n1\n为 1 表示尝试减少输入数据的大小，同时保留其完整的特征集\n\n\nrss_limit_mb\n2048\nRSS 内存用量限制，单位为 Mb。为 0 表示无限制\n\n\npurge_allocator_interval\n1\n清理缓存的建个时长，单位为秒。当指定 rss_limit_mb 且 rss 使用率超过 50% 时，开始清理。为 -1 表示禁止\n\n\nmalloc_limit_mb\n0\n单次 malloc 申请内存的大小限制，单位为 Mb。为 0 则采用 rss_limit_mb 进行限制\n\n\ndetect_leaks\n1\n为 1，且启用 LeakSanitizer 消毒器时，将在 Fuzz 过程中检测内存泄漏，而不仅是在 Fuzz 结束时才检测\n\n\nprint_coverage\n0\n退出时打印覆盖率信息\n\n\nprint_corpus_stats\n0\n退出时打印语料信息\n\n\nprint_final_stats\n0\n退出时打印统计信息\n\n\nonly_ascii\n0\n为 1 表示只生成 ASCII（isprint + isspace）字符作为输入\n\n\nartifact_prefix\n0\n将 fuzzing artifacts（crash、timeout 等 file）保存为文件时所使用的前缀，即文件将保存为 $(artifact_prefix)file\n\n\nexact_artifact_path\n0\n将单个 fuzz artfifact 保存为文件时所使用的前缀。将覆盖 -artifact_prefix，并行任务中不要使用相同取值\n\n\n(2) 语料使用  模糊测试通过随机的方式变异或生成测试用例。提供种子语料库作为随机变异的基础用例，避免从头开始生完全随机地生成用例，在待测函数接受复杂或结构化输入的情况下，能显著提升 Fuzz 测试的效率和覆盖率。\nLibFuzzer 是以覆盖率为引导的，当提供种子语料库时，LibFuzzer 从语料库中读取语料，通过随机变异产生新的测试数据，输入到 Fuzz Target。由于在构建 Fuzz Target 时，通过编译参数进行了代码插桩，因此可以跟踪 Fuzz Target 在接收到输入后，具体执行了哪些代码。如果某个测试输入能执行到之前从未执行的代码，那么这个测试输入就是一个有效变异，将被纳入到语料库，作为后续变异的基础。整体流程大致如下，仅做原理示意，不等于具体实现。\ngraph LR\n    A[从语料库中读取样本] --> B[随机变异生成新样本]\n    B --> C[新样本输入 Fuzz Target]\n    C --> D[跟踪代码执行路径]\n    D --> E{是否覆盖新的代码}\n    E -->| 是 | F[测试数据加入语料库]\n    E -->| 否 | B\n    F --> A\n\n使用 corpus 时，需要提供一个或多个存放种子语料的路径，命令为：\n1./fuzz_target -max_len=1000 -jobs=20 corpus_dir  # 种子语料存放在 corpus_dir 目录下\n\n当语料库很大时，可以在保持代码覆盖率的情况下进行精简操作，这时需要用 -merge 参数，命令为：\n1./fuzz_target -merge=1 mini_corpus_dir corpus_dir  # 原始语料集存放在 corpus_dir 目录下，精简后的语料集存放在 mini_corpus_dir 目录下\n\n利用 -merge 参数，还可以实现有效语料的提取，即从一批候选语料中，找到能够触发新代码路径的语料，命令为：\n1./fuzz_target -merge=1 interesting_corpus_dir candidate_corpus_dir  # 候选语料放在 candidate_corpus_dir，有效语料放在 interesting_corpus_dir\n\n总的来说，语料集的路径可以有一个、两个或更多，当使用 -merge 参数时，这些语料集中发现的有效语料，都会被保存到第一个路径下。需要注意的是，合并语料是一个非常耗时的过程，通过使用 -merge_control_file 参数，可以实现无缝恢复的多阶段合并，即通过 killall -SIGUSR1 /path/to/fuzzer/binary 中断合并操作后，下次还能继续上一次的合并进度，继续开始合并操作。示例如下：\n123456789101112131415% rm -f SomeLocalPath% ./my_fuzzer CORPUS1 CORPUS2 -merge=1 -merge_control_file=SomeLocalPath...MERGE-INNER: using the control file &#x27;SomeLocalPath&#x27;...# While this is running, do `killall -SIGUSR1 my_fuzzer` in another console==9015== INFO: libFuzzer: exiting as requested# This will leave the file SomeLocalPath with the partial state of the merge.# Now, you can continue the merge by executing the same command. The merge will continue from where it has been interrupted.% ./my_fuzzer CORPUS1 CORPUS2 -merge=1 -merge_control_file=SomeLocalPath...MERGE-OUTER: non-empty control file provided: &#x27;SomeLocalPath&#x27;MERGE-OUTER: control file ok, 32 files total, first not processed file 20...\n\n语料库除了用于提高 Fuzz 效率，还可用于回归测试。在回归测试和复现 crash 时，还可以具体指定某一个 testcase，命令为：\n1./fuzz_target testcase_path  # testcase_path 就是 fuzz crash 时保存的 testcase file 的文件路径\n\n4. 输出解读  在 Fuzz 执行过程中，标准错误流 stderr 中，通常会输出以下格式的内容：\n12345678910111213INFO: Seed: 1523017872INFO: Loaded 1 modules (16 guards): [0x744e60, 0x744ea0),INFO: -max_len is not provided, using 64INFO: A corpus is not provided, starting from an empty corpus#0    READ units: 1#1    INITED cov: 3 ft: 2 corp: 1/1b exec/s: 0 rss: 24Mb#3811 NEW    cov: 4 ft: 3 corp: 2/2b exec/s: 0 rss: 25Mb L: 1 MS: 5 ChangeBit-ChangeByte-ChangeBit-ShuffleBytes-ChangeByte-#3827 NEW    cov: 5 ft: 4 corp: 3/4b exec/s: 0 rss: 25Mb L: 2 MS: 1 CopyPart-#3963 NEW    cov: 6 ft: 5 corp: 4/6b exec/s: 0 rss: 25Mb L: 2 MS: 2 ShuffleBytes-ChangeBit-#4167 NEW    cov: 7 ft: 6 corp: 5/9b exec/s: 0 rss: 25Mb L: 3 MS: 1 InsertByte-==31511== ERROR: libFuzzer: deadly signal...artifact_prefix=&#x27;./&#x27;; Test unit written to ./crash-b13e8756b13a00cf168300179061fb4b91fefbed\n\n第一行显示 Fuzz 测试使用的随机种子，可以通过 -seed 参数来设置。\n第二行显示插桩后的 PC guards 数量（PC 指 Program Counter），可理解为 Fuzz 识别出来的 edge 总数，参考  此处脚注说明。\n第三行显示输入数据的长度限制，示例中 -max_len 参数没有设置，Fuzz 程序将 -max_len 定为 64，即最大数据长度不超过 64kb。\n第四行显示语料库信息，示例中没有提供 corpus，Fuzz 程序从头开始生成语料。\n第五行到第十行，每行开头的 #N 表示 Fuzz 已执行了 N 次测试输入，后面的内容为测试过程中的事件代码和统计信息：\n\n\n\n事件代码\n含义\n\n\n\nREAD\nFuzz 已从语料库中读取所有初始输入样本\n\n\nINITED\nFuzz 已完成初始化，包括通过被测代码运行每个初始输入样本\n\n\nNEW\nFuzz 生成了一个测试输入样本，它能触发被测代码的新路径，将被保存到主语料库目录\n\n\nREDUCE\nFuzz 找到了一个更好的输入样本，它能保持原有样本的特征集（参考下表 ft 含义），但是 size 更小\n\n\npulse\nFuzz 已生成 2 的 n 次方个输入（定期生成以使用户确信 Fuzz 仍在工作）\n\n\nDONE\nFuzz 已完成操作，因为它已达到指定的迭代限制（-runs）或时间限制（-max_total_time）\n\n\nRELOAD\nFuzz 正在定期重新加载语料库目录中的输入样本，这使它能够发现其他 Fuzz 进程发现的任何输入\n\n\n\n\n\n统计指标\n含义\n\n\n\ncov\n执行当前语料库所覆盖的 block 或 edge 的总数\n\n\nft\nLibFuzzer 使用不同的信号来评估代码覆盖率：边缘覆盖率、边缘计数器、间接调用者 &#x2F; 被调用者对等。这些信号组合起来称为特征\n\n\ncorp\n当前内存测试语料库中的条目数及其大小（单位为 byte）\n\n\nlim\n当前语料库中新样本的长度限制。 随着时间的推移而增加，直到达到最大长度 (-max_len)\n\n\nexec&#x2F;s\n每秒 Fuzz 执行次数\n\n\nrss\n当前内存消耗（单位为 Mb）\n\n\nL\n新样本的大小（单位为 byte）。只用于 NEW 和 REDUCE 事件\n\n\nMS: &lt;n&gt; &lt;operations&gt;\n生成新样本时的变异次数和变异方法。只用于 NEW 和 REDUCE 事件\n\n\n第十一行开始，显示 Fuzz 遇到 crash 并终止执行，导致 crash 的用例被保存为.&#x2F;crash-&lt;sha1&gt; 文件，保存路径和名称可以通过 -artifact_prefix 参数修改。\n二、使用示例  以CVE-2016-5180为例，演示 LibFuzzer 的使用过程。CVE-2016-5180是在 c-ares 中出现的堆溢出问题，是使得 ChromeOS 被攻击（重启后以访客模式执行代码）的漏洞之一。\n1. 下载源码  最新的 c-ares 代码已修复漏洞，为了复现漏洞，clone 代码后，需要恢复到漏洞修复之前。\n123git clone https://github.com/c-ares/c-ares.gitcd c-ares/git reset --hard 51fbb479f7948fca2ace3ff34a15ff27e796afdd\n\n2. 编写 Fuzz 主函数  实现 LLVMFuzzerTestOneInput 函数，将 LibFuzzer 输入的字节流进行转换，调用 ares_create_query 函数，并将代码保存为 target.cc 文件。\n1234567891011121314151617// Copyright 2016 Google Inc. All Rights Reserved.// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);#include &lt;stdint.h&gt;#include &lt;stdlib.h&gt;#include &lt;string&gt;#include &lt;arpa/nameser.h&gt;#include &lt;ares.h&gt;extern &quot;C&quot; int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) &#123;  unsigned char *buf;  int buflen;  std::string s(reinterpret_cast&lt;const char *&gt;(Data), Size);  ares_create_query(s.c_str(), ns_c_in, ns_t_a, 0x1234, 0, &amp;buf, &amp;buflen, 0);  free(buf);  return 0;&#125;\n\n3. 编译 Fuzz target使用 fuzzer-test-suite 提供的编译脚本，执行 build.sh 脚本，会自动调用 custom-build.sh 和 common.sh 进行编译。三个 shell 脚本和 Fuzz 函数的存放路径如下，脚本中会自动使用 git 拉取代码，这里将第 1 步手动拉取的代码删掉了：\n123456789root@server:~/fuzz$ tree.├── cares│   ├── build.sh│   └── target.cc├── common.sh└── custom-build.sh1 directory, 4 files\n\n注意需要将原始脚本中的 -fsanitize-coverage&#x3D;trace-pc-guard 替换为 -fsanitize&#x3D;fuzzer，否则执行 Fuzz 时会出现错误：-fsanitize-coverage&#x3D;trace-pc-guard is no longer supported by libFuzzer。\n1234root@server:~/fuzz$ ./cares-fsanitize_fuzzer-fsanitize-coverage=trace-pc-guard is no longer supported by libFuzzer.Please either migrate to a compiler that supports -fsanitize=fuzzeror use an older version of libFuzzer\n\n执行脚本进行编译（也可以自己编写命令进行编译，编译相关的内容之后会单独写文章进行说明）：\n1root@server:~/fuzz$ ./cares/build.sh\n\n编译完后，可以看到目录下多了一个二进制文件 cares-fsanitize_fuzzer，两个目录 BUILD 和 SRC。cares-fsanitize_fuzzer 是可执行的 Fuzz 程序，SRC 目录存放 c-ares 含漏洞的源码，BUILD 目录用于存放编译产生的中间文件和最终文件：\n12345678910root@server:~/fuzz$ tree -L 1.├── BUILD├── cares├── cares-fsanitize_fuzzer├── common.sh├── custom-build.sh└── SRC3 directories, 3 files\n\n4. 执行 Fuzz 测试  直接运行编译得到的二进制文件，如需附带参数，可参考第一章节执行 fuzz 的参数说明。\n123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778root@server:~/fuzz$ ./cares-fsanitize_fuzzerINFO: Seed: 817252946INFO: Loaded 1 modules   (10 inline 8-bit counters): 10 [0x5a90e0, 0x5a90ea),INFO: Loaded 1 PC tables (10 PCs): 10 [0x56c278,0x56c318),INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytesINFO: A corpus is not provided, starting from an empty corpus#2      INITED cov: 3 ft: 3 corp: 1/1b exec/s: 0 rss: 27Mb#3      NEW    cov: 4 ft: 4 corp: 2/5b lim: 4 exec/s: 0 rss: 27Mb L: 4/4 MS: 1 CrossOver-#10     REDUCE cov: 4 ft: 4 corp: 2/4b lim: 4 exec/s: 0 rss: 27Mb L: 3/3 MS: 2 ChangeByte-CrossOver-#11     REDUCE cov: 4 ft: 4 corp: 2/3b lim: 4 exec/s: 0 rss: 27Mb L: 2/2 MS: 1 EraseBytes-#1368   REDUCE cov: 6 ft: 6 corp: 3/20b lim: 17 exec/s: 0 rss: 27Mb L: 17/17 MS: 2 InsertByte-InsertRepeatedBytes-#1524   REDUCE cov: 6 ft: 6 corp: 3/19b lim: 17 exec/s: 0 rss: 27Mb L: 16/16 MS: 1 EraseBytes-===================================================================3049145==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6030012599c2 at pc 0x000000550e1c bp 0x7fffbad826d0 sp 0x7fffbad826c8WRITE of size 1 at 0x6030012599c2 thread T0    #0 0x550e1b in ares_create_query (/home/fuzz/cares-fsanitize_fuzzer+0x550e1b)    #1 0x55053c in LLVMFuzzerTestOneInput /home/fuzz/cares/target.cc:14:3    #2 0x4586a1 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/home/fuzz/cares-fsanitize_fuzzer+0x4586a1)    #3 0x457de5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool*) (/home/fuzz/cares-fsanitize_fuzzer+0x457de5)    #4 0x45a087 in fuzzer::Fuzzer::MutateAndTestOne() (/home/fuzz/cares-fsanitize_fuzzer+0x45a087)    #5 0x45ad85 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, fuzzer::fuzzer_allocator&lt;fuzzer::SizedFile&gt; &gt;&amp;) (/home/fuzz/cares-fsanitize_fuzzer+0x45ad85)    #6 0x44973e in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/home/fuzz/cares-fsanitize_fuzzer+0x44973e)    #7 0x472582 in main (/home/fuzz/cares-fsanitize_fuzzer+0x472582)    #8 0x7fd31481c082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082)    #9 0x41e4dd in _start (/home/fuzz/cares-fsanitize_fuzzer+0x41e4dd)0x6030012599c2 is located 0 bytes to the right of 18-byte region [0x6030012599b0,0x6030012599c2)allocated by thread T0 here:    #0 0x51e20d in malloc (/home/fuzz/cares-fsanitize_fuzzer+0x51e20d)    #1 0x5508f6 in ares_create_query (/home/fuzz/cares-fsanitize_fuzzer+0x5508f6)    #2 0x55053c in LLVMFuzzerTestOneInput /home/fuzz/cares/target.cc:14:3    #3 0x4586a1 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/home/fuzz/cares-fsanitize_fuzzer+0x4586a1)    #4 0x457de5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool*) (/home/fuzz/cares-fsanitize_fuzzer+0x457de5)    #5 0x45a087 in fuzzer::Fuzzer::MutateAndTestOne() (/home/fuzz/cares-fsanitize_fuzzer+0x45a087)    #6 0x45ad85 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, fuzzer::fuzzer_allocator&lt;fuzzer::SizedFile&gt; &gt;&amp;) (/home/fuzz/cares-fsanitize_fuzzer+0x45ad85)    #7 0x44973e in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/home/fuzz/cares-fsanitize_fuzzer+0x44973e)    #8 0x472582 in main (/home/fuzz/cares-fsanitize_fuzzer+0x472582)    #9 0x7fd31481c082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082)SUMMARY: AddressSanitizer: heap-buffer-overflow (/home/fuzz/cares-fsanitize_fuzzer+0x550e1b) in ares_create_queryShadow bytes around the buggy address:  0x0c06802432e0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa  0x0c06802432f0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa  0x0c0680243300: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa  0x0c0680243310: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa  0x0c0680243320: fa fa fa fa fa fa fa fa fa fa fd fd fd fa fa fa=&gt;0x0c0680243330: fd fd fd fa fa fa 00 00[02]fa fa fa fd fd fd fa  0x0c0680243340: fa fa fd fd fd fa fa fa fd fd fd fa fa fa fd fd  0x0c0680243350: fd fa fa fa fd fd fd fa fa fa fd fd fd fa fa fa  0x0c0680243360: fd fd fd fa fa fa fd fd fd fa fa fa fd fd fd fa  0x0c0680243370: fa fa fd fd fd fa fa fa fd fd fd fa fa fa fd fd  0x0c0680243380: fd fa fa fa fd fd fd fa fa fa fd fd fd fa fa faShadow byte legend (one shadow byte represents 8 application bytes):  Addressable:           00  Partially addressable: 01 02 03 04 05 06 07  Heap left redzone:       fa  Freed heap region:       fd  Stack left redzone:      f1  Stack mid redzone:       f2  Stack right redzone:     f3  Stack after return:      f5  Stack use after scope:   f8  Global redzone:          f9  Global init order:       f6  Poisoned by user:        f7  Container overflow:      fc  Array cookie:            ac  Intra object redzone:    bb  ASan internal:           fe  Left alloca redzone:     ca  Right alloca redzone:    cb  Shadow gap:              cc==3049145==ABORTINGMS: 4 ChangeByte-InsertByte-CopyPart-ChangeByte-; base unit: 00b28ff06b788b9b67c6b259800f404f9f3761fd0x5c,0x2e,0x0,0x6b,0x0,\\\\.\\x00k\\x00artifact_prefix=&#x27;./&#x27;; Test unit written to ./crash-edef708d314ed627eba0ef2b042e47aa96a9b899Base64: XC4AawA=\n\n可以看到，LibFuzzer 发现了 c-ares 中的 heap-buffer-overflow 漏洞，触发 crash 的用例保存为 crash-edef708d314ed627eba0ef2b042e47aa96a9b899 文件，该用例包含 5 个字节，字节码分别为：0x5c,0x2e,0x0,0x6b,0x0，其中 0x0 为空字符 NULL，属于不可见字符。\n5. 提取语料  执行 Fuzz 时，传入一个空文件夹作为 copus 路径，执行完后，可以在文件夹中看到 LibFuzzer 执行过程中，生成的有效语料。\n123456789101112131415161718192021222324252627282930313233343536373839404142root@server:~/fuzz/cares$ mkdir corpusroot@server:~/fuzz/cares$ lsBUILD  build.sh  cares_fuzzer  corpus  target.ccroot@server:~/fuzz/cares$ ./cares_fuzzer corpus/INFO: Seed: 4140748905INFO: Loaded 1 modules   (57 inline 8-bit counters): 57 [0x5a9100, 0x5a9139),INFO: Loaded 1 PC tables (57 PCs): 57 [0x5a9140,0x5a94d0),INFO:        0 files found in corpus/INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytesINFO: A corpus is not provided, starting from an empty corpus#2      INITED cov: 13 ft: 14 corp: 1/1b exec/s: 0 rss: 27Mb#4      NEW    cov: 16 ft: 20 corp: 2/3b lim: 4 exec/s: 0 rss: 27Mb L: 2/2 MS: 2 ChangeByte-InsertByte-#9      NEW    cov: 16 ft: 26 corp: 3/6b lim: 4 exec/s: 0 rss: 27Mb L: 3/3 MS: 5 ChangeBit-ChangeByte-ChangeByte-CopyPart-InsertByte-#10     NEW    cov: 16 ft: 32 corp: 4/10b lim: 4 exec/s: 0 rss: 27Mb L: 4/4 MS: 1 CrossOver-#25     NEW    cov: 18 ft: 34 corp: 5/11b lim: 4 exec/s: 0 rss: 27Mb L: 1/4 MS: 5 ChangeBit-ChangeASCIIInt-CMP-CrossOver-EraseBytes- DE: &quot;\\x01\\x00&quot;-#94     NEW    cov: 19 ft: 35 corp: 6/15b lim: 4 exec/s: 0 rss: 27Mb L: 4/4 MS: 4 CrossOver-ShuffleBytes-ChangeByte-ChangeBit-#108    NEW    cov: 21 ft: 37 corp: 7/16b lim: 4 exec/s: 0 rss: 27Mb L: 1/4 MS: 4 ChangeByte-ShuffleBytes-ChangeBit-ChangeByte-#125    NEW    cov: 22 ft: 38 corp: 8/18b lim: 4 exec/s: 0 rss: 27Mb L: 2/4 MS: 2 ShuffleBytes-InsertByte-...==3237059==ABORTINGMS: 2 InsertRepeatedBytes-ChangeByte-; base unit: 1bef8aac927d18852642a96c20e50efba80fdfae0x5c,0x5,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x5c,0x2e,\\\\\\x05\\x98\\x98\\x98\\x98\\x98\\x98\\x98\\x98\\x98\\x98\\x98\\\\.artifact_prefix=&#x27;./&#x27;; Test unit written to ./crash-157768d6f06d94325fe0e6bcf66cbd2d27dd8db7Base64: XAWYmJiYmJiYmJiYmFwuroot@server:~/fuzz/cares$ ls -altotal 2244drwxrwxr-x 4 root root    4096 Sep 26 17:47 .drwxrwxr-x 5 root root    4096 Sep 26 15:25 ..drwxrwxr-x 9 root root   20480 Sep 26 17:18 BUILD-rw-rw-r-- 1 root root     722 Sep 26 17:13 build.sh-rwxrwxr-x 1 root root 2250720 Sep 26 17:18 cares_fuzzerdrwxrwxr-x 2 root root    4096 Sep 26 17:47 corpus-rw-rw-r-- 1 root root      15 Sep 26 17:47 crash-157768d6f06d94325fe0e6bcf66cbd2d27dd8db7-rw-rw-r-- 1 root root     499 Sep 26 17:14 target.ccroot@server:~/fuzz/cares$ ls corpus/08534f33c201a45017b502e90a800f1b708ebcb3  5175b74bd75b8d90a01f77709deba3982fbbdcb2  78bdce51613f555049a9937095bf469bcb77e94f  be566cb17d3bce0b2a8e5e710b3779df720db1f50f1c5448bf80343eeac759f8adcbdc2720533d15  5318c4ac20dac95a702bee2e27834d39ea6bc2b6  8e54ed049741d7cf6fb8ef7f4288ef0be3b54f17  be5c29e07560abcf094c3419712a01590bbe85940fe509b10d833be6eb3d5ed4947cbe0fbb64ed84  5ba93c9db0cff93f52b521d7420e43f6eda2784f  8ea51a3719d7cbfc3e2dcd3edf6109918d5aad55  caea31b9ef76b9be352ad1054956efbb86d4451a1bef8aac927d18852642a96c20e50efba80fdfae  60321f72401b49b895535045eb8d3b9ca7db7c7c  91a3f7c503955600f5dac12c1c1a3c5b674a4d98  dea712be0e801f4502a21e04dfbec5bd0cbc677c24792aa3923c4cd185519d3d445ecfd0801db1c1  6380a9a2d2701df0cb53d880842747cbefef8a5d  9f64357cb30f24cf567513e140e9fb0cbf1a2be5  e716589d09e16cf4a48d2c7f1d357bb481aaf3bc3a52ce780950d4d969792a2559cd519d7ee8c727  6414bd7955e39106721edf7cc29efdb82f7007ac  b534844fd943d8b338025ad82d68283f1bcdb5c0\n\n6. 合并语料  当 Fuzz 执行很久之后，会产生大量语料。为了减少语料数量，可以使用 merge 参数进行合并。创建一个 min_corpus 目录，执行 Fuzz 时，启动 merge 参数，传入 min_corpus 目录和 corpus 目录，合并完后，可以在 min_corpus 目录下看到缩减之后的语料。以下示例显示预料数据从 31 个减少到 29 个：\n1234567891011121314151617181920212223root@server:~/fuzz/cares$ mkdir min_corpusroot@server:~/fuzz/cares$ ./cares_fuzzer -merge=1 min_corpus/ corpus/INFO: Seed: 1671146211INFO: Loaded 1 modules   (57 inline 8-bit counters): 57 [0x5a9100, 0x5a9139),INFO: Loaded 1 PC tables (57 PCs): 57 [0x5a9140,0x5a94d0),MERGE-OUTER: 31 files, 0 in the initial corpus, 0 processed earlierMERGE-OUTER: attempt 1INFO: Seed: 1671165588INFO: Loaded 1 modules   (57 inline 8-bit counters): 57 [0x5a9100, 0x5a9139),INFO: Loaded 1 PC tables (57 PCs): 57 [0x5a9140,0x5a94d0),INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytesMERGE-INNER: using the control file &#x27;/tmp/libFuzzerTemp.3327149.txt&#x27;MERGE-INNER: 31 total files; 0 processed earlier; will process 31 files now#1      pulse  cov: 9 ft: 10 exec/s: 0 rss: 27Mb#2      pulse  cov: 13 ft: 14 exec/s: 0 rss: 27Mb#4      pulse  cov: 20 ft: 22 exec/s: 0 rss: 27Mb#8      pulse  cov: 28 ft: 38 exec/s: 0 rss: 27Mb#16     pulse  cov: 29 ft: 56 exec/s: 0 rss: 27Mb#31     DONE   cov: 29 ft: 82 exec/s: 0 rss: 28MbMERGE-OUTER: succesfull in 1 attempt(s)MERGE-OUTER: the control file has 2691 bytesMERGE-OUTER: consumed 0Mb (27Mb rss) to parse the control fileMERGE-OUTER: 29 new files with 82 new features added; 29 new coverage edges\n\n三、优化技巧  整体优化思路分两种：\n\n找到 crash 更快 –&gt; 并行化，多个实例一起运行\n覆盖 edge 更多 –&gt; 加强语料，让输入能走到更深的分支\n\n（一）并行化1、LibFuzzer(1) jobs 和 workers\n\njobs：指定 fuzz 实例的数量。在不设置运行时长的情况下，每个 fuzz 实例找到 crash 才会停止。理论上有多少 jobs，最后会产生多少个 crash 文件。但实际上，不同的 job 可能找到同样的 crash，最后 crash 文件个数少于 job 个数。\nworks：执行 fuzz 进程的数量。在多个 jobs 的情况下，平均每个 woker 执行 #jobs&#x2F;#workers 个 job。\n\n简单来说，使用 workers 能提升 fuzz 运行速度，使用 jobs 能增加 crash 数量（仅根据输入去重，没有对调用栈去重）。 只使用 jobs 的情况下，默认开启 min(#jobs, #cores) &#x2F;&#x2F; 2 个 workers。\n(2) fork\n目前 fork 是实验阶段的参数，计划最终使用 fork 代替 jobs 和 workers 来实现 LibFuzzer 的并行化。\n\nfork：父进程不直接执行 fuzz，而是开启 N 个子进程，每个子进程使用语料库的随机子集进行 fuzz，当子进程退出后，该子进程的语料将被合并到主语料库中。子进程可以通过设置参数，来实现对指定错误的容错能力：\n\n-ignore_ooms：默认为 True。子进程发生内存溢出时，保存输入用于重现，但 fuzz 继续执行。\n\n-ignore_timeouts：默认为 True。子进程发生超时时，保留输入用于重现，但 fuzz 继续执行。\n\n-ignore_crashes：默认为 False。子进程发生其他类型 crash 时，保留输入用于重现，但 fuzz 继续执行。\n\n\n2、LibFuzzer 结合 AFLAFL 可以支持 LibFuzzer 的 target，编译方法参考  此处说明。\n12afl-fuzz -i testcase_dir -o findings_dir ./fuzz-target @@ ./fuzz-target testcase_dir findings_dir # Will write new tests to testcase_dir\n\n需要定期重启 AFL 和 LibFuzzer，以完成语料同步。\n（二）加强语料 1、字典 运行时使用 -dict 参数指定字典（Dictionary）文件的路径，字典用于指定和控制模糊测试中输入数据的一部分，从而提高模糊测试的效果。\n字典文件：\n12345678910# Lines starting with &#x27;#&#x27; and empty lines are ignored.# Adds &quot;blah&quot; (w/o quotes) to the dictionary.kw1=&quot;blah&quot;# Use \\\\ for backslash and \\&quot; for quotes.kw2=&quot;\\&quot;ac\\\\dc\\&quot;&quot;# Use \\xAB for hex valueskw3=&quot;\\xF7\\xF8&quot;# the name of the keyword followed by &#x27;=&#x27; may be omitted:&quot;foo\\x0Abar&quot;\n\n使用方法（运行时）：\n1./fuzz-target -dict=dict_file\n\n2、CMP编译时使用 -fsanitize-coverage&#x3D;trace-cmp 参数，让 fuzz 拦截 CMP 指令（例如 if 语句中的 compare 条件）并根据拦截到的 CMP 指令的参数来引导变异。这可能会减慢模糊测试的速度，但很可能会改善测试结果。\n使用方法（编译时）：\n1clang++ buggy.cc -fsanitize=fuzzer,address -fsanitize-coverage=trace-cmp -g -o buggy-fuzzer\n\n3、Value Profile需要与 -fsanitize-coverage=trace-cmp 一起使用，让 fuzz 收集 CMP 指令的参数值进行分析，用于发现更多的有效输入。但是有两个缺点：首先可能会导致速度降低 2 倍。 其次语料库可能增长数倍。\n使用方法（运行时）：\n1./fuzz-target -use_value_profile=1\n\n4、Fuzzer-friendly build mode程序中可能存在某些对 fuzz 不友好的特性，例如：\n\n随机化：同一个输入，可能走不同的路径\n校验和：拦截无效输入\n\n此时可以用构建宏 FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION 来编译一个对 fuzz 友好的版本，使用时需要对源码进行修改。例如：\n12345678void MyInitPRNG() &#123;#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION  // In fuzzing mode the behavior of the code should be deterministic.  srand(0);#else  srand(time(0));#endif&#125;\n\n四、 参考资料\nlibFuzzer – a library for coverage-guided fuzz testing\nlibFuzzer 使用总结教程\nEfficient Fuzzing Guide\nThe art of fuzzing-A Step-by-Step Guide to Coverage-Guided Fuzzing with LibFuzzer\nAn introduction to LLVM libFuzzer\nAn informative guide on using AFL and libFuzzer\nlibfuzzer-workshop\nSanitizers\nThe Magic Behind Feedback-Based Fuzzing\n","dateCreated":"2023-09-17T18:30:15+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2023-09-17T18:30:15+08:00","description":"模糊测试工具 LibFuzzer 从 0 到 1，原理 + 安装 + 使用 + 优化，一篇讲完","headline":"LibFuzzer 使用说明","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2023/LibFuzzer%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2023/LibFuzzer%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E/","keywords":"Fuzz, LibFuzzer"}</script>
+    <meta name="description" content="模糊测试工具 LibFuzzer 从 0 到 1，原理 + 安装 + 使用 + 优化，一篇讲完">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="LibFuzzer 使用说明">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2023/LibFuzzer%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="模糊测试工具 LibFuzzer 从 0 到 1，原理 + 安装 + 使用 + 优化，一篇讲完">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-09-17T10:30:15.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.498Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="Fuzz">
+<meta property="article:tag" content="LibFuzzer">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            LibFuzzer 使用说明
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2023-09-17T18:30:15+08:00">
+	
+		    2023 年 9 月 17 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/">模糊测试</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<p>按照 <a target="_blank" rel="external nofollow noopener noreferrer" href="https://llvm.org/docs/LibFuzzer.html"> 官方定义</a>，LibFuzzer 是一个<strong>in-process</strong>（进程内的），<strong>coverage-guided</strong>（以覆盖率为引导的），<strong>evolutionary</strong>（进化的） 的 fuzz 引擎，是 LLVM 项目的一部分，主要用于对 C&#x2F;C++ 程序进行 Fuzz 测试。LibFuzzer 三个特性的具体含义为：</p>
+<ul>
+<li><p>in-process：不会为每个测试用例启动一个进程，而是将所有的测试数据投放在同一个进程的内存空间中</p>
+</li>
+<li><p>coverage-guided：对每一个测试输入都进行代码覆盖率计算，不断累积测试用例使得代码覆盖率最大化</p>
+</li>
+<li><p>evolutionary：结合了变异和生成两种形势的 Fuzz 引擎</p>
+<ul>
+<li><p>变异：基于已有的数据样本，通过一些变异规则，产生新的测试用例</p>
+</li>
+<li><p>生成：通过对目标协议或接口规范进行建模，从零开始产生测试用例</p>
+</li>
+</ul>
+</li>
+</ul>
+<p>LibFuzzer 与待测的 library 进行链接，通过向指定的 fuzzing 入口（即<strong>target 函数</strong>）发送测试数据，并跟踪被触达的代码区域，然后对输入的数据进行变异，以达到代码覆盖率最大的目的，其中代码覆盖率的信息由 LLVM 的 SanitizerCoverage 工具提供。</p>
+<h2 id="一、使用方法"><a href="# 一、使用方法" class="headerlink" title="一、使用方法"></a>一、使用方法 </h2><h3 id="1- 安装环境"><a href="#1- 安装环境" class="headerlink" title="1. 安装环境"></a>1. 安装环境</h3><p>Clang 是一个类似 GCC 的 C&#x2F;C++ 语言编译工具，此处<a target="_blank" rel="external nofollow noopener noreferrer" href="https://blog.csdn.net/momo0853/article/details/121040320"> 简介</a>。LibFuzzer 现在已被集成到 Clang 6.0 之后的版本中，在 Linux 环境下，只需直接安装 Clang 即可：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">apt install clang</span><br></pre></td></tr></table></figure>
+
+<p>安装完毕之后，可以通过如下命令查看 clang 版本：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">clang --version</span><br></pre></td></tr></table></figure>
+
+<h3 id="2- 构建 target"><a href="#2- 构建 target" class="headerlink" title="2. 构建 target"></a>2. 构建 target</h3><p>使用 LibFuzzer 时，第一步就是要实现 target 函数——LLVMFuzzerTestOneInput，该函数以 bytes 数组作为输入，函数体内使用待测 API 对这个 bytes 数组进行处理：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// fuzz_target.cc</span></span><br><span class="line"><span class="keyword">extern</span> <span class="string">&quot;C&quot;</span> <span class="function"><span class="type">int</span> <span class="title">LLVMFuzzerTestOneInput</span><span class="params">(<span class="type">const</span> <span class="type">uint8_t</span> *Data, <span class="type">size_t</span> Size)</span> </span>&#123;</span><br><span class="line">  <span class="built_in">DoSomethingInterestingWithMyAPI</span>(Data, Size);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;  <span class="comment">// Values other than 0 and -1 are reserved for future use.</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>target 函数的名称、参数类型、返回值类型都不能改变。此外，官方文档中还有如下说明：</p>
+<ul>
+<li><p>target 函数在同一个进程中被多次执行，被不同的输入循环调用；</p>
+</li>
+<li><p>target 函数需要容忍任何形势的输入，比如空数据、很长的数据、格式错误的数据等；</p>
+</li>
+<li><p>target 函数不允许调用 exit 函数，否则将导致 Fuzz 终止执行；</p>
+</li>
+<li><p>target 函数中可以使用线程，但是子线程要在函数体结束前 join，即进入下一次循环前，结束上一次循环的子线程；</p>
+</li>
+<li><p>target 函数的结果必须是确定性的，即两次的 Data 如果一致，两次的执行结果也必须一致；</p>
+</li>
+<li><p>target 函数执行速度必须快，避免三阶及以上的复杂度、日志记录和过多的内存消耗；</p>
+</li>
+<li><p>target 函数应尽量避免修改全局状态，因为在同一个进程中修改全局变量，会导致下一次运行与上一次运行的上下文不同，可能影响程序确定性；</p>
+</li>
+<li><p>target 函数的处理范围越窄越好，如果函数要处理多种数据格式，那最好拆分成多个子函数，每个子函数处理一种格式。</p>
+</li>
+</ul>
+<p>target 函数编写完成后，通过以下命令编译成可执行文件：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">clang -g -O1 -fsanitize=fuzzer                         fuzz_target.cc # Builds the fuzz target w/o sanitizers</span><br><span class="line">clang -g -O1 -fsanitize=fuzzer,address                 fuzz_target.cc # Builds the fuzz target with ASAN</span><br><span class="line">clang -g -O1 -fsanitize=fuzzer,signed-integer-overflow fuzz_target.cc # Builds the fuzz target with a part of UBSAN</span><br><span class="line">clang -g -O1 -fsanitize=fuzzer,memory                  fuzz_target.cc # Builds the fuzz target with MSAN</span><br></pre></td></tr></table></figure>
+
+<p>Clang 支持的编译选项可以 <a target="_blank" rel="external nofollow noopener noreferrer" href="https://clang.llvm.org/docs/ClangCommandLineReference.html"> 参考文档 </a> 或者通过–help 查看，构建 LibFuzzer target 时常用的 <strong> 编译选项 </strong> 如下：</p>
+<ul>
+<li><p>-g：生成调试信息</p>
+</li>
+<li><p>-O：设置编译器优化等级，可以是 1&#x2F;2&#x2F;3，默认为 1，数字越大，优化越多，注意<a target="_blank" rel="external nofollow noopener noreferrer" href="https://stackoverflow.com/questions/74640023/how-to-use-libfuzz-on-a-c-project-that-is-not-a-library">2 和 3 有可能导致 Fuzz 找不到 crash</a></p>
+</li>
+<li><p><strong>-o</strong>：指定输出文件名</p>
+</li>
+<li><p><strong>-I</strong>：uppercase i，添加头文件搜索路径</p>
+</li>
+<li><p>-L：添加库文件搜索路径</p>
+</li>
+<li><p>-l：lowercase L，指定库文件名称，动态库和静态库同时存在时，动态库优先</p>
+</li>
+<li><p>-<strong>fsanitize</strong>：启用 LibFuzzer，对源码进行插桩，并添加各种 <strong> 消毒器 sanitizer</strong>，对程序进行运行时检查。</p>
+<ul>
+<li><p>-fsanitize&#x3D;fuzzer  编译时对源码插桩，链接 libFuzzer 库文件（使用 libFuzzer 的 main 函数）</p>
+</li>
+<li><p>-fsanitize&#x3D;fuzzer-no-link  编译时对源码插桩，不链接 libFuzzer，适用于拥有 main 函数的源码。对大型项目来说，构建效率更高</p>
+</li>
+<li><p>-fsanitize&#x3D;address  地址消毒器（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://clang.llvm.org/docs/AddressSanitizer.html">AddressSanitizer</a>），用于检测缓冲区溢出、UAF、Double Free、内存泄漏等内存问题</p>
+</li>
+<li><p>-fsanitize&#x3D;memory  内存消毒器（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://clang.llvm.org/docs/MemorySanitizer.html">MemorySanitizer</a>），用于检测未初始化的内存访问</p>
+</li>
+<li><p>-fsanitize&#x3D;undefined  未定义行为消毒器（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html">UndefinedBehaviorSanitizer</a>），用于检测程序运行中未定义行为，如越界访问、整数溢出、空指针解引用等</p>
+</li>
+</ul>
+</li>
+<li><p>-fsanitize-coverage：启用代码覆盖率的统计，包括 function 级别，basic block 级别和 edge 级别，详情可 <a target="_blank" rel="external nofollow noopener noreferrer" href="https://clang.llvm.org/docs/SanitizerCoverage.html"> 参考文档 </a>。但需要注意的是，<strong> 高版本的 clang 中，已经取消了对 -fsanitize-coverage&#x3D;trace-pc-guard 的支持，建议改用 -fsanitize&#x3D;fuzzer 替代</strong>，否则会出现报错，参见第二章节使用示例。</p>
+<ul>
+<li><p>-fsanitize-coverage&#x3D;trace-pc-guard,edge  使用 edge 级别代码覆盖率，edge 为默认级别，可省略</p>
+</li>
+<li><p>-fsanitize-coverage&#x3D;trace-pc-guard,func  使用 function 级别代码覆盖率</p>
+</li>
+<li><p>-fsanitize-coverage&#x3D;trace-pc-guard,bb  使用 basic block 级别代码覆盖率</p>
+</li>
+</ul>
+</li>
+</ul>
+<p>关于添加 LibFuzzer 相关选项后的详细构建过程，有兴趣可以参考<a target="_blank" rel="external nofollow noopener noreferrer" href="https://i-m.dev/posts/20190831-143715.html">libFuzzer 编译链接</a>。</p>
+<p>关于 LibFuzzer 通过插桩统计代码覆盖率的具体实现，有兴趣可以参考<a target="_blank" rel="external nofollow noopener noreferrer" href="https://cyruscyliu.github.io/posts/2021-11-02-libFuzzer-cov-control/">Coverage Control in libFuzzer</a>。</p>
+<h3 id="3- 执行 fuzz"><a href="#3- 执行 fuzz" class="headerlink" title="3. 执行 fuzz"></a>3. 执行 fuzz</h3><p>在 target 函数构建成功后，会生成一个可执行的 fuzz 二进制文件，该文件通过命令行方式执行，可以接受指定的参数选项。执行格式为：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./fuzz-target -flag1=val1 -flag2=val2 ... path1 path2 ...</span><br></pre></td></tr></table></figure>
+
+<p>在不限制运行时长的情况下，Fuzz 将会一直执行下去，直到出现 crash（通常是因为触发 sanitizer 异常）才会终止。导致 crash 的输入将会作为能触发 bug 的 testcase 保存到磁盘上，并根据 crash 的类型，用不同的文件名前缀进行区分，比如 crash-XXX，leak-XXX，timeout-XXX 等。</p>
+<h4 id="1- 参数说明"><a href="#1- 参数说明" class="headerlink" title="(1) 参数说明"></a>(1) 参数说明 </h4><p> 常见的 flag 选项及作用列举如下，使用 flag 时必须以 <strong>-flag&#x3D;val</strong> 的格式：</p>
+<table>
+<thead>
+<tr>
+<th>flag</th>
+<th>默认值</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>verbosity</td>
+<td>1</td>
+<td>运行时输出详细日志</td>
+</tr>
+<tr>
+<td>seed</td>
+<td>0</td>
+<td>随机种子。如果为 0，则自动生成随机种子</td>
+</tr>
+<tr>
+<td>runs</td>
+<td>-1</td>
+<td>测试运行的次数（-1 表示无限）</td>
+</tr>
+<tr>
+<td>max_len</td>
+<td>0</td>
+<td>测试输入的最大长度。若为 0，libFuzzer 会自行猜测</td>
+</tr>
+<tr>
+<td>shuffle</td>
+<td>1</td>
+<td>为 1 表示启动时打乱初始语料库</td>
+</tr>
+<tr>
+<td>prefer_small</td>
+<td>1</td>
+<td>为 1 表示打乱语料库时，较小输入更优先</td>
+</tr>
+<tr>
+<td><strong>timeout</strong></td>
+<td>1200</td>
+<td>超时时长，单位为秒。如果单次运行超过时长，Fuzz 将被终止</td>
+</tr>
+<tr>
+<td><strong>max_total_time</strong></td>
+<td>0</td>
+<td>最大运行时长，单位为秒。若为正，表示 Fuzz 最长运行时间</td>
+</tr>
+<tr>
+<td>help</td>
+<td>0</td>
+<td>为 1 表示打印帮助信息</td>
+</tr>
+<tr>
+<td><strong>merge</strong></td>
+<td>0</td>
+<td>为 1 表示在不损失代码覆盖率的情况下，进行语料库合并</td>
+</tr>
+<tr>
+<td>merge_control_file</td>
+<td>0</td>
+<td>指定合并进程的控制文件，用于恢复合并状态</td>
+</tr>
+<tr>
+<td>minimize_crash</td>
+<td>0</td>
+<td>为 1 表示将提供的崩溃输入进行最小化。与 -runs &#x3D; N 或 -max_total_time &#x3D; N 一起使用以限制尝试次数</td>
+</tr>
+<tr>
+<td><strong>jobs</strong></td>
+<td>0</td>
+<td>job 的数量，多个 job 将被分配到 workers 上执行，每个 job 的 stdout&#x2F;stderr 被重定向到 fuzz-&lt;JOB&gt;.log</td>
+</tr>
+<tr>
+<td><strong>workers</strong></td>
+<td>0</td>
+<td>worker 的数量，为 0 将使用 min(jobs, number_of_cpu_cores&#x2F;2)</td>
+</tr>
+<tr>
+<td><strong>reload</strong></td>
+<td>1</td>
+<td>设置重新加载主语料库的间隔秒数。在并行模式下，在多个 job 中同步语料集。为 0 表示禁止</td>
+</tr>
+<tr>
+<td>reduce_inputs</td>
+<td>1</td>
+<td>为 1 表示尝试减少输入数据的大小，同时保留其完整的特征集</td>
+</tr>
+<tr>
+<td>rss_limit_mb</td>
+<td>2048</td>
+<td>RSS 内存用量限制，单位为 Mb。为 0 表示无限制</td>
+</tr>
+<tr>
+<td>purge_allocator_interval</td>
+<td>1</td>
+<td>清理缓存的建个时长，单位为秒。当指定 rss_limit_mb 且 rss 使用率超过 50% 时，开始清理。为 -1 表示禁止</td>
+</tr>
+<tr>
+<td>malloc_limit_mb</td>
+<td>0</td>
+<td>单次 malloc 申请内存的大小限制，单位为 Mb。为 0 则采用 rss_limit_mb 进行限制</td>
+</tr>
+<tr>
+<td>detect_leaks</td>
+<td>1</td>
+<td>为 1，且启用 LeakSanitizer 消毒器时，将在 Fuzz 过程中检测内存泄漏，而不仅是在 Fuzz 结束时才检测</td>
+</tr>
+<tr>
+<td>print_coverage</td>
+<td>0</td>
+<td>退出时打印覆盖率信息</td>
+</tr>
+<tr>
+<td>print_corpus_stats</td>
+<td>0</td>
+<td>退出时打印语料信息</td>
+</tr>
+<tr>
+<td>print_final_stats</td>
+<td>0</td>
+<td>退出时打印统计信息</td>
+</tr>
+<tr>
+<td>only_ascii</td>
+<td>0</td>
+<td>为 1 表示只生成 ASCII（isprint + isspace）字符作为输入</td>
+</tr>
+<tr>
+<td>artifact_prefix</td>
+<td>0</td>
+<td>将 fuzzing artifacts（crash、timeout 等 file）保存为文件时所使用的前缀，即文件将保存为 $(artifact_prefix)file</td>
+</tr>
+<tr>
+<td>exact_artifact_path</td>
+<td>0</td>
+<td>将单个 fuzz artfifact 保存为文件时所使用的前缀。将覆盖 -artifact_prefix，并行任务中不要使用相同取值</td>
+</tr>
+</tbody></table>
+<h4 id="2- 语料使用"><a href="#2- 语料使用" class="headerlink" title="(2) 语料使用"></a>(2) 语料使用 </h4><p> 模糊测试通过随机的方式变异或生成测试用例。提供种子语料库作为随机变异的基础用例，避免从头开始生完全随机地生成用例，在待测函数接受复杂或结构化输入的情况下，能显著提升 Fuzz 测试的效率和覆盖率。</p>
+<p>LibFuzzer 是以覆盖率为引导的，当提供种子语料库时，LibFuzzer 从语料库中读取语料，通过随机变异产生新的测试数据，输入到 Fuzz Target。由于在构建 Fuzz Target 时，通过编译参数进行了代码插桩，因此可以跟踪 Fuzz Target 在接收到输入后，具体执行了哪些代码。如果某个测试输入能执行到之前从未执行的代码，那么这个测试输入就是一个有效变异，将被纳入到语料库，作为后续变异的基础。整体流程大致如下，仅做原理示意，不等于具体实现。</p>
+<pre class="mermaid">graph LR
+    A[从语料库中读取样本] --> B[随机变异生成新样本]
+    B --> C[新样本输入 Fuzz Target]
+    C --> D[跟踪代码执行路径]
+    D --> E{是否覆盖新的代码}
+    E -->| 是 | F[测试数据加入语料库]
+    E -->| 否 | B
+    F --> A</pre>
+
+<p>使用 corpus 时，需要提供一个或多个存放种子语料的路径，命令为：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./fuzz_target -max_len=1000 -jobs=20 corpus_dir  # 种子语料存放在 corpus_dir 目录下</span><br></pre></td></tr></table></figure>
+
+<p>当语料库很大时，可以在保持代码覆盖率的情况下进行精简操作，这时需要用 -merge 参数，命令为：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./fuzz_target -merge=1 mini_corpus_dir corpus_dir  # 原始语料集存放在 corpus_dir 目录下，精简后的语料集存放在 mini_corpus_dir 目录下</span><br></pre></td></tr></table></figure>
+
+<p>利用 -merge 参数，还可以实现有效语料的提取，即从一批候选语料中，找到能够触发新代码路径的语料，命令为：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./fuzz_target -merge=1 interesting_corpus_dir candidate_corpus_dir  # 候选语料放在 candidate_corpus_dir，有效语料放在 interesting_corpus_dir</span><br></pre></td></tr></table></figure>
+
+<p>总的来说，语料集的路径可以有一个、两个或更多，当使用 -merge 参数时，这些语料集中发现的有效语料，都会被保存到第一个路径下。需要注意的是，合并语料是一个非常耗时的过程，通过使用 -merge_control_file 参数，可以实现无缝恢复的多阶段合并，即通过 <code>killall -SIGUSR1 /path/to/fuzzer/binary</code> 中断合并操作后，下次还能继续上一次的合并进度，继续开始合并操作。示例如下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">% </span><span class="language-bash"><span class="built_in">rm</span> -f SomeLocalPath</span></span><br><span class="line"><span class="meta prompt_">% </span><span class="language-bash">./my_fuzzer CORPUS1 CORPUS2 -merge=1 -merge_control_file=SomeLocalPath</span></span><br><span class="line">...</span><br><span class="line">MERGE-INNER: using the control file &#x27;SomeLocalPath&#x27;</span><br><span class="line">...</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">While this is running, <span class="keyword">do</span> `killall -SIGUSR1 my_fuzzer` <span class="keyword">in</span> another console</span></span><br><span class="line">==9015== INFO: libFuzzer: exiting as requested</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">This will leave the file SomeLocalPath with the partial state of the merge.</span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Now, you can <span class="built_in">continue</span> the merge by executing the same <span class="built_in">command</span>. The merge will <span class="built_in">continue</span> from <span class="built_in">where</span> it has been interrupted.</span></span><br><span class="line"><span class="meta prompt_">% </span><span class="language-bash">./my_fuzzer CORPUS1 CORPUS2 -merge=1 -merge_control_file=SomeLocalPath</span></span><br><span class="line">...</span><br><span class="line">MERGE-OUTER: non-empty control file provided: &#x27;SomeLocalPath&#x27;</span><br><span class="line">MERGE-OUTER: control file ok, 32 files total, first not processed file 20</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>语料库除了用于提高 Fuzz 效率，还可用于回归测试。在回归测试和复现 crash 时，还可以具体指定某一个 testcase，命令为：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./fuzz_target testcase_path  # testcase_path 就是 fuzz crash 时保存的 testcase file 的文件路径</span><br></pre></td></tr></table></figure>
+
+<h3 id="4- 输出解读"><a href="#4- 输出解读" class="headerlink" title="4. 输出解读"></a>4. 输出解读 </h3><p> 在 Fuzz 执行过程中，标准错误流 stderr 中，通常会输出以下格式的内容：</p>
+<figure class="highlight vim"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">INFO: Seed: <span class="number">1523017872</span></span><br><span class="line">INFO: Loaded <span class="number">1</span> modules (<span class="number">16</span> guards): [<span class="number">0</span>x744e60, <span class="number">0</span>x744ea0),</span><br><span class="line">INFO: -max_len <span class="keyword">is</span> not provided, using <span class="number">64</span></span><br><span class="line">INFO: A corpus <span class="keyword">is</span> not provided, starting from <span class="keyword">an</span> <span class="built_in">empty</span> corpus</span><br><span class="line">#<span class="number">0</span>    READ units: <span class="number">1</span></span><br><span class="line">#<span class="number">1</span>    INITED cov: <span class="number">3</span> ft: <span class="number">2</span> corp: <span class="number">1</span>/<span class="number">1</span><span class="keyword">b</span> exec/s: <span class="number">0</span> rss: <span class="number">24</span>Mb</span><br><span class="line">#<span class="number">3811</span> NEW    cov: <span class="number">4</span> ft: <span class="number">3</span> corp: <span class="number">2</span>/<span class="number">2</span><span class="keyword">b</span> exec/s: <span class="number">0</span> rss: <span class="number">25</span>Mb L: <span class="number">1</span> MS: <span class="number">5</span> ChangeBit-ChangeByte-ChangeBit-ShuffleBytes-ChangeByte-</span><br><span class="line">#<span class="number">3827</span> NEW    cov: <span class="number">5</span> ft: <span class="number">4</span> corp: <span class="number">3</span>/<span class="number">4</span><span class="keyword">b</span> exec/s: <span class="number">0</span> rss: <span class="number">25</span>Mb L: <span class="number">2</span> MS: <span class="number">1</span> CopyPart-</span><br><span class="line">#<span class="number">3963</span> NEW    cov: <span class="number">6</span> ft: <span class="number">5</span> corp: <span class="number">4</span>/<span class="number">6</span><span class="keyword">b</span> exec/s: <span class="number">0</span> rss: <span class="number">25</span>Mb L: <span class="number">2</span> MS: <span class="number">2</span> ShuffleBytes-ChangeBit-</span><br><span class="line">#<span class="number">4167</span> NEW    cov: <span class="number">7</span> ft: <span class="number">6</span> corp: <span class="number">5</span>/<span class="number">9</span><span class="keyword">b</span> exec/s: <span class="number">0</span> rss: <span class="number">25</span>Mb L: <span class="number">3</span> MS: <span class="number">1</span> InsertByte-</span><br><span class="line">==<span class="number">31511</span>== ERROR: libFuzzer: deadly signal</span><br><span class="line">...</span><br><span class="line">artifact_prefix=<span class="string">&#x27;./&#x27;</span>; Test unit written <span class="keyword">to</span> ./crash-b13e8756b13a00cf168300179061fb4b91fefbed</span><br></pre></td></tr></table></figure>
+
+<p>第一行显示 Fuzz 测试使用的随机种子，可以通过 -seed 参数来设置。</p>
+<p>第二行显示插桩后的 PC guards 数量（PC 指 Program Counter），可理解为 Fuzz 识别出来的 edge 总数，参考 <a target="_blank" rel="external nofollow noopener noreferrer" href="https://google.github.io/fuzzbench/reference/benchmarks/"> 此处脚注说明</a>。</p>
+<p>第三行显示输入数据的长度限制，示例中 -max_len 参数没有设置，Fuzz 程序将 -max_len 定为 64，即最大数据长度不超过 64kb。</p>
+<p>第四行显示语料库信息，示例中没有提供 corpus，Fuzz 程序从头开始生成语料。</p>
+<p>第五行到第十行，每行开头的 #N 表示 Fuzz 已执行了 N 次测试输入，后面的内容为测试过程中的事件代码和统计信息：</p>
+<table>
+<thead>
+<tr>
+<th>事件代码</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>READ</td>
+<td>Fuzz 已从语料库中读取所有初始输入样本</td>
+</tr>
+<tr>
+<td>INITED</td>
+<td>Fuzz 已完成初始化，包括通过被测代码运行每个初始输入样本</td>
+</tr>
+<tr>
+<td>NEW</td>
+<td>Fuzz 生成了一个测试输入样本，它能触发被测代码的新路径，将被保存到主语料库目录</td>
+</tr>
+<tr>
+<td>REDUCE</td>
+<td>Fuzz 找到了一个更好的输入样本，它能保持原有样本的特征集（参考下表 ft 含义），但是 size 更小</td>
+</tr>
+<tr>
+<td>pulse</td>
+<td>Fuzz 已生成 2 的 n 次方个输入（定期生成以使用户确信 Fuzz 仍在工作）</td>
+</tr>
+<tr>
+<td>DONE</td>
+<td>Fuzz 已完成操作，因为它已达到指定的迭代限制（-runs）或时间限制（-max_total_time）</td>
+</tr>
+<tr>
+<td>RELOAD</td>
+<td>Fuzz 正在定期重新加载语料库目录中的输入样本，这使它能够发现其他 Fuzz 进程发现的任何输入</td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>统计指标</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>cov</td>
+<td>执行当前语料库所覆盖的 block 或 edge 的总数</td>
+</tr>
+<tr>
+<td>ft</td>
+<td>LibFuzzer 使用不同的信号来评估代码覆盖率：边缘覆盖率、边缘计数器、间接调用者 &#x2F; 被调用者对等。这些信号组合起来称为特征</td>
+</tr>
+<tr>
+<td>corp</td>
+<td>当前内存测试语料库中的条目数及其大小（单位为 byte）</td>
+</tr>
+<tr>
+<td>lim</td>
+<td>当前语料库中新样本的长度限制。 随着时间的推移而增加，直到达到最大长度 (-max_len)</td>
+</tr>
+<tr>
+<td>exec&#x2F;s</td>
+<td>每秒 Fuzz 执行次数</td>
+</tr>
+<tr>
+<td>rss</td>
+<td>当前内存消耗（单位为 Mb）</td>
+</tr>
+<tr>
+<td>L</td>
+<td>新样本的大小（单位为 byte）。只用于 NEW 和 REDUCE 事件</td>
+</tr>
+<tr>
+<td>MS: &lt;n&gt; &lt;operations&gt;</td>
+<td>生成新样本时的变异次数和变异方法。只用于 NEW 和 REDUCE 事件</td>
+</tr>
+</tbody></table>
+<p>第十一行开始，显示 Fuzz 遇到 crash 并终止执行，导致 crash 的用例被保存为.&#x2F;crash-&lt;sha1&gt; 文件，保存路径和名称可以通过 -artifact_prefix 参数修改。</p>
+<h2 id="二、使用示例"><a href="# 二、使用示例" class="headerlink" title="二、使用示例"></a>二、使用示例 </h2><p> 以<a target="_blank" rel="external nofollow noopener noreferrer" href="https://c-ares.org/adv_20160929.html">CVE-2016-5180</a>为例，演示 LibFuzzer 的使用过程。<a target="_blank" rel="external nofollow noopener noreferrer" href="https://c-ares.org/adv_20160929.html">CVE-2016-5180</a>是在 <a target="_blank" rel="external nofollow noopener noreferrer" href="https://c-ares.haxx.se/">c-ares</a> 中出现的堆溢出问题，是使得 ChromeOS 被攻击（<a target="_blank" rel="external nofollow noopener noreferrer" href="https://chromereleases.googleblog.com/2016/09/stable-channel-updates-for-chrome-os.html">重启后以访客模式执行代码</a>）的漏洞之一。</p>
+<h3 id="1- 下载源码"><a href="#1- 下载源码" class="headerlink" title="1. 下载源码"></a>1. 下载源码 </h3><p> 最新的 c-ares 代码已修复漏洞，为了复现漏洞，clone 代码后，需要恢复到漏洞修复之前。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git clone https://github.com/c-ares/c-ares.git</span><br><span class="line">cd c-ares/</span><br><span class="line">git reset --hard 51fbb479f7948fca2ace3ff34a15ff27e796afdd</span><br></pre></td></tr></table></figure>
+
+<h3 id="2- 编写 Fuzz 主函数"><a href="#2- 编写 Fuzz 主函数" class="headerlink" title="2. 编写 Fuzz 主函数"></a>2. 编写 Fuzz 主函数 </h3><p> 实现 LLVMFuzzerTestOneInput 函数，将 LibFuzzer 输入的字节流进行转换，调用 ares_create_query 函数，并将代码保存为 target.cc 文件。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Copyright 2016 Google Inc. All Rights Reserved.</span></span><br><span class="line"><span class="comment">// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdint.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;arpa/nameser.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;ares.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">extern</span> <span class="string">&quot;C&quot;</span> <span class="function"><span class="type">int</span> <span class="title">LLVMFuzzerTestOneInput</span><span class="params">(<span class="type">const</span> <span class="type">uint8_t</span> *Data, <span class="type">size_t</span> Size)</span> </span>&#123;</span><br><span class="line">  <span class="type">unsigned</span> <span class="type">char</span> *buf;</span><br><span class="line">  <span class="type">int</span> buflen;</span><br><span class="line">  <span class="function">std::string <span class="title">s</span><span class="params">(<span class="keyword">reinterpret_cast</span>&lt;<span class="type">const</span> <span class="type">char</span> *&gt;(Data), Size)</span></span>;</span><br><span class="line">  <span class="built_in">ares_create_query</span>(s.<span class="built_in">c_str</span>(), ns_c_in, ns_t_a, <span class="number">0x1234</span>, <span class="number">0</span>, &amp;buf, &amp;buflen, <span class="number">0</span>);</span><br><span class="line">  <span class="built_in">free</span>(buf);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="3- 编译 Fuzz-target"><a href="#3- 编译 Fuzz-target" class="headerlink" title="3. 编译 Fuzz target"></a>3. 编译 Fuzz target</h3><p>使用 <a target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/google/fuzzer-test-suite/tree/master/c-ares-CVE-2016-5180">fuzzer-test-suite</a> 提供的编译脚本，执行 build.sh 脚本，会自动调用 custom-build.sh 和 common.sh 进行编译。三个 shell 脚本和 Fuzz 函数的存放路径如下，脚本中会自动使用 git 拉取代码，这里将第 1 步手动拉取的代码删掉了：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">root@server:~/fuzz$ tree</span><br><span class="line">.</span><br><span class="line">├── cares</span><br><span class="line">│   ├── build.sh</span><br><span class="line">│   └── target.cc</span><br><span class="line">├── common.sh</span><br><span class="line">└── custom-build.sh</span><br><span class="line"></span><br><span class="line">1 directory, 4 files</span><br></pre></td></tr></table></figure>
+
+<p>注意需要将原始脚本中的 -fsanitize-coverage&#x3D;trace-pc-guard 替换为 -fsanitize&#x3D;fuzzer，否则执行 Fuzz 时会出现错误：-fsanitize-coverage&#x3D;trace-pc-guard is no longer supported by libFuzzer。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">root@server:~/fuzz$ ./cares-fsanitize_fuzzer</span><br><span class="line">-fsanitize-coverage=trace-pc-guard is no longer supported by libFuzzer.</span><br><span class="line">Please either migrate to a compiler that supports -fsanitize=fuzzer</span><br><span class="line">or use an older version of libFuzzer</span><br></pre></td></tr></table></figure>
+
+<p>执行脚本进行编译（也可以自己编写命令进行编译，编译相关的内容之后会单独写文章进行说明）：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">root@server:~/fuzz$ ./cares/build.sh</span><br></pre></td></tr></table></figure>
+
+<p>编译完后，可以看到目录下多了一个二进制文件 cares-fsanitize_fuzzer，两个目录 BUILD 和 SRC。cares-fsanitize_fuzzer 是可执行的 Fuzz 程序，SRC 目录存放 c-ares 含漏洞的源码，BUILD 目录用于存放编译产生的中间文件和最终文件：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">root@server:~/fuzz$ tree -L 1</span><br><span class="line">.</span><br><span class="line">├── BUILD</span><br><span class="line">├── cares</span><br><span class="line">├── cares-fsanitize_fuzzer</span><br><span class="line">├── common.sh</span><br><span class="line">├── custom-build.sh</span><br><span class="line">└── SRC</span><br><span class="line"></span><br><span class="line">3 directories, 3 files</span><br></pre></td></tr></table></figure>
+
+<h3 id="4- 执行 Fuzz 测试"><a href="#4- 执行 Fuzz 测试" class="headerlink" title="4. 执行 Fuzz 测试"></a>4. 执行 Fuzz 测试 </h3><p> 直接运行编译得到的二进制文件，如需附带参数，可参考第一章节执行 fuzz 的参数说明。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br></pre></td><td class="code"><pre><span class="line">root@server:~/fuzz$ ./cares-fsanitize_fuzzer</span><br><span class="line">INFO: Seed: 817252946</span><br><span class="line">INFO: Loaded 1 modules   (10 inline 8-bit counters): 10 [0x5a90e0, 0x5a90ea),</span><br><span class="line">INFO: Loaded 1 PC tables (10 PCs): 10 [0x56c278,0x56c318),</span><br><span class="line">INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes</span><br><span class="line">INFO: A corpus is not provided, starting from an empty corpus</span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">2      INITED cov: 3 ft: 3 corp: 1/1b <span class="built_in">exec</span>/s: 0 rss: 27Mb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">3      NEW    cov: 4 ft: 4 corp: 2/5b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 4/4 MS: 1 CrossOver-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">10     REDUCE cov: 4 ft: 4 corp: 2/4b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 3/3 MS: 2 ChangeByte-CrossOver-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">11     REDUCE cov: 4 ft: 4 corp: 2/3b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 2/2 MS: 1 EraseBytes-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">1368   REDUCE cov: 6 ft: 6 corp: 3/20b lim: 17 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 17/17 MS: 2 InsertByte-InsertRepeatedBytes-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">1524   REDUCE cov: 6 ft: 6 corp: 3/19b lim: 17 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 16/16 MS: 1 EraseBytes-</span></span><br><span class="line">=================================================================</span><br><span class="line">==3049145==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6030012599c2 at pc 0x000000550e1c bp 0x7fffbad826d0 sp 0x7fffbad826c8</span><br><span class="line">WRITE of size 1 at 0x6030012599c2 thread T0</span><br><span class="line">    #0 0x550e1b in ares_create_query (/home/fuzz/cares-fsanitize_fuzzer+0x550e1b)</span><br><span class="line">    #1 0x55053c in LLVMFuzzerTestOneInput /home/fuzz/cares/target.cc:14:3</span><br><span class="line">    #2 0x4586a1 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/home/fuzz/cares-fsanitize_fuzzer+0x4586a1)</span><br><span class="line">    #3 0x457de5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool*) (/home/fuzz/cares-fsanitize_fuzzer+0x457de5)</span><br><span class="line">    #4 0x45a087 in fuzzer::Fuzzer::MutateAndTestOne() (/home/fuzz/cares-fsanitize_fuzzer+0x45a087)</span><br><span class="line">    #5 0x45ad85 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, fuzzer::fuzzer_allocator&lt;fuzzer::SizedFile&gt; &gt;&amp;) (/home/fuzz/cares-fsanitize_fuzzer+0x45ad85)</span><br><span class="line">    #6 0x44973e in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/home/fuzz/cares-fsanitize_fuzzer+0x44973e)</span><br><span class="line">    #7 0x472582 in main (/home/fuzz/cares-fsanitize_fuzzer+0x472582)</span><br><span class="line">    #8 0x7fd31481c082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082)</span><br><span class="line">    #9 0x41e4dd in _start (/home/fuzz/cares-fsanitize_fuzzer+0x41e4dd)</span><br><span class="line"></span><br><span class="line">0x6030012599c2 is located 0 bytes to the right of 18-byte region [0x6030012599b0,0x6030012599c2)</span><br><span class="line">allocated by thread T0 here:</span><br><span class="line">    #0 0x51e20d in malloc (/home/fuzz/cares-fsanitize_fuzzer+0x51e20d)</span><br><span class="line">    #1 0x5508f6 in ares_create_query (/home/fuzz/cares-fsanitize_fuzzer+0x5508f6)</span><br><span class="line">    #2 0x55053c in LLVMFuzzerTestOneInput /home/fuzz/cares/target.cc:14:3</span><br><span class="line">    #3 0x4586a1 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/home/fuzz/cares-fsanitize_fuzzer+0x4586a1)</span><br><span class="line">    #4 0x457de5 in fuzzer::Fuzzer::RunOne(unsigned char const*, unsigned long, bool, fuzzer::InputInfo*, bool*) (/home/fuzz/cares-fsanitize_fuzzer+0x457de5)</span><br><span class="line">    #5 0x45a087 in fuzzer::Fuzzer::MutateAndTestOne() (/home/fuzz/cares-fsanitize_fuzzer+0x45a087)</span><br><span class="line">    #6 0x45ad85 in fuzzer::Fuzzer::Loop(std::__Fuzzer::vector&lt;fuzzer::SizedFile, fuzzer::fuzzer_allocator&lt;fuzzer::SizedFile&gt; &gt;&amp;) (/home/fuzz/cares-fsanitize_fuzzer+0x45ad85)</span><br><span class="line">    #7 0x44973e in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/home/fuzz/cares-fsanitize_fuzzer+0x44973e)</span><br><span class="line">    #8 0x472582 in main (/home/fuzz/cares-fsanitize_fuzzer+0x472582)</span><br><span class="line">    #9 0x7fd31481c082 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x24082)</span><br><span class="line"></span><br><span class="line">SUMMARY: AddressSanitizer: heap-buffer-overflow (/home/fuzz/cares-fsanitize_fuzzer+0x550e1b) in ares_create_query</span><br><span class="line">Shadow bytes around the buggy address:</span><br><span class="line">  0x0c06802432e0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa</span><br><span class="line">  0x0c06802432f0: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa</span><br><span class="line">  0x0c0680243300: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa</span><br><span class="line">  0x0c0680243310: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa</span><br><span class="line">  0x0c0680243320: fa fa fa fa fa fa fa fa fa fa fd fd fd fa fa fa</span><br><span class="line">=&gt;0x0c0680243330: fd fd fd fa fa fa 00 00[02]fa fa fa fd fd fd fa</span><br><span class="line">  0x0c0680243340: fa fa fd fd fd fa fa fa fd fd fd fa fa fa fd fd</span><br><span class="line">  0x0c0680243350: fd fa fa fa fd fd fd fa fa fa fd fd fd fa fa fa</span><br><span class="line">  0x0c0680243360: fd fd fd fa fa fa fd fd fd fa fa fa fd fd fd fa</span><br><span class="line">  0x0c0680243370: fa fa fd fd fd fa fa fa fd fd fd fa fa fa fd fd</span><br><span class="line">  0x0c0680243380: fd fa fa fa fd fd fd fa fa fa fd fd fd fa fa fa</span><br><span class="line">Shadow byte legend (one shadow byte represents 8 application bytes):</span><br><span class="line">  Addressable:           00</span><br><span class="line">  Partially addressable: 01 02 03 04 05 06 07</span><br><span class="line">  Heap left redzone:       fa</span><br><span class="line">  Freed heap region:       fd</span><br><span class="line">  Stack left redzone:      f1</span><br><span class="line">  Stack mid redzone:       f2</span><br><span class="line">  Stack right redzone:     f3</span><br><span class="line">  Stack after return:      f5</span><br><span class="line">  Stack use after scope:   f8</span><br><span class="line">  Global redzone:          f9</span><br><span class="line">  Global init order:       f6</span><br><span class="line">  Poisoned by user:        f7</span><br><span class="line">  Container overflow:      fc</span><br><span class="line">  Array cookie:            ac</span><br><span class="line">  Intra object redzone:    bb</span><br><span class="line">  ASan internal:           fe</span><br><span class="line">  Left alloca redzone:     ca</span><br><span class="line">  Right alloca redzone:    cb</span><br><span class="line">  Shadow gap:              cc</span><br><span class="line">==3049145==ABORTING</span><br><span class="line">MS: 4 ChangeByte-InsertByte-CopyPart-ChangeByte-; base unit: 00b28ff06b788b9b67c6b259800f404f9f3761fd</span><br><span class="line">0x5c,0x2e,0x0,0x6b,0x0,</span><br><span class="line">\\.\x00k\x00</span><br><span class="line">artifact_prefix=&#x27;./&#x27;; Test unit written to ./crash-edef708d314ed627eba0ef2b042e47aa96a9b899</span><br><span class="line">Base64: XC4AawA=</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，LibFuzzer 发现了 c-ares 中的 heap-buffer-overflow 漏洞，触发 crash 的用例保存为 crash-edef708d314ed627eba0ef2b042e47aa96a9b899 文件，该用例包含 5 个字节，字节码分别为：0x5c,0x2e,0x0,0x6b,0x0，其中 0x0 为空字符 NULL，属于不可见字符。</p>
+<h3 id="5- 提取语料"><a href="#5- 提取语料" class="headerlink" title="5. 提取语料"></a>5. 提取语料 </h3><p> 执行 Fuzz 时，传入一个空文件夹作为 copus 路径，执行完后，可以在文件夹中看到 LibFuzzer 执行过程中，生成的有效语料。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line">root@server:~/fuzz/cares$ mkdir corpus</span><br><span class="line">root@server:~/fuzz/cares$ ls</span><br><span class="line">BUILD  build.sh  cares_fuzzer  corpus  target.cc</span><br><span class="line">root@server:~/fuzz/cares$ ./cares_fuzzer corpus/</span><br><span class="line">INFO: Seed: 4140748905</span><br><span class="line">INFO: Loaded 1 modules   (57 inline 8-bit counters): 57 [0x5a9100, 0x5a9139),</span><br><span class="line">INFO: Loaded 1 PC tables (57 PCs): 57 [0x5a9140,0x5a94d0),</span><br><span class="line">INFO:        0 files found in corpus/</span><br><span class="line">INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes</span><br><span class="line">INFO: A corpus is not provided, starting from an empty corpus</span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">2      INITED cov: 13 ft: 14 corp: 1/1b <span class="built_in">exec</span>/s: 0 rss: 27Mb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">4      NEW    cov: 16 ft: 20 corp: 2/3b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 2/2 MS: 2 ChangeByte-InsertByte-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">9      NEW    cov: 16 ft: 26 corp: 3/6b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 3/3 MS: 5 ChangeBit-ChangeByte-ChangeByte-CopyPart-InsertByte-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">10     NEW    cov: 16 ft: 32 corp: 4/10b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 4/4 MS: 1 CrossOver-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">25     NEW    cov: 18 ft: 34 corp: 5/11b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 1/4 MS: 5 ChangeBit-ChangeASCIIInt-CMP-CrossOver-EraseBytes- DE: <span class="string">&quot;\x01\x00&quot;</span>-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">94     NEW    cov: 19 ft: 35 corp: 6/15b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 4/4 MS: 4 CrossOver-ShuffleBytes-ChangeByte-ChangeBit-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">108    NEW    cov: 21 ft: 37 corp: 7/16b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 1/4 MS: 4 ChangeByte-ShuffleBytes-ChangeBit-ChangeByte-</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">125    NEW    cov: 22 ft: 38 corp: 8/18b lim: 4 <span class="built_in">exec</span>/s: 0 rss: 27Mb L: 2/4 MS: 2 ShuffleBytes-InsertByte-</span></span><br><span class="line">...</span><br><span class="line">==3237059==ABORTING</span><br><span class="line">MS: 2 InsertRepeatedBytes-ChangeByte-; base unit: 1bef8aac927d18852642a96c20e50efba80fdfae</span><br><span class="line">0x5c,0x5,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x98,0x5c,0x2e,</span><br><span class="line">\\\x05\x98\x98\x98\x98\x98\x98\x98\x98\x98\x98\x98\\.</span><br><span class="line">artifact_prefix=&#x27;./&#x27;; Test unit written to ./crash-157768d6f06d94325fe0e6bcf66cbd2d27dd8db7</span><br><span class="line">Base64: XAWYmJiYmJiYmJiYmFwu</span><br><span class="line">root@server:~/fuzz/cares$ ls -al</span><br><span class="line">total 2244</span><br><span class="line">drwxrwxr-x 4 root root    4096 Sep 26 17:47 .</span><br><span class="line">drwxrwxr-x 5 root root    4096 Sep 26 15:25 ..</span><br><span class="line">drwxrwxr-x 9 root root   20480 Sep 26 17:18 BUILD</span><br><span class="line">-rw-rw-r-- 1 root root     722 Sep 26 17:13 build.sh</span><br><span class="line">-rwxrwxr-x 1 root root 2250720 Sep 26 17:18 cares_fuzzer</span><br><span class="line">drwxrwxr-x 2 root root    4096 Sep 26 17:47 corpus</span><br><span class="line">-rw-rw-r-- 1 root root      15 Sep 26 17:47 crash-157768d6f06d94325fe0e6bcf66cbd2d27dd8db7</span><br><span class="line">-rw-rw-r-- 1 root root     499 Sep 26 17:14 target.cc</span><br><span class="line">root@server:~/fuzz/cares$ ls corpus/</span><br><span class="line">08534f33c201a45017b502e90a800f1b708ebcb3  5175b74bd75b8d90a01f77709deba3982fbbdcb2  78bdce51613f555049a9937095bf469bcb77e94f  be566cb17d3bce0b2a8e5e710b3779df720db1f5</span><br><span class="line">0f1c5448bf80343eeac759f8adcbdc2720533d15  5318c4ac20dac95a702bee2e27834d39ea6bc2b6  8e54ed049741d7cf6fb8ef7f4288ef0be3b54f17  be5c29e07560abcf094c3419712a01590bbe8594</span><br><span class="line">0fe509b10d833be6eb3d5ed4947cbe0fbb64ed84  5ba93c9db0cff93f52b521d7420e43f6eda2784f  8ea51a3719d7cbfc3e2dcd3edf6109918d5aad55  caea31b9ef76b9be352ad1054956efbb86d4451a</span><br><span class="line">1bef8aac927d18852642a96c20e50efba80fdfae  60321f72401b49b895535045eb8d3b9ca7db7c7c  91a3f7c503955600f5dac12c1c1a3c5b674a4d98  dea712be0e801f4502a21e04dfbec5bd0cbc677c</span><br><span class="line">24792aa3923c4cd185519d3d445ecfd0801db1c1  6380a9a2d2701df0cb53d880842747cbefef8a5d  9f64357cb30f24cf567513e140e9fb0cbf1a2be5  e716589d09e16cf4a48d2c7f1d357bb481aaf3bc</span><br><span class="line">3a52ce780950d4d969792a2559cd519d7ee8c727  6414bd7955e39106721edf7cc29efdb82f7007ac  b534844fd943d8b338025ad82d68283f1bcdb5c0</span><br></pre></td></tr></table></figure>
+
+<h3 id="6- 合并语料"><a href="#6- 合并语料" class="headerlink" title="6. 合并语料"></a>6. 合并语料 </h3><p> 当 Fuzz 执行很久之后，会产生大量语料。为了减少语料数量，可以使用 merge 参数进行合并。创建一个 min_corpus 目录，执行 Fuzz 时，启动 merge 参数，传入 min_corpus 目录和 corpus 目录，合并完后，可以在 min_corpus 目录下看到缩减之后的语料。以下示例显示预料数据从 31 个减少到 29 个：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">root@server:~/fuzz/cares$ mkdir min_corpus</span><br><span class="line">root@server:~/fuzz/cares$ ./cares_fuzzer -merge=1 min_corpus/ corpus/</span><br><span class="line">INFO: Seed: 1671146211</span><br><span class="line">INFO: Loaded 1 modules   (57 inline 8-bit counters): 57 [0x5a9100, 0x5a9139),</span><br><span class="line">INFO: Loaded 1 PC tables (57 PCs): 57 [0x5a9140,0x5a94d0),</span><br><span class="line">MERGE-OUTER: 31 files, 0 in the initial corpus, 0 processed earlier</span><br><span class="line">MERGE-OUTER: attempt 1</span><br><span class="line">INFO: Seed: 1671165588</span><br><span class="line">INFO: Loaded 1 modules   (57 inline 8-bit counters): 57 [0x5a9100, 0x5a9139),</span><br><span class="line">INFO: Loaded 1 PC tables (57 PCs): 57 [0x5a9140,0x5a94d0),</span><br><span class="line">INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 1048576 bytes</span><br><span class="line">MERGE-INNER: using the control file &#x27;/tmp/libFuzzerTemp.3327149.txt&#x27;</span><br><span class="line">MERGE-INNER: 31 total files; 0 processed earlier; will process 31 files now</span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">1      pulse  cov: 9 ft: 10 <span class="built_in">exec</span>/s: 0 rss: 27Mb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">2      pulse  cov: 13 ft: 14 <span class="built_in">exec</span>/s: 0 rss: 27Mb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">4      pulse  cov: 20 ft: 22 <span class="built_in">exec</span>/s: 0 rss: 27Mb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">8      pulse  cov: 28 ft: 38 <span class="built_in">exec</span>/s: 0 rss: 27Mb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">16     pulse  cov: 29 ft: 56 <span class="built_in">exec</span>/s: 0 rss: 27Mb</span></span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">31     DONE   cov: 29 ft: 82 <span class="built_in">exec</span>/s: 0 rss: 28Mb</span></span><br><span class="line">MERGE-OUTER: succesfull in 1 attempt(s)</span><br><span class="line">MERGE-OUTER: the control file has 2691 bytes</span><br><span class="line">MERGE-OUTER: consumed 0Mb (27Mb rss) to parse the control file</span><br><span class="line">MERGE-OUTER: 29 new files with 82 new features added; 29 new coverage edges</span><br></pre></td></tr></table></figure>
+
+<h2 id="三、优化技巧"><a href="# 三、优化技巧" class="headerlink" title="三、优化技巧"></a>三、优化技巧 </h2><p> 整体优化思路分两种：</p>
+<ol>
+<li>找到 crash 更快 –&gt; 并行化，多个实例一起运行</li>
+<li>覆盖 edge 更多 –&gt; 加强语料，让输入能走到更深的分支</li>
+</ol>
+<h3 id="（一）并行化"><a href="#（一）并行化" class="headerlink" title="（一）并行化"></a>（一）并行化</h3><h4 id="1、LibFuzzer"><a href="#1、LibFuzzer" class="headerlink" title="1、LibFuzzer"></a>1、LibFuzzer</h4><p><strong>(1) jobs 和 workers</strong></p>
+<ul>
+<li>jobs：指定 fuzz 实例的数量。在不设置运行时长的情况下，每个 fuzz 实例找到 crash 才会停止。理论上有多少 jobs，最后会产生多少个 crash 文件。但实际上，不同的 job 可能找到同样的 crash，最后 crash 文件个数少于 job 个数。</li>
+<li>works：执行 fuzz 进程的数量。在多个 jobs 的情况下，平均每个 woker 执行 #jobs&#x2F;#workers 个 job。</li>
+</ul>
+<p>简单来说，使用 workers 能提升 fuzz 运行速度，使用 jobs 能增加 crash 数量（仅根据输入去重，没有对调用栈去重）。 只使用 jobs 的情况下，默认开启 min(#jobs, #cores) &#x2F;&#x2F; 2 个 workers。</p>
+<p><strong>(2) fork</strong></p>
+<p>目前 fork 是实验阶段的参数，计划最终使用 fork 代替 jobs 和 workers 来实现 LibFuzzer 的并行化。</p>
+<ul>
+<li><p>fork：父进程不直接执行 fuzz，而是开启 N 个子进程，每个子进程使用语料库的随机子集进行 fuzz，当子进程退出后，该子进程的语料将被合并到主语料库中。子进程可以通过设置参数，来实现对指定错误的容错能力：</p>
+</li>
+<li><p>-ignore_ooms：默认为 True。子进程发生内存溢出时，保存输入用于重现，但 fuzz 继续执行。</p>
+</li>
+<li><p>-ignore_timeouts：默认为 True。子进程发生超时时，保留输入用于重现，但 fuzz 继续执行。</p>
+</li>
+<li><p>-ignore_crashes：默认为 False。子进程发生其他类型 crash 时，保留输入用于重现，但 fuzz 继续执行。</p>
+</li>
+</ul>
+<h4 id="2、LibFuzzer 结合 AFL"><a href="#2、LibFuzzer 结合 AFL" class="headerlink" title="2、LibFuzzer 结合 AFL"></a>2、LibFuzzer 结合 AFL</h4><p>AFL 可以支持 LibFuzzer 的 target，编译方法参考 <a href="https://link.zhihu.com/?target=https://github.com/llvm/llvm-project/blob/main/compiler-rt/lib/fuzzer/afl/afl_driver.cpp" rel="external nofollow noopener noreferrer" target="_blank"> 此处说明</a>。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">afl-fuzz -i testcase_dir -o findings_dir ./fuzz-target @@ </span><br><span class="line">./fuzz-target testcase_dir findings_dir # Will write new tests to testcase_dir</span><br></pre></td></tr></table></figure>
+
+<p>需要定期重启 AFL 和 LibFuzzer，以完成语料同步。</p>
+<h3 id="（二）加强语料"><a href="#（二）加强语料" class="headerlink" title="（二）加强语料"></a>（二）加强语料 </h3><h4 id="1、字典"><a href="#1、字典" class="headerlink" title="1、字典"></a>1、字典</h4><p> 运行时使用 -dict 参数指定字典（Dictionary）文件的路径，字典用于指定和控制模糊测试中输入数据的一部分，从而提高模糊测试的效果。</p>
+<p>字典文件：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Lines starting with <span class="string">&#x27;#&#x27;</span> and empty lines are ignored.</span></span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Adds <span class="string">&quot;blah&quot;</span> (w/o quotes) to the dictionary.</span></span><br><span class="line">kw1=&quot;blah&quot;</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Use \\ <span class="keyword">for</span> backslash and \&quot; <span class="keyword">for</span> quotes.</span></span><br><span class="line">kw2=&quot;\&quot;ac\\dc\&quot;&quot;</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">Use \xAB <span class="keyword">for</span> hex values</span></span><br><span class="line">kw3=&quot;\xF7\xF8&quot;</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">the name of the keyword followed by <span class="string">&#x27;=&#x27;</span> may be omitted:</span></span><br><span class="line">&quot;foo\x0Abar&quot;</span><br></pre></td></tr></table></figure>
+
+<p>使用方法（运行时）：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./fuzz-target -dict=dict_file</span><br></pre></td></tr></table></figure>
+
+<h4 id="2、CMP"><a href="#2、CMP" class="headerlink" title="2、CMP"></a>2、CMP</h4><p>编译时使用 -fsanitize-coverage&#x3D;trace-cmp 参数，让 fuzz 拦截 CMP 指令（例如 if 语句中的 compare 条件）并根据拦截到的 CMP 指令的参数来引导变异。这可能会减慢模糊测试的速度，但很可能会改善测试结果。</p>
+<p>使用方法（编译时）：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">clang++ buggy.cc -fsanitize=fuzzer,address -fsanitize-coverage=trace-cmp -g -o buggy-fuzzer</span><br></pre></td></tr></table></figure>
+
+<h4 id="3、Value-Profile"><a href="#3、Value-Profile" class="headerlink" title="3、Value Profile"></a>3、Value Profile</h4><p>需要与 <code>-fsanitize-coverage=trace-cmp</code> 一起使用，让 fuzz 收集 CMP 指令的参数值进行分析，用于发现更多的有效输入。但是有两个缺点：首先可能会导致速度降低 2 倍。 其次语料库可能增长数倍。</p>
+<p>使用方法（运行时）：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./fuzz-target -use_value_profile=1</span><br></pre></td></tr></table></figure>
+
+<h4 id="4、Fuzzer-friendly-build-mode"><a href="#4、Fuzzer-friendly-build-mode" class="headerlink" title="4、Fuzzer-friendly build mode"></a>4、Fuzzer-friendly build mode</h4><p>程序中可能存在某些对 fuzz 不友好的特性，例如：</p>
+<ul>
+<li>随机化：同一个输入，可能走不同的路径</li>
+<li>校验和：拦截无效输入</li>
+</ul>
+<p>此时可以用构建宏 FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION 来编译一个对 fuzz 友好的版本，使用时需要对源码进行修改。例如：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">MyInitPRNG</span><span class="params">()</span> &#123;</span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION</span></span><br><span class="line">  <span class="comment">// In fuzzing mode the behavior of the code should be deterministic.</span></span><br><span class="line">  srand(<span class="number">0</span>);</span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line">  srand(time(<span class="number">0</span>));</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="四、- 参考资料"><a href="# 四、- 参考资料" class="headerlink" title="四、 参考资料"></a>四、 参考资料</h2><ol>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://llvm.org/docs/LibFuzzer.html#fuzzer-friendly-build-mode">libFuzzer – a library for coverage-guided fuzz testing</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://bbs.kanxue.com/thread-274792.htm">libFuzzer 使用总结教程</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://chromium.googlesource.com/chromium/src/+/main/testing/libfuzzer/efficient_fuzzing.md">Efficient Fuzzing Guide</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://aviii.hashnode.dev/the-art-of-fuzzing-a-step-by-step-guide-to-coverage-guided-fuzzing-with-libfuzzer">The art of fuzzing-A Step-by-Step Guide to Coverage-Guided Fuzzing with LibFuzzer</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.moritz.systems/blog/an-introduction-to-llvm-libfuzzer/">An introduction to LLVM libFuzzer</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.withsecure.com/se-sv/expertise/blog-posts/super-awesome-fuzzing-part-one">An informative guide on using AFL and libFuzzer</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/Dor1s/libfuzzer-workshop">libfuzzer-workshop</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/google/sanitizers">Sanitizers</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.code-intelligence.com/blog/the-magic-behind-feedback-based-fuzzing">The Magic Behind Feedback-Based Fuzzing</a></li>
+</ol>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/Fuzz/" rel="tag">Fuzz</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/LibFuzzer/" rel="tag">LibFuzzer</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/LibFuzzer%E7%BC%96%E8%AF%91%E6%8C%87%E5%8D%97/" data-tooltip="LibFuzzer 编译指南" aria-label="上一篇: LibFuzzer 编译指南">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/Docker%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/" data-tooltip="Docker 必知必会" aria-label="下一篇: Docker 必知必会">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/LibFuzzer%E7%BC%96%E8%AF%91%E6%8C%87%E5%8D%97/" data-tooltip="LibFuzzer 编译指南" aria-label="上一篇: LibFuzzer 编译指南">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/Docker%E5%BF%85%E7%9F%A5%E5%BF%85%E4%BC%9A/" data-tooltip="Docker 必知必会" aria-label="下一篇: Docker 必知必会">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2023/LibFuzzer使用说明/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

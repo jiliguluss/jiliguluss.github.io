@@ -1,0 +1,553 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>Python 进阶——并发编程 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、基本概念1. 进程、线程与协程\n进程：进程是操作系统分配资源的基本单位，它包含了一个程序的执行实例及其用到的系统资源（如内存、文件、设备等）。每个进程有自己独立的内存空间，不同的进程通过进程间通信来交换信息。\n线程：线程是 CPU 调度和执行的基本单位，是包含在进程中（比进程更小）的能独立运行的最小单位，线程又称为轻量级进程。每个进程可以有一个或多个线程，进程中的各个线程共享该进程的内存空间。线程没有独立的内存空间，只拥有运行时必不可少的资源，如程序计数器、寄存器和栈。\n协程：协程又称微线程，是用户态的轻量级线程，其调度由用户控制。每个协程拥有自己的寄存器上下文和栈。当协程切换时，将寄存器上下文和栈保存起来，协程切回来时，恢复之前保存的寄存器上下文和栈。协程间的切换不涉及内核切换的开销，协程切换比线程切换效率更高。\n\n\n\n\n概念\n进程\n线程\n协程\n\n\n\n资源占用\n独立的内存地址空间（保存数据、代码等资源）\n共享所属进程的内存地址空间\n共享所在线程的内存地址空间\n\n\n创建开销\n较高，需要进行大量的资源分配和初始化\n较低，因为共享进程资源\n最低，通常由程序内部控制，不需要操作系统介入\n\n\n切换开销\n较高，涉及 CPU 的上下文切换\n较低，涉及内核线程的上下文切换\n最低，通常由程序控制，不需要 CPU 和内核上下文切换\n\n\n通信方式\n通过进程间通信(IPC)，如管道、消息队列、共享内存等\n通过共享内存\n通过参数传递，或共享数据结构\n\n\n应用场景\n不同的程序或服务\n多个子任务并发执行\n异步编程，提高性能\n\n\n竞态条件\n使用锁、信号量等同步机制\n使用锁、信号量等同步机制\n通常不用加锁，协程之间没有竞争关系\n\n\n举个通俗点的例子来理解下这些干巴巴的概念：\n比如我们要准备一顿晚饭，做饭这项活动就可以视为一个进程，炉灶和食材是这个进程可以利用的资源。\n炒菜和煮饭可以视为两个子线程，它们共用炉灶和食材资源，当资源紧缺（比如只有一个炉灶）时，会存在竞争关系。\n晚饭计划一菜一汤，当炖汤时，我们可以一边等，一边准备下一道菜的工序，比如摘菜、洗菜、切菜。每项工序完成，我们还要去看看炖汤的进展。这个切换操作就是协程。\n2. 并发和并行\n并发：指在同一时间段内宏观上有多个程序在同时运行，但在单核 CPU 中，这些程序是交替执行的，同一时刻，只有一条指令在执行。\n并行：指在同一时刻，有多条指令在多个处理器上同时执行，需要有硬件支持，比如多核 CPU、GPU 等，是真正意义上的同时运行。\n\n举个例子，在一个便利店有两队（红队和蓝队）顾客排队买单。\n如果只有一个收银员，那这个收银员只能交替给两队顾客结账，在同一时刻，只能有一个顾客在买单，要么来自红队，要么来自蓝队。\n如果有两个收银员，那么每个收银员可以对接一队顾客。在同一时刻，蓝队和红队可能同时有顾客在买单。\n3. 同步和异步\n同步：在同步模式下，当程序执行一个操作 A，必须等这个 A 操作返回结果后，才能执行下一个操作 B。当操作 A 需要执行很长时间才能完成时，操作 B 需要陷入长久的等待，程序出现阻塞。\n异步：在异步模式下，当程序执行一个操作 A，不会等 A 操作完成，而是立即执行下一个操作 B。当 A 操作执行完后，程序通过某种机制（例如回调函数、事件等）接收 A 操作的结果，再进行后续处理。异步使得在等待操作 A 运行期间，程序可以执行其他操作，提高了运行效率。\n\n举个例子，肚子饿了去搞吃的，有两种餐馆：\n一种是没有服务员上菜的，只能在窗口排队等着，现点现做，拿到餐品才能去找座位。这种就是同步模式，等取餐了才能去找座位。\n另一种是有服务员负责传餐的，点完餐品，可以先去找个位子坐下，等服务员上菜就行。这种就是异步模式，等餐的过程中可以去找座位。\n异步和协程的想法很相似，当某一项任务需要花费很长时间时，可以先转去做别的任务，避免干等。\n协程可以作为实现异步的一种技术，它提供了一种简洁好用的异步模型，避免了多层嵌套的回调函数（回调地狱）导致代码变得极其复杂，难以理解和维护。\n二、python 并发实践 1. 多进程与进程池2. 多线程与线程池3. 协程4. 异步 三、参考资料\n一文读懂什么是进程、线程、协程\n一篇文章搞懂 Python 中的进程和线程\npython3-cookbook 并发编程\n2w 字 + 40 张图带你参透并发编程\n","dateCreated":"2024-06-26T10:56:20+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-06-26T10:56:20+08:00","description":"进程、线程、协程，并发编程绕不过的三座大山","headline":"Python 进阶——并发编程","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/Python%E8%BF%9B%E9%98%B6%E2%80%94%E2%80%94%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/Python%E8%BF%9B%E9%98%B6%E2%80%94%E2%80%94%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/","keywords":"Python"}</script>
+    <meta name="description" content="进程、线程、协程，并发编程绕不过的三座大山">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="Python 进阶——并发编程">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/Python%E8%BF%9B%E9%98%B6%E2%80%94%E2%80%94%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="进程、线程、协程，并发编程绕不过的三座大山">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2024-06-26T02:56:20.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.572Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="Python">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            Python 进阶——并发编程
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-06-26T10:56:20+08:00">
+	
+		    2024 年 6 月 26 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/">开发</a>, <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/">编程语言</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="一、基本概念"><a href="# 一、基本概念" class="headerlink" title="一、基本概念"></a>一、基本概念</h2><h3 id="1- 进程、线程与协程"><a href="#1- 进程、线程与协程" class="headerlink" title="1. 进程、线程与协程"></a>1. 进程、线程与协程</h3><ul>
+<li><strong>进程</strong>：进程是操作系统分配资源的基本单位，它包含了一个程序的执行实例及其用到的系统资源（如内存、文件、设备等）。每个进程有自己独立的内存空间，不同的进程通过进程间通信来交换信息。</li>
+<li><strong>线程</strong>：线程是 CPU 调度和执行的基本单位，是包含在进程中（比进程更小）的能独立运行的最小单位，线程又称为轻量级进程。每个进程可以有一个或多个线程，进程中的各个线程共享该进程的内存空间。线程没有独立的内存空间，只拥有运行时必不可少的资源，如程序计数器、寄存器和栈。</li>
+<li><strong>协程</strong>：协程又称微线程，是用户态的轻量级线程，其调度由用户控制。每个协程拥有自己的寄存器上下文和栈。当协程切换时，将寄存器上下文和栈保存起来，协程切回来时，恢复之前保存的寄存器上下文和栈。协程间的切换不涉及内核切换的开销，协程切换比线程切换效率更高。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>进程</th>
+<th>线程</th>
+<th>协程</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>资源占用</td>
+<td>独立的内存地址空间（保存数据、代码等资源）</td>
+<td>共享所属进程的内存地址空间</td>
+<td>共享所在线程的内存地址空间</td>
+</tr>
+<tr>
+<td>创建开销</td>
+<td>较高，需要进行大量的资源分配和初始化</td>
+<td>较低，因为共享进程资源</td>
+<td>最低，通常由程序内部控制，不需要操作系统介入</td>
+</tr>
+<tr>
+<td>切换开销</td>
+<td>较高，涉及 CPU 的上下文切换</td>
+<td>较低，涉及内核线程的上下文切换</td>
+<td>最低，通常由程序控制，不需要 CPU 和内核上下文切换</td>
+</tr>
+<tr>
+<td>通信方式</td>
+<td>通过进程间通信(IPC)，如管道、消息队列、共享内存等</td>
+<td>通过共享内存</td>
+<td>通过参数传递，或共享数据结构</td>
+</tr>
+<tr>
+<td>应用场景</td>
+<td>不同的程序或服务</td>
+<td>多个子任务并发执行</td>
+<td>异步编程，提高性能</td>
+</tr>
+<tr>
+<td>竞态条件</td>
+<td>使用锁、信号量等同步机制</td>
+<td>使用锁、信号量等同步机制</td>
+<td>通常不用加锁，协程之间没有竞争关系</td>
+</tr>
+</tbody></table>
+<p>举个通俗点的例子来理解下这些干巴巴的概念：</p>
+<p>比如我们要准备一顿晚饭，做饭这项活动就可以视为一个进程，炉灶和食材是这个进程可以利用的资源。</p>
+<p>炒菜和煮饭可以视为两个子线程，它们共用炉灶和食材资源，当资源紧缺（比如只有一个炉灶）时，会存在竞争关系。</p>
+<p>晚饭计划一菜一汤，当炖汤时，我们可以一边等，一边准备下一道菜的工序，比如摘菜、洗菜、切菜。每项工序完成，我们还要去看看炖汤的进展。这个切换操作就是协程。</p>
+<h3 id="2- 并发和并行"><a href="#2- 并发和并行" class="headerlink" title="2. 并发和并行"></a>2. 并发和并行</h3><ul>
+<li><strong>并发</strong>：指在同一时间段内宏观上有多个程序在同时运行，但在单核 CPU 中，这些程序是交替执行的，同一时刻，只有一条指令在执行。</li>
+<li><strong>并行</strong>：指在同一时刻，有多条指令在多个处理器上同时执行，需要有硬件支持，比如多核 CPU、GPU 等，是真正意义上的同时运行。</li>
+</ul>
+<p>举个例子，在一个便利店有两队（红队和蓝队）顾客排队买单。</p>
+<p>如果只有一个收银员，那这个收银员只能交替给两队顾客结账，在同一时刻，只能有一个顾客在买单，要么来自红队，要么来自蓝队。</p>
+<p>如果有两个收银员，那么每个收银员可以对接一队顾客。在同一时刻，蓝队和红队可能同时有顾客在买单。</p>
+<h3 id="3- 同步和异步"><a href="#3- 同步和异步" class="headerlink" title="3. 同步和异步"></a>3. 同步和异步</h3><ul>
+<li><strong>同步</strong>：在同步模式下，当程序执行一个操作 A，必须等这个 A 操作返回结果后，才能执行下一个操作 B。当操作 A 需要执行很长时间才能完成时，操作 B 需要陷入长久的等待，程序出现阻塞。</li>
+<li><strong>异步</strong>：在异步模式下，当程序执行一个操作 A，不会等 A 操作完成，而是立即执行下一个操作 B。当 A 操作执行完后，程序通过某种机制（例如回调函数、事件等）接收 A 操作的结果，再进行后续处理。异步使得在等待操作 A 运行期间，程序可以执行其他操作，提高了运行效率。</li>
+</ul>
+<p>举个例子，肚子饿了去搞吃的，有两种餐馆：</p>
+<p>一种是没有服务员上菜的，只能在窗口排队等着，现点现做，拿到餐品才能去找座位。这种就是同步模式，等取餐了才能去找座位。</p>
+<p>另一种是有服务员负责传餐的，点完餐品，可以先去找个位子坐下，等服务员上菜就行。这种就是异步模式，等餐的过程中可以去找座位。</p>
+<p>异步和协程的想法很相似，当某一项任务需要花费很长时间时，可以先转去做别的任务，避免干等。</p>
+<p><strong>协程可以作为实现异步的一种技术</strong>，它提供了一种简洁好用的异步模型，避免了多层嵌套的回调函数（回调地狱）导致代码变得极其复杂，难以理解和维护。</p>
+<h2 id="二、python 并发实践"><a href="# 二、python 并发实践" class="headerlink" title="二、python 并发实践"></a>二、python 并发实践 </h2><h3 id="1- 多进程与进程池"><a href="#1- 多进程与进程池" class="headerlink" title="1. 多进程与进程池"></a>1. 多进程与进程池</h3><h3 id="2- 多线程与线程池"><a href="#2- 多线程与线程池" class="headerlink" title="2. 多线程与线程池"></a>2. 多线程与线程池</h3><h3 id="3- 协程"><a href="#3- 协程" class="headerlink" title="3. 协程"></a>3. 协程</h3><h3 id="4- 异步"><a href="#4- 异步" class="headerlink" title="4. 异步"></a>4. 异步</h3><h2 id="三、参考资料"><a href="# 三、参考资料" class="headerlink" title="三、参考资料"></a> 三、参考资料</h2><ol>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.cnblogs.com/Survivalist/p/11527949.html">一文读懂什么是进程、线程、协程</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://yangcongchufang.com/%E9%AB%98%E7%BA%A7python%E7%BC%96%E7%A8%8B%E5%9F%BA%E7%A1%80/python-process-thread.html">一篇文章搞懂 Python 中的进程和线程</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://python3-cookbook.readthedocs.io/zh-cn/latest/chapters/p12_concurrency.html">python3-cookbook 并发编程</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://juejin.cn/post/6862464169158344717">2w 字 + 40 张图带你参透并发编程</a></li>
+</ol>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/Python/" rel="tag">Python</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/" data-tooltip="AFL++ 源码分析——同步机制" aria-label="上一篇: AFL++ 源码分析——同步机制">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/" data-tooltip="污点分析工具——libdft64" aria-label="下一篇: 污点分析工具——libdft64">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/" data-tooltip="AFL++ 源码分析——同步机制" aria-label="上一篇: AFL++ 源码分析——同步机制">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/" data-tooltip="污点分析工具——libdft64" aria-label="下一篇: 污点分析工具——libdft64">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/Python进阶——并发编程/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

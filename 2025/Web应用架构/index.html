@@ -1,0 +1,837 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>Web 应用架构 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、架构设计(一) 分层架构Web 应用主要采用层级架构的设计，整体可以分为三层：\n\n表现层（Presentation Layer）：处理用户交互，使用 HTML&#x2F;CSS&#x2F;JavaScript 构建界面。\n业务逻辑层（Business Layer）：执行核心业务规则，如数据验证和事务处理。\n数据访问层（Data Layer）：负责数据库操作，常用 ORM 框架实现。\n\n层次架构的优点为：\n\n分离关注点：每一层都有其特定的职责，这有助于开发人员专注于各自的任务。\n可维护性：由于层与层之间的耦合度低，修改一层不会影响其他层，这使得维护和升级变得更加容易。\n可扩展性：可以根据需要独立扩展每一层，以应对不同的性能和功能需求。\n可测试性：每一层可以独立进行单元测试，这有助于提高代码质量和发现潜在问题。\n\n层次架构的局限为：\n\n性能损耗：跨层调用可能产生性能损耗（约 5%-10% 请求延迟）。\n污水池反模式：请求简单的穿过几个层，每层里面基本没有或很少做业务逻辑。这种层次隔离失效的情况，容易导致业务修改时出现遗漏和不一致的问题。解决办法是层次开发，即允许部分数据的处理直达核心层，而不用层层穿越。\n\n(二) 前后端分离  在分层架构中，表现层属于前端处理，业务逻辑层和数据访问层属于后端处理。通过‌前后端分离的模式，解耦前端与后端开发，从而提升开发效率、系统可维护性和用户体验‌。\n\n前端：主要由 HTML、CSS 和 JavaScript 构成。通常使用前端框架（React、Vue.js、Angular）进行开发。\n后端：可以选择不同的编程语言和框架来实现，如 Node.js、Django（Python）、Spring Boot（Java）等。\n通信：\n数据交互：多数场景使用 JSON，高性能场景使用 Protobuf\n接口风格：Restful 风格\n跨域请求：CORS 跨域访问\n\n\n\n二、前端技术  前端表现层通常有 MVC&#x2F;MVP&#x2F;MVVM 三种架构：\n\n\n\n模式\nMVC\nMVP\nMVVP\n\n\n\n核心组件\n- 模型（Model）：数据存储与业务逻辑  - 视图（View）：用户界面展示  - 控制器（Controller）：处理用户输入，协调模型与视图\n- 模型（Model）：数据存储与业务逻辑  - 视图（View）：用户界面交互接口  - 呈现器（Presenter）：处理逻辑，控制视图更新\n- 模型（Model）：数据存储与业务逻辑  - 视图（View）：绑定数据的 UI  - 视图模型（ViewModel）：数据转换与双向绑定\n\n\n数据流\n单向为主（存在双向例外）\n双向（通过 Presenter 中介）\n双向（自动绑定）\n\n\n数据交互\n视图可直接调用控制器，也可能直接访问模型\n视图通过接口与呈现器通信，不直接访问模型\n视图通过数据绑定与视图模型交互，无直接逻辑调用\n\n\n耦合度\n高（View 与 Controller 耦合）\n低（通过接口解耦）\n最低（数据绑定解耦）\n\n\n\n\n\n\n\n\n\nMVC 数据流\n\n理论上是  单向数据流（用户→View→Controller→Model→View），实际上常出现 Controller 直接操作 View 的反模式graph LR\n A[用户] -->| 操作 | B(View)\n B -->| 事件通知 | C(Controller)\n C -->| 更新 | D(Model)\n D -->| 推送新数据 | B\n C -.->| 可能直接操作 | B\n\n\nMVP 数据流\n\n双向数据流，呈现器是视图与模型之间的唯一中介graph LR\n A[用户] -->| 操作 | B(View 接口)\n B -->| 委托事件 | C(Presenter)\n C -->| 调用 | D(Model)\n D -->| 返回数据 | C\n C -->| 通过接口 | B\n B -.->| 查询数据 | C\n\n\nMVVM 数据流\n\n双向数据流，通过绑定视图和视图模型实现自动同步，无需显式调用接口完成视图更新graph LR\n A[用户] -->| 操作 | B(View)\n B -->| 自动绑定 | C(ViewModel)\n C -->| 更新数据 | D(Model)\n D -->| 数据变更 | C\n C -->| 数据驱动 | B\n\n\n\n三、后端技术 1. RESTfulREST 全称是 Representational State Transfer，中文意思是  表述性状态转移。如果一个架构符合 REST 的约束条件和原则（如下表所示），我们就称之为 RESTful 风格。\n\n\n\n概念\n解释\n\n\n\n资源标识\n资源是任何有被引用必要的事物，包括实体和抽象概念。使用 URI 作为资源唯一标识，可看作资源地址或名称。\n\n\n操作接口\n使用标准 HTTP 方法访问资源。GET 表示获取资源；POST 表示创建资源；PUT 表示全局更新资源；DELETE 表示删除资源；PATCH 表示局部更新资源。\n\n\n资源表述\n客户端获取资源表述，通常采用 json、xml 等格式描述资源\n\n\n资源链接\n利用超媒体概念，在表述格式中添加相关操作的链接，驱动客户端的状态转移\n\n\n无状态\n服务端不保存客户端状态，客户端的每次请求需要包含完整的上下文信息\n\n\n2. CORS 跨域访问  为了保护用户的安全和隐私，浏览器默认使用  同源策略，即要求协议、域名、端口三者完全相同，才能正常访问。\n解决跨域问题，常见的方案有：\n\nCORS（跨域资源共享）：在服务器端设置响应头部，允许指定的域名访问资源。\nJSONP（JSON with Padding）：通过在页面中动态添加 &lt;script&gt; 元素，利用 script 标签的跨域特性来获取数据。\n代理服务器：在服务器端设置一个代理服务器，将请求代理转发到目标服务器，绕过浏览器的同源策略。\n\n\n\n\n对比项\nCORS\nJSONP\n代理服务器\n\n\n\n支持方法\n所有方法\nGET 方法\n所有方法\n\n\n安全性\n高\n低\n中\n\n\n兼容性\n现代浏览器\n老旧浏览器\n所有浏览器\n\n\n适用场景\nAPI 接口、单点登录\n第三方数据加载\n无法修改服务端时\n\n\nCORS 通过在 HTTP(s)请求和响应中使用特定的头部字段来实现跨域资源共享，具体来说，CORS 分为两种类型的请求处理方式：简单请求和预检请求。\n\n简单请求：对于某些简单的 HTTP 请求（如 GET、POST 请求，且不包含自定义头部），浏览器会直接发送请求，并在响应中检查 CORS 头部。\n预检请求：对于复杂请求（如使用 PUT、DELETE 方法，或包含自定义头部），浏览器会首先发送一个 OPTIONS 请求，称为预检请求（Preflight Request），以确定服务器是否允许实际请求。如果预检请求通过，浏览器会继续发送实际请求。\n\n服务器可以通过设置响应头部来细粒度配置 CORS：\n\n\n\n响应头字段\n作用\n示例\n\n\n\nAccess-Control-Allow-Origin\n允许的源（* 表示允许所有）\nhttp://domain.com\n\n\nAccess-Control-Allow-Methods\n允许的 HTTP 方法\nGET, POST, PUT\n\n\nAccess-Control-Allow-Headers\n允许的自定义请求头\nAuthorization, Content-Type\n\n\nAccess-Control-Max-Age\n预检请求缓存时间（秒）\n3600\n\n\nAccess-Control-Allow-Credentials\n是否允许携带 Cookie（需配合 withCredentials）\ntrue\n\n\n四、性能 1. 负载均衡 负载均衡（Load Balance）是将网络流量或计算任务动态分配到多台服务器 &#x2F; 计算节点的技术，旨在优化资源利用、提升系统吞吐量并保障服务高可用性。其优势在于：\n\n消除单点故障，提升系统容错能力\n实现水平扩展，突破单机性能瓶颈\n降低响应延迟，改善用户体验\n\n负载均衡的实现方案可以分软硬件两大类：\n\n硬件负载均衡：使用专用硬件设备（如 F5 BIG-IP），性能卓越但成本高昂\n软件负载均衡：通过软件实现，灵活经济，是市场主流技术\n\n\n\n\n对比维度\nF5 BIG-IP\nDNS 负载均衡\nLVS\nNginx\nHAProxy\nIstio 服务网格\n\n\n\n原理\n专用硬件处理全协议流量，集成 SSL 卸载与安全防护\n域名解析返回多个 IP 地址，客户端自动轮询访问\nLinux 内核 IPVS 模块实现四层转发\n反向代理拦截 HTTP 请求，通过 upstream 模块分配流量\n基于状态机的连接处理，精细化 TCP 会话管理\nEnvoy 代理 Sidecar 模式拦截流量，控制平面动态下发路由规则\n\n\n性能\n百万级 QPS，支持全协议\n无额外延迟（受 TTL 缓存限制）\n四层转发性能接近硬件\n万级 QPS\n高并发 TCP 吞吐\n依赖 Envoy 代理性能\n\n\n稳定性\n冗余设计，金融级可靠性\n中（依赖 DNS 冗余设计）\n热备方案支持高可用\n高可用需配合 Keepalived\n动态健康检查\n基于 K8s 自动容错\n\n\n配置难度\n低（GUI 界面）\n低（多 A 记录配置）\n高（需内核调优）\n低（配置文件）\n中（策略复杂）\n高（YAML 声明式配置）\n\n\n成本\n高昂（20 万 +）\n低（仅 DNS 服务费用）\n免费（开源）\n免费（开源）\n免费（开源）\n中等（运维复杂度高）\n\n\n支持层级\n四层 &#x2F; 七层\n四层（IP 层）\n四层\n七层为主\n四层 &#x2F; 七层\n七层（应用感知）\n\n\n典型场景\n金融核心交易系统\n全局流量分发（如 CDN）\n大规模 TCP 流量分发\nWeb 服务器 &#x2F;API 网关\n数据库集群负载\n微服务流量治理\n\n\n负载均衡算法  可分为静态算法和动态算法：\n\n静态分配策略\n\n\n轮询算法：依次分配请求，适合服务器性能均等场景\n加权轮询：根据服务器处理能力设置权重比例（如 4 核服务器权重为 2 核的 2 倍）\nIP 地址哈希：基于客户端 IP 固定分配服务器，保持会话连续性\n\n\n动态调整策略\n\n\n最少连接数：优先选择当前连接数最少的节点，适用于长连接服务（如 FTP）\n响应时间优先：通过 ICMP 探测选择延迟最低节点，改善实时交互体验\n自适应混合算法：结合 CPU 负载、内存使用率等指标动态计算权重\n\ngraph TD\n    A[新请求] --> B{算法选择}\n    B -->| 常规请求 | C[轮询 / 加权轮询]\n    B -->| 会话保持需求 | D[源地址哈希]\n    B -->| 实时性要求高 | E[响应时间优先]\n    B -->| 复杂业务场景 | F[自适应混合算法]\n\n2. 读写分离  实现策略：\n\n数据库层：MySQL 主从复制（延迟 &lt;100ms）\n中间件：MyCAT&#x2F;ShardingSphere 实现自动路由\n缓存层：Redis 集群 + 读写分离（读性能提升 10 倍）\n\n一致性保障：\n\n同步写：主库确认后返回（强一致）\n异步读：从库延迟监控（最终一致）\n\n五、安全性 1. JWT 认证JWT（JSON Web Token）是一种开放标准（RFC 7519），用于在各方之间以 JSON 对象形式安全传递信息。其核心特性是 无状态性，即服务器无需存储用户会话信息，仅通过令牌本身的签名和内容验证用户身份。\nJWT 由三部分构成，用点号（.）分隔：Header.Payload.Signature\n\nHeader：包含令牌类型和签名算法。\nPayload：存储用户身份信息和声明。通过 Base64 编码，但未加密，不可存放密码等敏感信息。\nSignature：通过加密算法对 Base64(Header).Base64(Payload)和密钥（secret_key）计算生成，用于防篡改。\n\n服务端验证步骤为：\n\n解析 JWT，提取 Header 和 Payload。\n用相同算法和密钥重新生成签名，比对客户端传来的 Signature，若一致则合法。\n对合法令牌验证声明（如检查 exp 是否过期、iss 是否合法）是否有效，若有效则通过。\n\n2. CSRF 攻击CSRF（Cross-Site Request Forgery，跨站请求伪造）是一种利用用户已认证身份发起非授权操作的攻击方式。其核心在于浏览器自动携带用户凭证（如 Cookie），而服务器无法区分请求是否由用户主动发起。\nCSRF 攻击流程：\n\n用户登录受信任网站（如网银），服务器返回身份凭证（Cookie） 。\n用户访问恶意网站 B，该网站嵌入指向网站 A 的恶意请求（如转账 API）。\n浏览器自动携带网站 A 的 Cookie，向网站 A 发送请求，服务器误认为是合法操作并执行。\n\nCSRF 防御措施：\n\n验证 CSRF Token：服务器生成随机 Token 嵌入表单或请求头，验证请求是否携带有效 Token。\n设置 SameSite Cookie 属性：Strict 模式完全禁止跨域携带 Cookie，Lax 模式仅允许安全方法（如 GET）且导航类请求携带。\n检查 Referer&#x2F;Origin 头部：验证请求来源域名，拦截非信任域名的请求。\n双重认证机制：敏感操作（如转账）需二次验证，如短信验证码、人脸识别。\n","dateCreated":"2025-05-21T14:52:47+08:00","dateModified":"2025-05-22T10:02:28+08:00","datePublished":"2025-05-21T14:52:47+08:00","description":"Web 应用架构设计知识点","headline":"Web 应用架构","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/","keywords":"软件工程, Web应用"}</script>
+    <meta name="description" content="Web 应用架构设计知识点">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="Web 应用架构">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="Web 应用架构设计知识点">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-05-21T06:52:47.000Z">
+<meta property="article:modified_time" content="2025-05-22T02:02:28.765Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="软件工程">
+<meta property="article:tag" content="Web应用">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            Web 应用架构
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2025-05-21T14:52:47+08:00">
+	
+		    2025 年 5 月 21 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/">软考</a>, <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="一、架构设计"><a href="# 一、架构设计" class="headerlink" title="一、架构设计"></a>一、架构设计</h2><h3 id="一 - 分层架构"><a href="# 一 - 分层架构" class="headerlink" title="(一) 分层架构"></a>(一) 分层架构</h3><p>Web 应用主要采用层级架构的设计，整体可以分为三层：</p>
+<ul>
+<li><strong>表现层</strong>（Presentation Layer）：处理用户交互，使用 HTML&#x2F;CSS&#x2F;JavaScript 构建界面。</li>
+<li><strong>业务逻辑层</strong>（Business Layer）：执行核心业务规则，如数据验证和事务处理。</li>
+<li><strong>数据访问层</strong>（Data Layer）：负责数据库操作，常用 ORM 框架实现。</li>
+</ul>
+<p>层次架构的优点为：</p>
+<ul>
+<li>分离关注点：每一层都有其特定的职责，这有助于开发人员专注于各自的任务。</li>
+<li>可维护性：由于层与层之间的耦合度低，修改一层不会影响其他层，这使得维护和升级变得更加容易。</li>
+<li>可扩展性：可以根据需要独立扩展每一层，以应对不同的性能和功能需求。</li>
+<li>可测试性：每一层可以独立进行单元测试，这有助于提高代码质量和发现潜在问题。</li>
+</ul>
+<p>层次架构的局限为：</p>
+<ul>
+<li>性能损耗：跨层调用可能产生性能损耗（约 5%-10% 请求延迟）。</li>
+<li><strong>污水池反模式</strong>：请求简单的穿过几个层，每层里面基本没有或很少做业务逻辑。这种层次隔离失效的情况，容易导致业务修改时出现遗漏和不一致的问题。解决办法是层次开发，即允许部分数据的处理直达核心层，而不用层层穿越。</li>
+</ul>
+<h3 id="二 - 前后端分离"><a href="# 二 - 前后端分离" class="headerlink" title="(二) 前后端分离"></a>(二) 前后端分离 </h3><p> 在分层架构中，表现层属于前端处理，业务逻辑层和数据访问层属于后端处理。通过‌前后端分离的模式，解耦前端与后端开发，从而提升开发效率、系统可维护性和用户体验‌。</p>
+<ul>
+<li>前端：主要由 HTML、CSS 和 JavaScript 构成。通常使用前端框架（React、Vue.js、Angular）进行开发。</li>
+<li>后端：可以选择不同的编程语言和框架来实现，如 Node.js、Django（Python）、Spring Boot（Java）等。</li>
+<li>通信：<ul>
+<li>数据交互：多数场景使用 JSON，高性能场景使用 Protobuf</li>
+<li>接口风格：Restful 风格</li>
+<li>跨域请求：CORS 跨域访问</li>
+</ul>
+</li>
+</ul>
+<h2 id="二、前端技术"><a href="# 二、前端技术" class="headerlink" title="二、前端技术"></a>二、前端技术 </h2><p> 前端表现层通常有 <strong>MVC&#x2F;MVP&#x2F;MVVM</strong> 三种架构：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>MVC</th>
+<th>MVP</th>
+<th>MVVP</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>核心组件</td>
+<td>- 模型（Model）：数据存储与业务逻辑 <br> - 视图（View）：用户界面展示 <br> - 控制器（Controller）：处理用户输入，协调模型与视图</td>
+<td>- 模型（Model）：数据存储与业务逻辑 <br> - 视图（View）：用户界面交互接口 <br> - 呈现器（Presenter）：处理逻辑，控制视图更新</td>
+<td>- 模型（Model）：数据存储与业务逻辑 <br> - 视图（View）：绑定数据的 UI <br> - 视图模型（ViewModel）：数据转换与双向绑定</td>
+</tr>
+<tr>
+<td>数据流</td>
+<td>单向为主（存在双向例外）</td>
+<td>双向（通过 Presenter 中介）</td>
+<td>双向（自动绑定）</td>
+</tr>
+<tr>
+<td>数据交互</td>
+<td>视图可直接调用控制器，也可能直接访问模型</td>
+<td>视图通过接口与呈现器通信，不直接访问模型</td>
+<td>视图通过数据绑定与视图模型交互，无直接逻辑调用</td>
+</tr>
+<tr>
+<td>耦合度</td>
+<td>高（View 与 Controller 耦合）</td>
+<td>低（通过接口解耦）</td>
+<td>最低（数据绑定解耦）</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<ol>
+<li><p>MVC 数据流</p>
+<ul>
+<li>理论上是 <strong> 单向数据流</strong>（用户→View→Controller→Model→View），实际上常出现 Controller 直接操作 View 的反模式<pre class="mermaid">graph LR
+ A[用户] -->| 操作 | B(View)
+ B -->| 事件通知 | C(Controller)
+ C -->| 更新 | D(Model)
+ D -->| 推送新数据 | B
+ C -.->| 可能直接操作 | B</pre></li>
+</ul>
+</li>
+<li><p>MVP 数据流</p>
+<ul>
+<li><strong>双向数据流</strong>，呈现器是视图与模型之间的唯一中介<pre class="mermaid">graph LR
+ A[用户] -->| 操作 | B(View 接口)
+ B -->| 委托事件 | C(Presenter)
+ C -->| 调用 | D(Model)
+ D -->| 返回数据 | C
+ C -->| 通过接口 | B
+ B -.->| 查询数据 | C</pre></li>
+</ul>
+</li>
+<li><p>MVVM 数据流</p>
+<ul>
+<li><strong>双向数据流</strong>，通过绑定视图和视图模型实现自动同步，无需显式调用接口完成视图更新<pre class="mermaid">graph LR
+ A[用户] -->| 操作 | B(View)
+ B -->| 自动绑定 | C(ViewModel)
+ C -->| 更新数据 | D(Model)
+ D -->| 数据变更 | C
+ C -->| 数据驱动 | B</pre></li>
+</ul>
+</li>
+</ol>
+<h2 id="三、后端技术"><a href="# 三、后端技术" class="headerlink" title="三、后端技术"></a>三、后端技术 </h2><h3 id="1-RESTful"><a href="#1-RESTful" class="headerlink" title="1. RESTful"></a>1. RESTful</h3><p><strong>REST</strong> 全称是 Representational State Transfer，中文意思是 <strong> 表述性状态转移</strong>。如果一个架构符合 REST 的约束条件和原则（如下表所示），我们就称之为 RESTful 风格。</p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>资源标识</td>
+<td>资源是任何有被引用必要的事物，包括实体和抽象概念。使用 URI 作为资源唯一标识，可看作资源地址或名称。</td>
+</tr>
+<tr>
+<td>操作接口</td>
+<td>使用标准 HTTP 方法访问资源。GET 表示获取资源；POST 表示创建资源；PUT 表示全局更新资源；DELETE 表示删除资源；PATCH 表示局部更新资源。</td>
+</tr>
+<tr>
+<td>资源表述</td>
+<td>客户端获取资源表述，通常采用 json、xml 等格式描述资源</td>
+</tr>
+<tr>
+<td>资源链接</td>
+<td>利用超媒体概念，在表述格式中添加相关操作的链接，驱动客户端的状态转移</td>
+</tr>
+<tr>
+<td>无状态</td>
+<td>服务端不保存客户端状态，客户端的每次请求需要包含完整的上下文信息</td>
+</tr>
+</tbody></table>
+<h3 id="2-CORS 跨域访问"><a href="#2-CORS 跨域访问" class="headerlink" title="2. CORS 跨域访问"></a>2. CORS 跨域访问 </h3><p> 为了保护用户的安全和隐私，浏览器默认使用 <strong> 同源策略</strong>，即要求协议、域名、端口三者完全相同，才能正常访问。</p>
+<p>解决跨域问题，常见的方案有：</p>
+<ul>
+<li><strong>CORS</strong>（跨域资源共享）：在服务器端设置响应头部，允许指定的域名访问资源。</li>
+<li>JSONP（JSON with Padding）：通过在页面中动态添加 &lt;script&gt; 元素，利用 script 标签的跨域特性来获取数据。</li>
+<li>代理服务器：在服务器端设置一个代理服务器，将请求代理转发到目标服务器，绕过浏览器的同源策略。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>CORS</th>
+<th>JSONP</th>
+<th>代理服务器</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>支持方法</td>
+<td>所有方法</td>
+<td>GET 方法</td>
+<td>所有方法</td>
+</tr>
+<tr>
+<td>安全性</td>
+<td>高</td>
+<td>低</td>
+<td>中</td>
+</tr>
+<tr>
+<td>兼容性</td>
+<td>现代浏览器</td>
+<td>老旧浏览器</td>
+<td>所有浏览器</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>API 接口、单点登录</td>
+<td>第三方数据加载</td>
+<td>无法修改服务端时</td>
+</tr>
+</tbody></table>
+<p>CORS 通过在 HTTP(s)请求和响应中使用特定的头部字段来实现跨域资源共享，具体来说，CORS 分为两种类型的请求处理方式：简单请求和预检请求。</p>
+<ul>
+<li>简单请求：对于某些简单的 HTTP 请求（如 GET、POST 请求，且不包含自定义头部），浏览器会直接发送请求，并在响应中检查 CORS 头部。</li>
+<li>预检请求：对于复杂请求（如使用 PUT、DELETE 方法，或包含自定义头部），浏览器会首先发送一个 OPTIONS 请求，称为预检请求（Preflight Request），以确定服务器是否允许实际请求。如果预检请求通过，浏览器会继续发送实际请求。</li>
+</ul>
+<p>服务器可以通过设置响应头部来细粒度配置 CORS：</p>
+<table>
+<thead>
+<tr>
+<th>响应头字段</th>
+<th>作用</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Access-Control-Allow-Origin</td>
+<td>允许的源（* 表示允许所有）</td>
+<td><a target="_blank" rel="external nofollow noopener noreferrer" href="http://domain.com/">http://domain.com</a></td>
+</tr>
+<tr>
+<td>Access-Control-Allow-Methods</td>
+<td>允许的 HTTP 方法</td>
+<td>GET, POST, PUT</td>
+</tr>
+<tr>
+<td>Access-Control-Allow-Headers</td>
+<td>允许的自定义请求头</td>
+<td>Authorization, Content-Type</td>
+</tr>
+<tr>
+<td>Access-Control-Max-Age</td>
+<td>预检请求缓存时间（秒）</td>
+<td>3600</td>
+</tr>
+<tr>
+<td>Access-Control-Allow-Credentials</td>
+<td>是否允许携带 Cookie（需配合 withCredentials）</td>
+<td>true</td>
+</tr>
+</tbody></table>
+<h2 id="四、性能"><a href="# 四、性能" class="headerlink" title="四、性能"></a>四、性能 </h2><h3 id="1- 负载均衡"><a href="#1- 负载均衡" class="headerlink" title="1. 负载均衡"></a>1. 负载均衡</h3><p><strong> 负载均衡</strong>（Load Balance）是将网络流量或计算任务动态分配到多台服务器 &#x2F; 计算节点的技术，旨在优化资源利用、提升系统吞吐量并保障服务高可用性。其优势在于：</p>
+<ul>
+<li>消除单点故障，提升系统容错能力</li>
+<li>实现水平扩展，突破单机性能瓶颈</li>
+<li>降低响应延迟，改善用户体验</li>
+</ul>
+<p>负载均衡的实现方案可以分软硬件两大类：</p>
+<ul>
+<li>硬件负载均衡：使用专用硬件设备（如 F5 BIG-IP），性能卓越但成本高昂</li>
+<li>软件负载均衡：通过软件实现，灵活经济，是市场主流技术</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>对比维度</th>
+<th>F5 BIG-IP</th>
+<th>DNS 负载均衡</th>
+<th>LVS</th>
+<th>Nginx</th>
+<th>HAProxy</th>
+<th>Istio 服务网格</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>原理</td>
+<td>专用硬件处理全协议流量，集成 SSL 卸载与安全防护</td>
+<td>域名解析返回多个 IP 地址，客户端自动轮询访问</td>
+<td>Linux 内核 IPVS 模块实现四层转发</td>
+<td>反向代理拦截 HTTP 请求，通过 upstream 模块分配流量</td>
+<td>基于状态机的连接处理，精细化 TCP 会话管理</td>
+<td>Envoy 代理 Sidecar 模式拦截流量，控制平面动态下发路由规则</td>
+</tr>
+<tr>
+<td>性能</td>
+<td>百万级 QPS，支持全协议</td>
+<td>无额外延迟（受 TTL 缓存限制）</td>
+<td>四层转发性能接近硬件</td>
+<td>万级 QPS</td>
+<td>高并发 TCP 吞吐</td>
+<td>依赖 Envoy 代理性能</td>
+</tr>
+<tr>
+<td>稳定性</td>
+<td>冗余设计，金融级可靠性</td>
+<td>中（依赖 DNS 冗余设计）</td>
+<td>热备方案支持高可用</td>
+<td>高可用需配合 Keepalived</td>
+<td>动态健康检查</td>
+<td>基于 K8s 自动容错</td>
+</tr>
+<tr>
+<td>配置难度</td>
+<td>低（GUI 界面）</td>
+<td>低（多 A 记录配置）</td>
+<td>高（需内核调优）</td>
+<td>低（配置文件）</td>
+<td>中（策略复杂）</td>
+<td>高（YAML 声明式配置）</td>
+</tr>
+<tr>
+<td>成本</td>
+<td>高昂（20 万 +）</td>
+<td>低（仅 DNS 服务费用）</td>
+<td>免费（开源）</td>
+<td>免费（开源）</td>
+<td>免费（开源）</td>
+<td>中等（运维复杂度高）</td>
+</tr>
+<tr>
+<td>支持层级</td>
+<td>四层 &#x2F; 七层</td>
+<td>四层（IP 层）</td>
+<td>四层</td>
+<td>七层为主</td>
+<td>四层 &#x2F; 七层</td>
+<td>七层（应用感知）</td>
+</tr>
+<tr>
+<td>典型场景</td>
+<td>金融核心交易系统</td>
+<td>全局流量分发（如 CDN）</td>
+<td>大规模 TCP 流量分发</td>
+<td>Web 服务器 &#x2F;API 网关</td>
+<td>数据库集群负载</td>
+<td>微服务流量治理</td>
+</tr>
+</tbody></table>
+<p><strong>负载均衡算法 </strong> 可分为静态算法和动态算法：</p>
+<ol>
+<li>静态分配策略</li>
+</ol>
+<ul>
+<li>轮询算法：依次分配请求，适合服务器性能均等场景</li>
+<li>加权轮询：根据服务器处理能力设置权重比例（如 4 核服务器权重为 2 核的 2 倍）</li>
+<li>IP 地址哈希：基于客户端 IP 固定分配服务器，保持会话连续性</li>
+</ul>
+<ol start="2">
+<li>动态调整策略</li>
+</ol>
+<ul>
+<li>最少连接数：优先选择当前连接数最少的节点，适用于长连接服务（如 FTP）</li>
+<li>响应时间优先：通过 ICMP 探测选择延迟最低节点，改善实时交互体验</li>
+<li>自适应混合算法：结合 CPU 负载、内存使用率等指标动态计算权重</li>
+</ul>
+<pre class="mermaid">graph TD
+    A[新请求] --> B{算法选择}
+    B -->| 常规请求 | C[轮询 / 加权轮询]
+    B -->| 会话保持需求 | D[源地址哈希]
+    B -->| 实时性要求高 | E[响应时间优先]
+    B -->| 复杂业务场景 | F[自适应混合算法]</pre>
+
+<h3 id="2- 读写分离"><a href="#2- 读写分离" class="headerlink" title="2. 读写分离"></a>2. 读写分离 </h3><p> 实现策略：</p>
+<ul>
+<li>数据库层：MySQL 主从复制（延迟 &lt;100ms）</li>
+<li>中间件：MyCAT&#x2F;ShardingSphere 实现自动路由</li>
+<li>缓存层：Redis 集群 + 读写分离（读性能提升 10 倍）</li>
+</ul>
+<p>一致性保障：</p>
+<ul>
+<li>同步写：主库确认后返回（强一致）</li>
+<li>异步读：从库延迟监控（最终一致）</li>
+</ul>
+<h2 id="五、安全性"><a href="# 五、安全性" class="headerlink" title="五、安全性"></a>五、安全性 </h2><h3 id="1-JWT 认证"><a href="#1-JWT 认证" class="headerlink" title="1. JWT 认证"></a>1. JWT 认证</h3><p><strong>JWT</strong>（JSON Web Token）是一种开放标准（RFC 7519），用于在各方之间以 JSON 对象形式安全传递信息。其核心特性是<strong> 无状态性</strong>，即服务器无需存储用户会话信息，仅通过令牌本身的签名和内容验证用户身份。</p>
+<p>JWT 由三部分构成，用点号（.）分隔：Header.Payload.Signature</p>
+<ul>
+<li>Header：包含令牌类型和签名算法。</li>
+<li>Payload：存储用户身份信息和声明。通过 Base64 编码，但未加密，不可存放密码等敏感信息。</li>
+<li>Signature：通过加密算法对 Base64(Header).Base64(Payload)和密钥（secret_key）计算生成，用于防篡改。</li>
+</ul>
+<p>服务端验证步骤为：</p>
+<ol>
+<li>解析 JWT，提取 Header 和 Payload。</li>
+<li>用相同算法和密钥重新生成签名，比对客户端传来的 Signature，若一致则合法。</li>
+<li>对合法令牌验证声明（如检查 exp 是否过期、iss 是否合法）是否有效，若有效则通过。</li>
+</ol>
+<h3 id="2-CSRF 攻击"><a href="#2-CSRF 攻击" class="headerlink" title="2. CSRF 攻击"></a>2. CSRF 攻击</h3><p><strong>CSRF</strong>（Cross-Site Request Forgery，跨站请求伪造）是一种利用用户已认证身份发起非授权操作的攻击方式。其核心在于浏览器自动携带用户凭证（如 Cookie），而服务器无法区分请求是否由用户主动发起。</p>
+<p>CSRF 攻击流程：</p>
+<ol>
+<li>用户登录受信任网站（如网银），服务器返回身份凭证（Cookie） 。</li>
+<li>用户访问恶意网站 B，该网站嵌入指向网站 A 的恶意请求（如转账 API）。</li>
+<li>浏览器自动携带网站 A 的 Cookie，向网站 A 发送请求，服务器误认为是合法操作并执行。</li>
+</ol>
+<p>CSRF 防御措施：</p>
+<ol>
+<li>验证 CSRF Token：服务器生成随机 Token 嵌入表单或请求头，验证请求是否携带有效 Token。</li>
+<li>设置 SameSite Cookie 属性：Strict 模式完全禁止跨域携带 Cookie，Lax 模式仅允许安全方法（如 GET）且导航类请求携带。</li>
+<li>检查 Referer&#x2F;Origin 头部：验证请求来源域名，拦截非信任域名的请求。</li>
+<li>双重认证机制：敏感操作（如转账）需二次验证，如短信验证码、人脸识别。</li>
+</ol>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/Web%E5%BA%94%E7%94%A8/" rel="tag">Web应用</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/" rel="tag">软件工程</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2025/%E3%80%8A%E8%82%A1%E7%A5%A8%E6%8A%95%E8%B5%84%E5%85%A5%E9%97%A8%E3%80%81%E8%BF%9B%E9%98%B6%E4%B8%8E%E5%AE%9E%E6%88%98%E3%80%8B%E7%AC%94%E8%AE%B0/" data-tooltip="《股票投资入门、进阶与实战》笔记" aria-label="下一篇: 《股票投资入门、进阶与实战》笔记">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2025/%E3%80%8A%E8%82%A1%E7%A5%A8%E6%8A%95%E8%B5%84%E5%85%A5%E9%97%A8%E3%80%81%E8%BF%9B%E9%98%B6%E4%B8%8E%E5%AE%9E%E6%88%98%E3%80%8B%E7%AC%94%E8%AE%B0/" data-tooltip="《股票投资入门、进阶与实战》笔记" aria-label="下一篇: 《股票投资入门、进阶与实战》笔记">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2025/Web应用架构/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

@@ -1,0 +1,562 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>C++ 对象模型：对象内存布局 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n对象模型基础C++ 在 C 的基础上引入了面向对象的程序设计思想，类的封装、继承和多态使得 C++ 功能更加强大。C++ 的类包含数据成员和成员函数：\n数据成员：静态数据成员，非静态数据成员\n成员函数：非静态成员函数、静态函数、虚函数\nC++ 对象模型研究 C++ 类的数据成员和成员函数在内存中如何布局的问题。假设有个 C++ 类定义如下：\n12345678910class Base&#123;public:    int member;  // 非静态数据成员    static int smember;  // 静态数据成员        void func();  // 非静态成员函数    static void sfunc();  // 静态成员函数    virtual void vfunc();  // 虚函数&#125;;\n\n简单对象模型  在简单对象模型中，类的每个实例化对象在内存中都会申请一块连续内存，在这块内存上保存着指向成员变量和函数的指针。这样做的好处是，每个对象的内存大小是固定的，不管是数据成员还是成员函数，都只对应一个指针，在访问时可以很快计算出指针偏移量。但这样做的弊端也很明显，当访问对象的数据成员时，需要先找到数据成员的指针，然后通过这个指针获取到真实的数据，多了一次寻址，效率较低。\n\n\n表驱动对象模型  表格驱动对象模型对类中的数据成员和成员函数进行了区分，每个对象保留两个指针，一个指向数据成员表，其中存放数据成员的取值，一个指向成员函数表，其中存放指向成员函数的指针。这种做法的好处是对数据和函数进行分开管理，不好的地方在于访问成员函数时，需要先找到成员函数表，效率更低。\n\n\nC++ 对象模型  介绍 C++ 对象模型之前，先理解 C++ 中虚函数的概念。C++ 的多态是通过虚函数实现的。在基类中用 virtual 关键字定义虚函数，在派生类中重写虚函数，那么在运行时，传入基类指针时，会根据对象的实际类型来调用正确的函数，实现多态。\n不妨试想一下，如果要自己设计 C++ 对象模型，应该怎么做？我是这样想的：C++ 的类实例化为不同的对象，这些对象的静态数据成员是共享的，非静态数据成员是互不影响的，成员函数对各个对象来说是相同的。那么非静态数据成员应该放在每个对象的内存空间中，以保证不同对象相互独立；静态数据成员和成员函数应该放在这个类的公共空间，不用每个对象都存一份，减少存储空间；而虚函数在继承中发挥独特作用，应该与其他成员函数分开。\n揭开谜底，以 Base 类为例，C++ 对象模型是长这样的：\n\n\n可以看出：\n\nC++ 对象模型中有一个指向虚函数表的指针，这个虚函数表中除了存放虚函数的指针之外，还有一个 type_info 的信息，用于在运行时识别对象的正确类型。\nC++ 对象的非静态成员变量存放在对象的内存空间中，静态成员变量存放在全局数据区。\nC++ 对象的成员函数存放在代码区。\n\n普通继承场景下的对象模型  单一继承场景  以 Base 为基类，定义派生类 Derived 如下：\n1234567891011class Derived : public Base&#123;public:    int member;  // 非静态数据成员    static int smember_d;  // 静态数据成员        void func();  // 非静态成员函数    static void sfunc_d();  // 静态成员函数    virtual void vfunc();  // 虚函数    virtual void vfunc_d();  // 虚函数&#125;\n这种场景下，Derived 的对象模型如下：\n\n\n可以看出：\n\n派生类有自己的虚函数表，从基类那边拷贝一份，然后进行修改：将 type_info 改为派生类的信息；如果派生类重写了基类的虚函数 vfunc，那么虚函数表中用 Derived::vfunc()的指针替换 Base::vfunc()的指针；如果派生类新增了虚函数 vfunc_d，那么虚函数表中新增一个函数指针指向 Derived::vfunc_d()。\n派生类中重写了基类中同名的非虚函数，那么会在代码区中完成同名函数的替换，例如 Derived::func()替换 Base::func()。\n派生类和基类中的同名成员变量均保留。\n\n多重继承场景  单一继承场景下，派生类在基类的虚函数表上进行修改。多重继承场景，有多个基类的虚函数表。定义基类 Base1 和派生类 Derived 如下：\n12345678910111213141516171819202122class Base1&#123;public:    int member1;  // 非静态数据成员        virtual void vfunc();  // 虚函数    virtual void vfunc1();  // 虚函数    virtual void vfunc2();  // 虚函数&#125;;class Derived : public Base, public Base1&#123;public:    int member_d;  // 非静态数据成员    static int smember_d;  // 静态数据成员        void func();  // 非静态成员函数    static void sfunc_d();  // 静态成员函数    virtual void vfunc();  // 虚函数    virtual void vfunc1();  // 虚函数    virtual void vfunc_d();  // 虚函数&#125;;\n此时 Derived 的对象模型为：\n\n\n可以看出：\n\n继承多个父类时，派生类的对象模型中分别存储一个虚函数表的指针。如果派生类重写的基类同名虚函数，那就在虚函数表中进行替换；如果派生类新增了虚函数，那么在第一个父类的虚函数表中进行新增扩展。\n\n虚继承场景下的对象模型  使用普通继承的菱形继承  多重继承场景中，有一种特殊的情况叫菱形继承，它是这样操作的：B1 继承 B，B2 继承 B，D 继承 B1 和 B2，祖父类 B 被子类 D 重复继承，图示如下：\n\n\n按多重继承的方式推导 D 的对象模型是这样的：\n\n\n可以看到，在菱形继承场景中，访问祖父类成员 B::b 时，出现了二义性。\n为解决菱形继承中的问题，C++ 发明了虚继承。虚继承的对象模型与普通继承不同：普通继承是子类拷贝并修改父类的虚函数表；虚继承是子类和父类的虚函数表分开保存，将指向父类的虚函数表的指针也加入到子类的对象模型中。\n使用虚继承的单一继承  假定单一虚继承场景如下：\n\n\n此时派生类 Derived 的对象模型为：\n\n\n可以看到：\n\n派生类的虚函数表和基类的虚函数表是分开的，派生类重写的虚函数将覆盖基类虚函数表中的同名函数。\n派生类中新增了一个虚基类指针，它指向一个表，表中保存对象模型中各个虚函数表指针的偏移量，第一项为派生类虚函数表指针的偏移量，第二项为虚继承中第一个基类的虚函数表指针的偏移量，以此类推。\n派生类的信息与基类的信息用 0x00000000 隔开。\n\n使用虚继承的菱形继承  假定使用虚继承的菱形继承场景如下：\n\n\n结合多重继承与单一虚继承，推导派生类 Derived 的对象模型为：\n\n\n可以看到：\n\n多重继承的布局基本不变，虚基类的信息被追加到内存布局最后，并用 0x00000000 隔开。此时再访问 B::b 不会出现二义性。附注：推导时，从子类往祖父类逐步推进，子类与父类适用多重继承，父类与祖父类适用单一虚继承，每一步只决定派生类的数据成员的位置，例如 B::b 的布局应该由单一虚继承决定，如果在多重继承时决定，那推出来也是二义的。\n\n总结  对象模型揭示了 C++ 对象在内存中的存储布局，结合面向对象的三大特性（继承、封装和多态）来理解对象模型，印象会更深一点。","dateCreated":"2023-05-07T16:52:08+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2023-05-07T16:52:08+08:00","description":"介绍 C++ 对象在内存中的存储模型","headline":"C++ 对象模型：对象内存布局","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/","keywords":"C++"}</script>
+    <meta name="description" content="介绍 C++ 对象在内存中的存储模型">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="C++ 对象模型：对象内存布局">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="介绍 C++ 对象在内存中的存储模型">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E7%AE%80%E5%8D%95%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%A1%A8%E9%A9%B1%E5%8A%A8%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E6%97%A0%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E5%8D%95%E4%B8%80%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E5%A4%9A%E9%87%8D%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%8F%B1%E5%BD%A2%E7%BB%A7%E6%89%BF.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%8F%B1%E5%BD%A2%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E5%8D%95%E4%B8%80%E8%99%9A%E7%BB%A7%E6%89%BF.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E5%8D%95%E4%B8%80%E8%99%9A%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%8F%B1%E5%BD%A2%E8%99%9A%E7%BB%A7%E6%89%BF.PNG">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%8F%B1%E5%BD%A2%E8%99%9A%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+<meta property="article:published_time" content="2023-05-07T08:52:08.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.279Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E7%AE%80%E5%8D%95%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            C++ 对象模型：对象内存布局
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2023-05-07T16:52:08+08:00">
+	
+		    2023 年 5 月 7 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/">开发</a>, <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/">编程语言</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="对象模型基础"><a href="# 对象模型基础" class="headerlink" title="对象模型基础"></a><strong>对象模型基础</strong></h2><p>C++ 在 C 的基础上引入了面向对象的程序设计思想，类的封装、继承和多态使得 C++ 功能更加强大。C++ 的类包含数据成员和成员函数：</p>
+<p><strong>数据成员</strong>：静态数据成员，非静态数据成员</p>
+<p><strong>成员函数</strong>：非静态成员函数、静态函数、虚函数</p>
+<p>C++ 对象模型研究 C++ 类的数据成员和成员函数在内存中如何布局的问题。假设有个 C++ 类定义如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">int</span> member;  <span class="comment">// 非静态数据成员</span></span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> smember;  <span class="comment">// 静态数据成员</span></span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">func</span><span class="params">()</span></span>;  <span class="comment">// 非静态成员函数</span></span><br><span class="line">    <span class="function"><span class="type">static</span> <span class="type">void</span> <span class="title">sfunc</span><span class="params">()</span></span>;  <span class="comment">// 静态成员函数</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h3 id="简单对象模型"><a href="# 简单对象模型" class="headerlink" title="简单对象模型"></a>简单对象模型 </h3><p> 在简单对象模型中，类的每个实例化对象在内存中都会申请一块连续内存，在这块内存上保存着指向成员变量和函数的指针。这样做的好处是，每个对象的内存大小是固定的，不管是数据成员还是成员函数，都只对应一个指针，在访问时可以很快计算出指针偏移量。但这样做的弊端也很明显，当访问对象的数据成员时，需要先找到数据成员的指针，然后通过这个指针获取到真实的数据，多了一次寻址，效率较低。</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E7%AE%80%E5%8D%95%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG" class title=" 简单对象模型 ">
+
+<h3 id="表驱动对象模型"><a href="# 表驱动对象模型" class="headerlink" title="表驱动对象模型"></a>表驱动对象模型 </h3><p> 表格驱动对象模型对类中的数据成员和成员函数进行了区分，每个对象保留两个指针，一个指向数据成员表，其中存放数据成员的取值，一个指向成员函数表，其中存放指向成员函数的指针。这种做法的好处是对数据和函数进行分开管理，不好的地方在于访问成员函数时，需要先找到成员函数表，效率更低。</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%A1%A8%E9%A9%B1%E5%8A%A8%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG" class title=" 表驱动对象模型 ">
+
+<h3 id="C- 对象模型"><a href="#C- 对象模型" class="headerlink" title="C++ 对象模型"></a>C++ 对象模型 </h3><p> 介绍 C++ 对象模型之前，先理解 C++ 中虚函数的概念。C++ 的多态是通过虚函数实现的。在基类中用 virtual 关键字定义虚函数，在派生类中重写虚函数，那么在运行时，传入基类指针时，会根据对象的实际类型来调用正确的函数，实现多态。</p>
+<p>不妨试想一下，如果要自己设计 C++ 对象模型，应该怎么做？我是这样想的：C++ 的类实例化为不同的对象，这些对象的静态数据成员是共享的，非静态数据成员是互不影响的，成员函数对各个对象来说是相同的。那么非静态数据成员应该放在每个对象的内存空间中，以保证不同对象相互独立；静态数据成员和成员函数应该放在这个类的公共空间，不用每个对象都存一份，减少存储空间；而虚函数在继承中发挥独特作用，应该与其他成员函数分开。</p>
+<p>揭开谜底，以 Base 类为例，C++ 对象模型是长这样的：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E6%97%A0%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG" class title=" 无继承 C\+\+ 对象模型 ">
+
+<p>可以看出：</p>
+<ol>
+<li>C++ 对象模型中有一个指向虚函数表的指针，这个虚函数表中除了存放虚函数的指针之外，还有一个 type_info 的信息，用于在运行时识别对象的正确类型。</li>
+<li>C++ 对象的非静态成员变量存放在对象的内存空间中，静态成员变量存放在全局数据区。</li>
+<li>C++ 对象的成员函数存放在代码区。</li>
+</ol>
+<h2 id="普通继承场景下的对象模型"><a href="# 普通继承场景下的对象模型" class="headerlink" title="普通继承场景下的对象模型"></a><strong>普通继承场景下的对象模型 </strong></h2><h3 id="单一继承场景"><a href="# 单一继承场景" class="headerlink" title="单一继承场景"></a> 单一继承场景 </h3><p> 以 Base 为基类，定义派生类 Derived 如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base</span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">int</span> member;  <span class="comment">// 非静态数据成员</span></span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> smember_d;  <span class="comment">// 静态数据成员</span></span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">func</span><span class="params">()</span></span>;  <span class="comment">// 非静态成员函数</span></span><br><span class="line">    <span class="function"><span class="type">static</span> <span class="type">void</span> <span class="title">sfunc_d</span><span class="params">()</span></span>;  <span class="comment">// 静态成员函数</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc_d</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这种场景下，Derived 的对象模型如下：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E5%8D%95%E4%B8%80%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG" class title=" 单一继承 C\+\+ 对象模型 ">
+
+<p>可以看出：</p>
+<ol>
+<li>派生类有自己的虚函数表，从基类那边拷贝一份，然后进行修改：将 type_info 改为派生类的信息；如果派生类重写了基类的虚函数 vfunc，那么虚函数表中用 Derived::vfunc()的指针替换 Base::vfunc()的指针；如果派生类新增了虚函数 vfunc_d，那么虚函数表中新增一个函数指针指向 Derived::vfunc_d()。</li>
+<li>派生类中重写了基类中同名的非虚函数，那么会在代码区中完成同名函数的替换，例如 Derived::func()替换 Base::func()。</li>
+<li>派生类和基类中的同名成员变量均保留。</li>
+</ol>
+<h3 id="多重继承场景"><a href="# 多重继承场景" class="headerlink" title="多重继承场景"></a>多重继承场景 </h3><p> 单一继承场景下，派生类在基类的虚函数表上进行修改。多重继承场景，有多个基类的虚函数表。定义基类 Base1 和派生类 Derived 如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base1</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">int</span> member1;  <span class="comment">// 非静态数据成员</span></span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc1</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc2</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base, <span class="keyword">public</span> Base1</span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">int</span> member_d;  <span class="comment">// 非静态数据成员</span></span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> smember_d;  <span class="comment">// 静态数据成员</span></span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">func</span><span class="params">()</span></span>;  <span class="comment">// 非静态成员函数</span></span><br><span class="line">    <span class="function"><span class="type">static</span> <span class="type">void</span> <span class="title">sfunc_d</span><span class="params">()</span></span>;  <span class="comment">// 静态成员函数</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc1</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">vfunc_d</span><span class="params">()</span></span>;  <span class="comment">// 虚函数</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>此时 Derived 的对象模型为：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E5%A4%9A%E9%87%8D%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG" class title=" 多重继承 C\+\+ 对象模型 ">
+
+<p>可以看出：</p>
+<ol>
+<li>继承多个父类时，派生类的对象模型中分别存储一个虚函数表的指针。如果派生类重写的基类同名虚函数，那就在虚函数表中进行替换；如果派生类新增了虚函数，那么在第一个父类的虚函数表中进行新增扩展。</li>
+</ol>
+<h2 id="虚继承场景下的对象模型"><a href="# 虚继承场景下的对象模型" class="headerlink" title="虚继承场景下的对象模型"></a><strong>虚继承场景下的对象模型 </strong></h2><h3 id="使用普通继承的菱形继承"><a href="# 使用普通继承的菱形继承" class="headerlink" title="使用普通继承的菱形继承"></a> 使用普通继承的菱形继承 </h3><p> 多重继承场景中，有一种特殊的情况叫菱形继承，它是这样操作的：B1 继承 B，B2 继承 B，D 继承 B1 和 B2，祖父类 B 被子类 D 重复继承，图示如下：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%8F%B1%E5%BD%A2%E7%BB%A7%E6%89%BF.PNG" class title=" 菱形继承 ">
+
+<p>按多重继承的方式推导 D 的对象模型是这样的：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%8F%B1%E5%BD%A2%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG" class title=" 菱形继承 C\+\+ 对象模型 ">
+
+<p>可以看到，在菱形继承场景中，访问祖父类成员 B::b 时，出现了二义性。</p>
+<p>为解决菱形继承中的问题，C++ 发明了虚继承。虚继承的对象模型与普通继承不同：普通继承是子类拷贝并修改父类的虚函数表；虚继承是子类和父类的虚函数表分开保存，将指向父类的虚函数表的指针也加入到子类的对象模型中。</p>
+<h3 id="使用虚继承的单一继承"><a href="# 使用虚继承的单一继承" class="headerlink" title="使用虚继承的单一继承"></a>使用虚继承的单一继承 </h3><p> 假定单一虚继承场景如下：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E5%8D%95%E4%B8%80%E8%99%9A%E7%BB%A7%E6%89%BF.PNG" class title=" 单一虚继承 ">
+
+<p>此时派生类 Derived 的对象模型为：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E5%8D%95%E4%B8%80%E8%99%9A%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG" class title=" 单一虚继承 C\+\+ 对象模型 ">
+
+<p>可以看到：</p>
+<ol>
+<li>派生类的虚函数表和基类的虚函数表是分开的，派生类重写的虚函数将覆盖基类虚函数表中的同名函数。</li>
+<li>派生类中新增了一个虚基类指针，它指向一个表，表中保存对象模型中各个虚函数表指针的偏移量，第一项为派生类虚函数表指针的偏移量，第二项为虚继承中第一个基类的虚函数表指针的偏移量，以此类推。</li>
+<li>派生类的信息与基类的信息用 0x00000000 隔开。</li>
+</ol>
+<h3 id="使用虚继承的菱形继承"><a href="# 使用虚继承的菱形继承" class="headerlink" title="使用虚继承的菱形继承"></a>使用虚继承的菱形继承 </h3><p> 假定使用虚继承的菱形继承场景如下：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%8F%B1%E5%BD%A2%E8%99%9A%E7%BB%A7%E6%89%BF.PNG" class title=" 菱形虚继承 ">
+
+<p>结合多重继承与单一虚继承，推导派生类 Derived 的对象模型为：</p>
+<img src="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/%E8%8F%B1%E5%BD%A2%E8%99%9A%E7%BB%A7%E6%89%BFC++%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B.PNG" class title=" 菱形虚继承 C\+\+ 对象模型 ">
+
+<p>可以看到：</p>
+<ol>
+<li>多重继承的布局基本不变，虚基类的信息被追加到内存布局最后，并用 0x00000000 隔开。此时再访问 B::b 不会出现二义性。<br>附注：<br>推导时，从子类往祖父类逐步推进，子类与父类适用多重继承，父类与祖父类适用单一虚继承，每一步只决定派生类的数据成员的位置，例如 B::b 的布局应该由单一虚继承决定，如果在多重继承时决定，那推出来也是二义的。</li>
+</ol>
+<h2 id="总结"><a href="# 总结" class="headerlink" title="总结"></a><strong>总结 </strong></h2><p> 对象模型揭示了 C++ 对象在内存中的存储布局，结合面向对象的三大特性（继承、封装和多态）来理解对象模型，印象会更深一点。</p>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/C/" rel="tag">C++</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/" data-tooltip="C++ 与 Python 的 OOP 比较" aria-label="上一篇: C++ 与 Python 的 OOP 比较">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0/" data-tooltip="C++ 构造函数：默认构造和拷贝构造" aria-label="下一篇: C++ 构造函数：默认构造和拷贝构造">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E4%B8%8EPython%E7%9A%84OOP%E6%AF%94%E8%BE%83/" data-tooltip="C++ 与 Python 的 OOP 比较" aria-label="上一篇: C++ 与 Python 的 OOP 比较">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0/" data-tooltip="C++ 构造函数：默认构造和拷贝构造" aria-label="下一篇: C++ 构造函数：默认构造和拷贝构造">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2023/CPP对象模型/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

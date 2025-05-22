@@ -1,0 +1,594 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>交替符号执行工具——Symbion 初探 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、原理介绍  原始论文：SYMBION: Interleaving Symbolic with Concrete Execution\n官方博客：symbion: fusing concrete and symbolic execution\n1. 背景  符号执行可以用来获取走到指定程序区块的可行输入，但是符号执行在实际应用中面临很多挑战：\n\n路径爆炸问题：符号执行从程序入口开始探索，当程序中出现分支和循环时，会导致路径状态呈指数增长。\n\n环境交互问题：当程序与系统或三方库进行交互时，由于缺失源码或交互复杂等原因，会阻碍符号执行的状态更新。\n\n\n2. 方案Symbion 通过具体执行环境与符号执行环境的同步与切换，实现具体值和符号值交替执行。通过这种交替执行机制，减少符号执行探索的路径状态，并解决程序对外部环境的依赖问题。\n图中演示了具体执行环境与符号执行环境相互切换的过程：\n\n\n目标是对从 PoI 到TP的路径进行符号推理，CSP节点是程序入口。从 CSP 到PoI要经过复杂的运算和交互，这导致直接从 CSP 开始符号推理，将无法向后演进到PoI。\n使用 Symbion 时，首先将具体值输入给 CSP，在具体执行后到达PoI。然后在PoI 切换到符号执行环境，算出到达 TP 所需的变量取值。再将算出来的结果同步给具体执行环境，在 PoI 恢复具体执行，即可到达TP。\n3. 实现Symbion 的架构设计如下：\n\n\nSymbion 在 Angr 的基础上，增加了如下组件：\n\nConcrete Target：定义了与具体执行环境交互的方法，通过实现这些方法可以让 Symbion 支持特定的交互环境。例如 Symbion 实现的GDBConcreteTarget，它通过 gdbsever 控制远程目标程序的交互。\n\nread_memory(address, nbytes)：从具体进程内存中 address 开始读取 nbytes 字节。\nwrite_memory(address, value)：在具体进程内存中 address 处写入value。\nread_register(register)：返回具体进程中指定 register 的内容。\nwrite_register(register, value)：在具体进程的 register 中写入value。\nset_breakpoint(address)：在具体进程中的 address 处设置断点。\nremove_breakpoint(address)：移除之前在 address 处设置的断点。\nrun()：恢复具体进程的执行。\n\n\nSimEngineConcrete：利用 Concrete Target 的方法执行以下步骤，实现 Symbolic 环境到 Concrete 环境的切换。\n\n用用户提供的值修改具体进程的内存。\n用用户提供的值修改具体进程的寄存器。\n通过断点来设置新的PoI。\n恢复程序的具体执行，直到到达新的PoI，并将控制权交还给 Angr。\n\n\nConcrete SimPlugin：当具体执行到达 PoI，这个插件实现Concrete 环境到 Symbolic 环境的切换，它将具体状态导入 Angr 来创建SimState。\n\n将 SimState 的内存后端重定向到具体进程的内存，即在符号执行过程中，SimState的内存读取都是从具体进程中来操作。\n\n将具体进程中的寄存器值复制到 SimState 中。\n\n将具体进程的内存映射与 Angr 在启动期间加载的内存映射同步。\n\n\n\nSYMBION Exploration Technique：提供用户使用 Symbion 的 API ，通过这些 API ，用户指定 PoI 的地址，在具体执行到达 PoI 后，Symbion 切换为符号执行。\n\n\n简而言之，在 Symbion 的工作流程中，各组件的作用为：\n\n用户通过 SYMBION Exploration Technique 指定PoI。\n\n程序经过具体执行到达到 PoI 后暂停， Concrete SimPlugin 根据具体执行环境来创建一个SimState。\n\nAngr 通过符号执行，计算到达下一个 PoI 的可行解。\n\nSimEngineConcrete 用 Angr 算出来的结果修改具体进程中的变量，恢复具体执行直到下一个PoI。\n\n\n二、示例分析Symbion 官方示例：test_concrete_not_packed_elf64\n示例使用的二进制：not_packed_elf64\n二进制没有给源码，通过 IDA 逆向源码，并用 AI 改写，得到 C 源码如下，源码中取 dest 变量中的一串数值做判断，不同的分支触发不同的print。\n\n\n在 Symbion 的示例代码中，首先通过具体执行到达 BINARY_DECISION_ADDRESS，然后用符号执行探索从BINARY_DECISION_ADDRESS 到DROP_STAGE2_V2的路径。\n\n\n在符号执行求解成功后，再将求解结果传递给具体执行环境，并启动具体执行，即可到达DROP_STAGE2_V2：\n\n\n结合 CFG 和源码可以看到，符号执行的起点 BINARY_DECISION_ADDRESS 对应源码图右侧 55 行，符号执行的终点 DROP_STAGE2_V2 对应源码图右侧 77 行。通过 Symbion，实现了对二进制按指定路径的进行分析的目的。\n\n\nSymbion 的示例代码中，涉及到很多内存地址操作，需要结合 IDA 的反编译源码来看：\n\n\n\nline 2：启动具体执行，到 BINARY_DECISION_ADDRESS 停下，即 IDA 反编译源码第 67 行代码\n\nline 3：从具体执行环境的获取寄存器中的栈指针sp，指向栈顶（即栈开始的位置）\n\nline 4：从栈顶 sp 开始读取 20 个字节的内存，这块内存包括反编译源码中的变量 i 和v5\n\nline 5：判断是否为符号变量，此时为具体执行环境，所以不是符号变量\n\nline 7：定义符号变量，变量名为arg0，大小为 32 字节\n\nline 8：用 symbolic_buffer_memory 指向具体执行环境中 rbp-0xc0 的内存地址，它对应 IDA 反编译源码中的数组 s 的起始地址。\n\nline 10：从 symbolic_buffer_memory 开始加载 36 个字节的内存\n\nline 11：判断是否为符号变量，此时为具体执行环境，所以不是符号变量\n\nline 12：将 angr0 存储到symbolic_buffer_memory，将符号变量与具体执行环境的内存地址关联起来\n\nline 15：从 symbolic_buffer_memory 开始加载 36 个字节的内存\n\nline 16：判断是否为符号变量，因为 把 angr0 保存到这块内存，所以是符号变量\n\nline 19：符号执行状态初始化\n\nline 37：启动符号执行\n\n\n可以看到，Symbion 在切换具体执行环境和符号执行环境时，是通过内存地址把变量的具体值和符号值对应起来。需要结合 IDA 反编译的源码中给出的变量地址和内存大小，人工设置符号执行中所需要的符号变量，难以实现自动化。","dateCreated":"2024-02-27T16:33:24+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-02-27T16:33:24+08:00","description":"Symbion 是 Angr 的一款插件，可以实现具体执行与符号执行交替运行","headline":"交替符号执行工具——Symbion 初探","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/","keywords":"符号执行, Angr"}</script>
+    <meta name="description" content="Symbion 是 Angr 的一款插件，可以实现具体执行与符号执行交替运行">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="交替符号执行工具——Symbion 初探">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="Symbion 是 Angr 的一款插件，可以实现具体执行与符号执行交替运行">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%87%E6%8D%A2.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E6%9E%B6%E6%9E%84.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BA%8C%E8%BF%9B%E5%88%B6%E9%80%86%E5%90%91%E6%BA%90%E7%A0%81.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BB%A3%E7%A0%81%E6%AE%B51.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BB%A3%E7%A0%81%E6%AE%B52.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/not_packed_elf64%E6%8C%87%E5%AE%9A%E8%B7%AF%E5%BE%84.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/not_packed_elf64%E7%A4%BA%E4%BE%8B%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90.png">
+<meta property="article:published_time" content="2024-02-27T08:33:24.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.578Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="符号执行">
+<meta property="article:tag" content="Angr">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%87%E6%8D%A2.png">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            交替符号执行工具——Symbion 初探
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-02-27T16:33:24+08:00">
+	
+		    2024 年 2 月 27 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C/">符号执行</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="一、原理介绍"><a href="# 一、原理介绍" class="headerlink" title="一、原理介绍"></a>一、原理介绍 </h2><p> 原始论文：<a target="_blank" rel="external nofollow noopener noreferrer" href="https://seclab.cs.ucsb.edu/files/publications/gritti2020_symbion.pdf">SYMBION: Interleaving Symbolic with Concrete Execution</a></p>
+<p>官方博客：<a target="_blank" rel="external nofollow noopener noreferrer" href="https://angr.io/blog/angr_symbion/">symbion: fusing concrete and symbolic execution</a></p>
+<h3 id="1- 背景"><a href="#1- 背景" class="headerlink" title="1. 背景"></a>1. 背景 </h3><p> 符号执行可以用来获取走到指定程序区块的可行输入，但是符号执行在实际应用中面临很多挑战：</p>
+<ol>
+<li><p>路径爆炸问题：符号执行从程序入口开始探索，当程序中出现分支和循环时，会导致路径状态呈指数增长。</p>
+</li>
+<li><p>环境交互问题：当程序与系统或三方库进行交互时，由于缺失源码或交互复杂等原因，会阻碍符号执行的状态更新。</p>
+</li>
+</ol>
+<h3 id="2- 方案"><a href="#2- 方案" class="headerlink" title="2. 方案"></a>2. 方案</h3><p>Symbion 通过具体执行环境与符号执行环境的同步与切换，实现具体值和符号值交替执行。通过这种交替执行机制，减少符号执行探索的路径状态，并解决程序对外部环境的依赖问题。</p>
+<p>图中演示了具体执行环境与符号执行环境相互切换的过程：</p>
+<img src="/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%87%E6%8D%A2.png" class title="symbion 上下文切换 ">
+
+<p>目标是对从 <code>PoI</code> 到<code>TP</code>的路径进行符号推理，<code>CSP</code>节点是程序入口。从 <code>CSP</code> 到<code>PoI</code>要经过复杂的运算和交互，这导致直接从 <code>CSP</code> 开始符号推理，将无法向后演进到<code>PoI</code>。</p>
+<p>使用 <code>Symbion</code> 时，首先将具体值输入给 <code>CSP</code>，在具体执行后到达<code>PoI</code>。然后在<code>PoI</code> 切换到符号执行环境，算出到达 <code>TP</code> 所需的变量取值。再将算出来的结果同步给具体执行环境，在 <code>PoI</code> 恢复具体执行，即可到达<code>TP</code>。</p>
+<h3 id="3- 实现"><a href="#3- 实现" class="headerlink" title="3. 实现"></a>3. 实现</h3><p>Symbion 的架构设计如下：</p>
+<img src="/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E6%9E%B6%E6%9E%84.png" class title="symbion 架构 ">
+
+<p>Symbion 在 Angr 的基础上，增加了如下组件：</p>
+<ul>
+<li><p>Concrete Target：定义了与具体执行环境交互的方法，通过实现这些方法可以让 Symbion 支持特定的交互环境。例如 Symbion 实现的<code>GDBConcreteTarget</code>，它通过 gdbsever 控制远程目标程序的交互。</p>
+<ul>
+<li><code>read_memory(address, nbytes)</code>：从具体进程内存中 <code>address</code> 开始读取 <code>nbytes</code> 字节。</li>
+<li><code>write_memory(address, value)</code>：在具体进程内存中 <code>address</code> 处写入<code>value</code>。</li>
+<li><code>read_register(register)</code>：返回具体进程中指定 <code>register</code> 的内容。</li>
+<li><code>write_register(register, value)</code>：在具体进程的 <code>register</code> 中写入<code>value</code>。</li>
+<li><code>set_breakpoint(address)</code>：在具体进程中的 <code>address</code> 处设置断点。</li>
+<li><code>remove_breakpoint(address)</code>：移除之前在 <code>address</code> 处设置的断点。</li>
+<li><code>run()</code>：恢复具体进程的执行。</li>
+</ul>
+</li>
+<li><p>SimEngineConcrete：利用 Concrete Target 的方法执行以下步骤，实现 <code>Symbolic</code> 环境到 <code>Concrete</code> 环境的切换。</p>
+<ul>
+<li>用用户提供的值修改具体进程的内存。</li>
+<li>用用户提供的值修改具体进程的寄存器。</li>
+<li>通过断点来设置新的<code>PoI</code>。</li>
+<li>恢复程序的具体执行，直到到达新的<code>PoI</code>，并将控制权交还给 Angr。</li>
+</ul>
+</li>
+<li><p>Concrete SimPlugin：当具体执行到达 <code>PoI</code>，这个插件实现<code>Concrete</code> 环境到 <code>Symbolic</code> 环境的切换，它将具体状态导入 Angr 来创建<code>SimState</code>。</p>
+<ul>
+<li><p>将 <code>SimState</code> 的内存后端重定向到具体进程的内存，即在符号执行过程中，<code>SimState</code>的内存读取都是从具体进程中来操作。</p>
+</li>
+<li><p>将具体进程中的寄存器值复制到 <code>SimState</code> 中。</p>
+</li>
+<li><p>将具体进程的内存映射与 Angr 在启动期间加载的内存映射同步。</p>
+</li>
+</ul>
+</li>
+<li><p>SYMBION Exploration Technique：提供用户使用 Symbion 的 API ，通过这些 API ，用户指定 <code>PoI</code> 的地址，在具体执行到达 <code>PoI</code> 后，Symbion 切换为符号执行。</p>
+</li>
+</ul>
+<p>简而言之，在 Symbion 的工作流程中，各组件的作用为：</p>
+<ol>
+<li><p>用户通过 SYMBION Exploration Technique 指定<code>PoI</code>。</p>
+</li>
+<li><p>程序经过具体执行到达到 <code>PoI</code> 后暂停， Concrete SimPlugin 根据具体执行环境来创建一个<code>SimState</code>。</p>
+</li>
+<li><p>Angr 通过符号执行，计算到达下一个 <code>PoI</code> 的可行解。</p>
+</li>
+<li><p>SimEngineConcrete 用 Angr 算出来的结果修改具体进程中的变量，恢复具体执行直到下一个<code>PoI</code>。</p>
+</li>
+</ol>
+<h2 id="二、示例分析"><a href="# 二、示例分析" class="headerlink" title="二、示例分析"></a>二、示例分析</h2><p>Symbion 官方示例：<a target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/angr/angr-targets/blob/master/tests/test_concrete_not_packed_elf64.py">test_concrete_not_packed_elf64</a></p>
+<p>示例使用的二进制：<a target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/angr/binaries/blob/master/tests/x86_64/not_packed_elf64">not_packed_elf64</a></p>
+<p>二进制没有给源码，通过 IDA 逆向源码，并用 AI 改写，得到 C 源码如下，源码中取 <code>dest</code> 变量中的一串数值做判断，不同的分支触发不同的<code>print</code>。</p>
+<img src="/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BA%8C%E8%BF%9B%E5%88%B6%E9%80%86%E5%90%91%E6%BA%90%E7%A0%81.png" class>
+
+<p>在 Symbion 的示例代码中，首先通过具体执行到达 <code>BINARY_DECISION_ADDRESS</code>，然后用符号执行探索从<code>BINARY_DECISION_ADDRESS</code> 到<code>DROP_STAGE2_V2</code>的路径。</p>
+<img src="/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BB%A3%E7%A0%81%E6%AE%B51.png" class>
+
+<p>在符号执行求解成功后，再将求解结果传递给具体执行环境，并启动具体执行，即可到达<code>DROP_STAGE2_V2</code>：</p>
+<img src="/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BB%A3%E7%A0%81%E6%AE%B52.png" class>
+
+<p>结合 CFG 和源码可以看到，符号执行的起点 <code>BINARY_DECISION_ADDRESS</code> 对应源码图右侧 55 行，符号执行的终点 <code>DROP_STAGE2_V2</code> 对应源码图右侧 77 行。通过 Symbion，实现了对二进制按指定路径的进行分析的目的。</p>
+<img src="/2024/Symbion%E5%88%9D%E6%8E%A2/not_packed_elf64%E6%8C%87%E5%AE%9A%E8%B7%AF%E5%BE%84.png" class>
+
+<p>Symbion 的示例代码中，涉及到很多内存地址操作，需要结合 IDA 的反编译源码来看：</p>
+<img src="/2024/Symbion%E5%88%9D%E6%8E%A2/not_packed_elf64%E7%A4%BA%E4%BE%8B%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90.png" class title="not_packed_elf64 代码 ">
+
+<ul>
+<li><p>line 2：启动具体执行，到 <code>BINARY_DECISION_ADDRESS</code> 停下，即 IDA 反编译源码第 67 行代码</p>
+</li>
+<li><p>line 3：从具体执行环境的获取寄存器中的栈指针<code>sp</code>，指向栈顶（即栈开始的位置）</p>
+</li>
+<li><p>line 4：从栈顶 <code>sp</code> 开始读取 20 个字节的内存，这块内存包括反编译源码中的变量 <code>i</code> 和<code>v5</code></p>
+</li>
+<li><p>line 5：判断是否为符号变量，此时为具体执行环境，所以不是符号变量</p>
+</li>
+<li><p>line 7：定义符号变量，变量名为<code>arg0</code>，大小为 32 字节</p>
+</li>
+<li><p>line 8：用 <code>symbolic_buffer_memory</code> 指向具体执行环境中 <code>rbp-0xc0</code> 的内存地址，它对应 IDA 反编译源码中的数组 <code>s</code> 的起始地址。</p>
+</li>
+<li><p>line 10：从 <code>symbolic_buffer_memory</code> 开始加载 36 个字节的内存</p>
+</li>
+<li><p>line 11：判断是否为符号变量，此时为具体执行环境，所以不是符号变量</p>
+</li>
+<li><p>line 12：将 <code>angr0</code> 存储到<code>symbolic_buffer_memory</code>，将符号变量与具体执行环境的内存地址关联起来</p>
+</li>
+<li><p>line 15：从 <code>symbolic_buffer_memory</code> 开始加载 36 个字节的内存</p>
+</li>
+<li><p>line 16：判断是否为符号变量，因为 把 <code>angr0</code> 保存到这块内存，所以是符号变量</p>
+</li>
+<li><p>line 19：符号执行状态初始化</p>
+</li>
+<li><p>line 37：启动符号执行</p>
+</li>
+</ul>
+<p>可以看到，Symbion 在切换具体执行环境和符号执行环境时，是通过内存地址把变量的具体值和符号值对应起来。需要结合 IDA 反编译的源码中给出的变量地址和内存大小，人工设置符号执行中所需要的符号变量，难以实现自动化。</p>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/Angr/" rel="tag">Angr</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C/" rel="tag">符号执行</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/" data-tooltip="Hexo 捣鼓札记" aria-label="上一篇: Hexo 捣鼓札记">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/" data-tooltip="符号执行工具——Angr 零基础入门" aria-label="下一篇: 符号执行工具——Angr 零基础入门">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/" data-tooltip="Hexo 捣鼓札记" aria-label="上一篇: Hexo 捣鼓札记">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/" data-tooltip="符号执行工具——Angr 零基础入门" aria-label="下一篇: 符号执行工具——Angr 零基础入门">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/Symbion初探/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

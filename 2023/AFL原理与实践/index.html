@@ -1,0 +1,575 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>AFL 原理与实践 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n\n在软件开发的世界里，质量和安全性是评估产品成败的重要指标。模糊测试作为一种高效的自动化测试方法，专门用来发现程序中的错误和安全漏洞。本文旨在详细介绍 AFL（American Fuzzy Lop）的基本原理和使用方法。\n一、AFL 的原理介绍  模糊测试是一种通过向软件输入异常或随机数据的自动化技术，目的是发现程序在处理意外或边缘情况输入时的错误。AFL 是这一测试策略中的杰出代表，它通过不断学习程序反应来改进测试用例，提高测试的覆盖率和发现漏洞的概率。\nAFL 利用遗传算法，不断生成测试用例，并通过动态插桩技术监控程序的行为，特别是程序的代码覆盖情况。当新的输入能触发新的代码路径时，这个输入会被保存以供进一步的测试。该过程可以形成一个反馈循环，不断优化测试用例以探索更多程序状态。\n下面是 AFL 工作流程图，展示了从准备测试用例到监控程序行为的步骤：\ngraph TD\n    A[Compile with afl-gcc] --> B[Initialize seed corpus] --> C[Fuzzing loop] --> D[Select seed from corpus queue]\n    D[Select seed from corpus queue] --> E[Mutate selected seed] --> F[Execute with mutated testcase]\n    F[Execute with mutated testcase] --> G[Monitor for crashes and coverage update] --> H{Check for new coverage}\n    H{Check for new coverage} -- YES --> I[Save mutated testcase to queue] --> D\n    H{Check for new coverage} -- NO --> D\n\n流程图详细展示了 AFL 在模糊测试中的核心步骤：\n\n编译（Compile with afl-gcc） - 使用 AFL 提供的编译器 afl-gcc，对目标程序进行编译，实现程序的动态插桩。\n\n初始化种子库（Initialize seed corpus） - 创建初始测试用例集（种子库），这些测试用例将作为模糊测试的起点。\n\n模糊测试循环（Fuzzing loop） - 一个不断循环的过程，根据测试结果更新种子库，并反复执行下列子步骤：a. 选择种子（Select seed from corpus queue） - 从种子库中选择一个种子文件作为当前测试的输入。b. 突变种子（Mutate selected seed） - 对选中的种子文件应用突变算法，生成新的测试用例。c. 执行测试（Execute with mutated test case） - 将变异后的测试用例作为输入执行已插桩的目标程序。d. 监控结果（Monitor for crashes and coverage update） - 监控程序的执行情况，记录崩溃和代码覆盖率的变化。\n\n覆盖率检查（Check for new coverage） - 判断是否出现新的代码覆盖，如果有，则将其保存为新测试用例。\n\n保存新测试用例（Save new testcase to queue） - 将触发新代码覆盖的测试用例保存到队列中，用于后续的测试。\n\n\nAFL 采用了 fork 的运行模式，这使得当待测程序出现崩溃时，fuzz 进程不会终止，这一点相较于 LibFuzzer 更具优势。然而，频繁的 fork 操作也导致了 AFL 的效率不如 LibFuzzer。\n二、AFL 安装和运行1. 支持的系统和架构AFL 设计之初主要针对 UNIX-like 系统，其在 Linux 系统上有最好的支持。然而，在社区的努力下，也有 Windows 版本的 AFL，如 winafl，其可以在 Windows 进行模糊测试。\nAFL 还支持多种 CPU 架构，其中对 x86 和 x64 架构的支持最好。如果要支持 ARM 架构，则需要使用 AFL 的 QEMU 模式。\n2. 安装步骤AFL 可以通过源码进行安装：\n123apt install git make gccgit clone https://github.com/google/AFL.git cd AFL &amp;&amp; make\n\n3. 运行参数  在安装并编译完 AFL 之后，可以使用 afl-fuzz 命令来启动模糊测试。一个基本的 AFL fuzz 命令如下：\n1afl-fuzz -i input_dir -o output_dir -- /path/to/program [options] @@\n\n这里：\n\nafl-fuzz 是启动 AFL 模糊测试的程序。\n-i input_dir 指定包含初始化测试用例的目录。\n-o output_dir 指定存放的 fuzzing 结果的目录。\n\n-- 之后的部分是运行被测试程序的命令行，其中 /path/to/program 替换为需要进行模糊测试的程序的路径，[options] 是运行该程序的任何选项或参数。\n如果测试程序需要从文件中读取输入，可以在实际输入文件路径的位置使用 @@ 占位符。AFL 将替换 @@ 来插入它正在测试的输入文件。如果省略这个占位符，AFL 将会把模糊测试用例通过 stdin 传递给测试程序。\n三、AFL 的使用示例  本节使用一个简单的示例，演示 AFL 的操作步骤。\n这是待测源码，其功能是接受一行命令行输入，进行四则运算。其中使用了不安全的 gets 函数，可能导致缓冲区溢出：\n1234567891011121314151617181920212223242526272829303132#include &lt;stdio.h&gt;#include &lt;string.h&gt;int calculate(int a, int b, char op) &#123;    switch (op) &#123;        case &#x27;+&#x27;: return a + b;        case &#x27;-&#x27;: return a - b;        case &#x27;x&#x27;: return a * b;        case &#x27;/&#x27;: return b ? a / b : 0;        default: return 0;    &#125;&#125;int main() &#123;    char input[100];    // unsafe method that may cause buffer overflow    gets(input);    int a, b, result;    char op;    if (sscanf(input, &quot;%d %c %d&quot;, &amp;a, &amp;op, &amp;b) != 3)        return 1;    result = calculate(a, b, op);    printf(&quot;Result: %d\\n&quot;, result);    return 0;&#125;\n\n1. 编译源码  使用 AFL 的编译器 afl-gcc 或afl-clang对源文件 hello.c 进行编译，添加所需要的代码覆盖插桩。afl-gcc或 afl-clang 实际上是对常规的 gcc 或clang编译器进行了封装，通过在编译时进行插桩，来统计 fuzz 过程中的代码覆盖率：\n1afl-gcc -o hello hello.c\n\n2. 准备种子语料库  不论程序是从 file 还是从 stdin 获取数据，AFL 都需要一个初始语料库来启动模糊测试过程。输入（无论是来自 file 或 stdin）是 AFL 用来开始探索程序行为的基础。初始语料库（seed corpus）是一组文件，其中包含了各种有效的输入示例，这些输入会被 AFL 用作模糊测试的起始点。\n从 stdin 读取输入时，AFL 会将语料库中的每个文件内容作为输入在每次测试运行时送到程序的标准输入流中。使用 AFL 时，必须要有初始语料库。注意这一点 AFL 与 Libfuzzer 不同，Libfuzzer 只接受 stdin，不接受 file，初始语料库为可选项。\n12mkdir inecho &#x27;abc&#x27; &gt; in/seed\n\n3. 执行测试  在运行 AFL 之前，需要执行下面的系统设置命令，将字符串”core”写入到文件 /proc/sys/kernel/core_pattern 中。\n在 Linux 系统中，/proc/sys/kernel/core_pattern 文件用于指定当程序崩溃时，内核转储文件（core dump）的文件名模式。通过修改这个文件，可以控制内核生成 core 文件的行为。\n通过执行这个命令，生成的核心转储文件将以”core”命名，这使得 AFL 更容易检测和处理目标程序的崩溃情况，从而更好地进行模糊测试。\n1echo core | tee /proc/sys/kernel/core_pattern\n\n在 hello 中使用 gets 函数从 stdin 中读取数据，因此在运行 AFL 时，不需要添加 @@。是否使用@@ 取决于待测程序接受的输入来自 file 还是 stdin。\n1afl-fuzz -i in -o out -- ./hello\n\n4. 结果解读AFL 开始运行后，将会看到如下的界面显示：\n\n\n从这个界面上可以看到 AFL 找到了多少 crash，但还不能直观地显示覆盖率。pythia是一款 AFL 的扩展工具，可以查看代码覆盖率的情况。\nAFL 在运行过程中，会不断地产生输出。输出目录结构如下：\n123456789101112131415161718192021222324out|-- crashes|   |-- README.txt|   |-- id:000000,sig:06,src:000000,op:havoc,rep:64|   |-- id:000001,sig:06,src:000002+000003,op:splice,rep:128|   |-- id:000002,sig:06,src:000003,op:havoc,rep:32|   |-- id:000003,sig:06,src:000002+000003,op:splice,rep:16|   |-- id:000004,sig:06,src:000004,op:havoc,rep:32|   |-- id:000005,sig:11,src:000003+000002,op:splice,rep:64|   `-- id:000006,sig:06,src:000004+000005,op:splice,rep:2|-- fuzz_bitmap|-- fuzzer_stats|-- hangs|-- plot_data`-- queue    |-- id:000000,orig:seed    |-- id:000001,src:000000,op:havoc,rep:16,+cov    |-- id:000002,src:000000+000001,op:splice,rep:4,+cov    |-- id:000003,src:000001,op:arith8,pos:1,val:-5,+cov    |-- id:000004,src:000001,op:arith8,pos:1,val:-9,+cov    `-- id:000005,src:000002+000003,op:splice,rep:4,+cov3 directories, 17 files\n\n\nqueue&#x2F; - 存放 AFL 生成的触发新代码路径的测试样本\n\ncrashes&#x2F; - 存放能触发待测程序崩溃的测试样本\n\nhangs&#x2F; - 存发导致待测程序超时的测试样本\n\nfuzzer_stats - 文本文件，包含了 fuzzer 的实时统计信息，如执行速度、路径覆盖等度量指标。这个文件不断更新以反映当前的 fuzzing 状态。\n\nplot_data - 文本文件，包含了 AFL 执行过程中的统计数据。使用 AFL 的 afl-plot 工具处理 plot_data 文件，可以生成 fuzz 过程的可视化图像。\n\nfuzz_bitmap - 这是用来记录路径覆盖率的位图（coverage bitmap），非人类可读。AFL 使用这个位图来跟踪程序在处理不同输入时执行的不同分支，用来帮助 AFL 识别新的、唯一的代码路径，以便后续生成更具有探索性的测试样本。\n\n\n四、AFL 的 QEMU 模式  前面的例子中，AFL 在对待测程序的源码进行编译时插桩。实际中，我们不一定能拿到待测源码，我们要测的可能是一个已经编译好的二进制文件。这种情况下 Libfuzzer 就无能为力了，但 AFL 还能用，这依赖于 AFL 的 QEMU 模式。\nAFL 的 QEMU 模式，也称为 AFL-QEMU，允许你在二进制模糊测试中使用 AFL，即使源代码不可用。这在对闭源应用进行模糊测试时非常有用。这种模式使用 QEMU 的用户模式仿真，来运行并分析非原生的二进制文件。以下是安装 AFL 的 QEMU 模式和使用步骤的指南：\n1. 编译 QEMU 支持  在 AFL 主目录下有一个专门的 QEMU 模式目录。进入该目录并编译 QEMU 模式，过程中可能缺少依赖项，根据提示进行安装即可：\n12cd qemu_mode./build_qemu_support.sh\n\n2. AFL-QEMU 使用步骤  用法很简单，在 AFL 运行命令中添加 -Q 参数即可：\n1afl-fuzz -i input -o output -Q -- /path/to/binary @@\n\n\n五、AFL 的升级版——AFL++AFL++ 可以看作是原始 AFL 的”增强版”，对 AFL 的调度策略和变异算法进行了很多改进，同时还引入了很多新特性，如 CMPLOG 和持久化这样的特性。\n1. CMPLOGCMPLOG 是 AFL++ 引入的一个新功能，类似于 Libfuzzer 中的 trace-cmp，它可以极大地提高代码覆盖率。CMPLOG 的主要作用是对程序中的所有比较操作进行记录，包括等于、不等于、小于等逻辑比较。当 fuzzer 执行时，CMPLOG 能够捕获比较操作的参数，并将对应的值添加到 fuzzer 的输入测试用例中。这个过程实际上帮助 fuzzer 更好地理解代码中期待的输入，特别是那些用于逻辑分支的字面值和魔法数字。这种理解能够导向更深入的路径覆盖，进而揭露隐藏更深的潜在缺陷。\n2. 持久化模式AFL 的持久化（persistent）模式允许目标程序在单个进程周期内重复执行多次模糊测试用例。这对性能产生了显著的提升，因为它减少了程序启动和终止的开销，特别是当测试的目标程序需要很大的初始化成本时。在 AFL++ 中，持久化模式的执行更为高效，它允许模糊器在目标程序中一次性执行多个测试用例，而非每次执行一个用例都重启目标程序。有了持久化模式，AFL++ 能够在相同的时间内执行更多的测试迭代，从而提高漏洞检测的速度。\n六、小结AFL 是一款强大的模糊测试工具，实践中 AFL++ 的应用非常广泛。相比 Libfuzzer，AFL++ 不局限于源码，并且支持多种 cpu 架构，还有丰富的插件生态可以使用。\n但模糊测试本身存在覆盖率瓶颈的问题，难以探索复杂的程序路径，这时候可以结合其他的技术，如符号执行来突破。","dateCreated":"2023-10-15T11:23:55+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2023-10-15T11:23:55+08:00","description":"模糊测试工具 AFL（American Fuzzy Lop）的原理介绍与实践应用","headline":"AFL 原理与实践","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2023/AFL%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2023/AFL%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/","keywords":"Fuzz, AFL"}</script>
+    <meta name="description" content="模糊测试工具 AFL（American Fuzzy Lop）的原理介绍与实践应用">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="AFL 原理与实践">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2023/AFL%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="模糊测试工具 AFL（American Fuzzy Lop）的原理介绍与实践应用">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2023/AFL%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/AFL%E8%BF%90%E8%A1%8C%E7%95%8C%E9%9D%A2.png">
+<meta property="article:published_time" content="2023-10-15T03:23:55.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.221Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="Fuzz">
+<meta property="article:tag" content="AFL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2023/AFL%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/AFL%E8%BF%90%E8%A1%8C%E7%95%8C%E9%9D%A2.png">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            AFL 原理与实践
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2023-10-15T11:23:55+08:00">
+	
+		    2023 年 10 月 15 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/">模糊测试</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+
+<p>在软件开发的世界里，质量和安全性是评估产品成败的重要指标。模糊测试作为一种高效的自动化测试方法，专门用来发现程序中的错误和安全漏洞。本文旨在详细介绍 AFL（American Fuzzy Lop）的基本原理和使用方法。</p>
+<h2 id="一、AFL- 的原理介绍"><a href="# 一、AFL- 的原理介绍" class="headerlink" title="一、AFL 的原理介绍"></a>一、AFL 的原理介绍 </h2><p> 模糊测试是一种通过向软件输入异常或随机数据的自动化技术，目的是发现程序在处理意外或边缘情况输入时的错误。AFL 是这一测试策略中的杰出代表，它通过不断学习程序反应来改进测试用例，提高测试的覆盖率和发现漏洞的概率。</p>
+<p>AFL 利用遗传算法，不断生成测试用例，并通过动态插桩技术监控程序的行为，特别是程序的代码覆盖情况。当新的输入能触发新的代码路径时，这个输入会被保存以供进一步的测试。该过程可以形成一个反馈循环，不断优化测试用例以探索更多程序状态。</p>
+<p>下面是 AFL 工作流程图，展示了从准备测试用例到监控程序行为的步骤：</p>
+<pre class="mermaid">graph TD
+    A[Compile with afl-gcc] --> B[Initialize seed corpus] --> C[Fuzzing loop] --> D[Select seed from corpus queue]
+    D[Select seed from corpus queue] --> E[Mutate selected seed] --> F[Execute with mutated testcase]
+    F[Execute with mutated testcase] --> G[Monitor for crashes and coverage update] --> H{Check for new coverage}
+    H{Check for new coverage} -- YES --> I[Save mutated testcase to queue] --> D
+    H{Check for new coverage} -- NO --> D</pre>
+
+<p>流程图详细展示了 AFL 在模糊测试中的核心步骤：</p>
+<ol>
+<li><p><strong>编译（Compile with afl-gcc）</strong> - 使用 AFL 提供的编译器 afl-gcc，对目标程序进行编译，实现程序的动态插桩。</p>
+</li>
+<li><p><strong>初始化种子库（Initialize seed corpus）</strong> - 创建初始测试用例集（种子库），这些测试用例将作为模糊测试的起点。</p>
+</li>
+<li><p><strong>模糊测试循环（Fuzzing loop）</strong> - 一个不断循环的过程，根据测试结果更新种子库，并反复执行下列子步骤：<br>a. <strong>选择种子（Select seed from corpus queue）</strong> - 从种子库中选择一个种子文件作为当前测试的输入。<br>b. <strong>突变种子（Mutate selected seed）</strong> - 对选中的种子文件应用突变算法，生成新的测试用例。<br>c. <strong>执行测试（Execute with mutated test case）</strong> - 将变异后的测试用例作为输入执行已插桩的目标程序。<br>d. <strong>监控结果（Monitor for crashes and coverage update）</strong> - 监控程序的执行情况，记录崩溃和代码覆盖率的变化。</p>
+</li>
+<li><p><strong>覆盖率检查（Check for new coverage）</strong> - 判断是否出现新的代码覆盖，如果有，则将其保存为新测试用例。</p>
+</li>
+<li><p><strong>保存新测试用例（Save new testcase to queue）</strong> - 将触发新代码覆盖的测试用例保存到队列中，用于后续的测试。</p>
+</li>
+</ol>
+<p>AFL 采用了 fork 的运行模式，这使得当待测程序出现崩溃时，fuzz 进程不会终止，这一点相较于 LibFuzzer 更具优势。然而，频繁的 fork 操作也导致了 AFL 的效率不如 LibFuzzer。</p>
+<h2 id="二、AFL 安装和运行"><a href="# 二、AFL 安装和运行" class="headerlink" title="二、AFL 安装和运行"></a>二、AFL 安装和运行</h2><h3 id="1- 支持的系统和架构"><a href="#1- 支持的系统和架构" class="headerlink" title="1. 支持的系统和架构"></a>1. 支持的系统和架构</h3><p>AFL 设计之初主要针对 UNIX-like 系统，其在 Linux 系统上有最好的支持。然而，在社区的努力下，也有 Windows 版本的 AFL，如 winafl，其可以在 Windows 进行模糊测试。</p>
+<p>AFL 还支持多种 CPU 架构，其中对 x86 和 x64 架构的支持最好。如果要支持 ARM 架构，则需要使用 AFL 的 QEMU 模式。</p>
+<h3 id="2- 安装步骤"><a href="#2- 安装步骤" class="headerlink" title="2. 安装步骤"></a>2. 安装步骤</h3><p>AFL 可以通过源码进行安装：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">apt install git make gcc</span><br><span class="line">git clone https://github.com/google/AFL.git </span><br><span class="line">cd AFL &amp;&amp; make</span><br></pre></td></tr></table></figure>
+
+<h3 id="3- 运行参数"><a href="#3- 运行参数" class="headerlink" title="3. 运行参数"></a>3. 运行参数 </h3><p> 在安装并编译完 AFL 之后，可以使用 <code>afl-fuzz</code> 命令来启动模糊测试。一个基本的 AFL fuzz 命令如下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">afl-fuzz -i input_dir -o output_dir -- /path/to/program [options] @@</span><br></pre></td></tr></table></figure>
+
+<p>这里：</p>
+<ul>
+<li><code>afl-fuzz</code> 是启动 AFL 模糊测试的程序。</li>
+<li><code>-i input_dir</code> 指定包含初始化测试用例的目录。</li>
+<li><code>-o output_dir</code> 指定存放的 fuzzing 结果的目录。</li>
+</ul>
+<p><code>--</code> 之后的部分是运行被测试程序的命令行，其中 <code>/path/to/program</code> 替换为需要进行模糊测试的程序的路径，<code>[options]</code> 是运行该程序的任何选项或参数。</p>
+<p>如果测试程序需要从文件中读取输入，可以在实际输入文件路径的位置使用 <code>@@</code> 占位符。AFL 将替换 <code>@@</code> 来插入它正在测试的输入文件。如果省略这个占位符，AFL 将会把模糊测试用例通过 stdin 传递给测试程序。</p>
+<h2 id="三、AFL 的使用示例"><a href="# 三、AFL 的使用示例" class="headerlink" title="三、AFL 的使用示例"></a>三、AFL 的使用示例 </h2><p> 本节使用一个简单的示例，演示 AFL 的操作步骤。</p>
+<p>这是待测源码，其功能是接受一行命令行输入，进行四则运算。其中使用了不安全的 gets 函数，可能导致缓冲区溢出：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">calculate</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b, <span class="type">char</span> op)</span> &#123;</span><br><span class="line">    <span class="keyword">switch</span> (op) &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">return</span> a + b;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>: <span class="keyword">return</span> a - b;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;x&#x27;</span>: <span class="keyword">return</span> a * b;</span><br><span class="line">        <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>: <span class="keyword">return</span> b ? a / b : <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">default</span>: <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">char</span> input[<span class="number">100</span>];</span><br><span class="line"></span><br><span class="line">    <span class="comment">// unsafe method that may cause buffer overflow</span></span><br><span class="line">    gets(input);</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> a, b, result;</span><br><span class="line">    <span class="type">char</span> op;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">sscanf</span>(input, <span class="string">&quot;%d %c %d&quot;</span>, &amp;a, &amp;op, &amp;b) != <span class="number">3</span>)</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    result = calculate(a, b, op);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Result: %d\n&quot;</span>, result);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="1- 编译源码"><a href="#1- 编译源码" class="headerlink" title="1. 编译源码"></a>1. 编译源码 </h3><p> 使用 AFL 的编译器 <code>afl-gcc</code> 或<code>afl-clang</code>对源文件 <code>hello.c</code> 进行编译，添加所需要的代码覆盖插桩。<code>afl-gcc</code>或 <code>afl-clang</code> 实际上是对常规的 <code>gcc</code> 或<code>clang</code>编译器进行了封装，通过在编译时进行插桩，来统计 fuzz 过程中的代码覆盖率：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">afl-gcc -o hello hello.c</span><br></pre></td></tr></table></figure>
+
+<h3 id="2- 准备种子语料库"><a href="#2- 准备种子语料库" class="headerlink" title="2. 准备种子语料库"></a>2. 准备种子语料库 </h3><p> 不论程序是从 file 还是从 stdin 获取数据，AFL 都需要一个初始语料库来启动模糊测试过程。输入（无论是来自 file 或 stdin）是 AFL 用来开始探索程序行为的基础。初始语料库（seed corpus）是一组文件，其中包含了各种有效的输入示例，这些输入会被 AFL 用作模糊测试的起始点。</p>
+<p>从 stdin 读取输入时，AFL 会将语料库中的每个文件内容作为输入在每次测试运行时送到程序的标准输入流中。使用 AFL 时，必须要有初始语料库。注意这一点 AFL 与 Libfuzzer 不同，Libfuzzer 只接受 stdin，不接受 file，初始语料库为可选项。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mkdir in</span><br><span class="line">echo &#x27;abc&#x27; &gt; in/seed</span><br></pre></td></tr></table></figure>
+
+<h3 id="3- 执行测试"><a href="#3- 执行测试" class="headerlink" title="3. 执行测试"></a>3. 执行测试 </h3><p> 在运行 AFL 之前，需要执行下面的系统设置命令，将字符串”core”写入到文件 <code>/proc/sys/kernel/core_pattern</code> 中。</p>
+<p>在 Linux 系统中，<code>/proc/sys/kernel/core_pattern</code> 文件用于指定当程序崩溃时，内核转储文件（core dump）的文件名模式。通过修改这个文件，可以控制内核生成 core 文件的行为。</p>
+<p>通过执行这个命令，生成的核心转储文件将以”core”命名，这使得 AFL 更容易检测和处理目标程序的崩溃情况，从而更好地进行模糊测试。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">echo core | tee /proc/sys/kernel/core_pattern</span><br></pre></td></tr></table></figure>
+
+<p>在 hello 中使用 gets 函数从 stdin 中读取数据，因此在运行 AFL 时，不需要添加 <code>@@</code>。是否使用<code>@@</code> 取决于待测程序接受的输入来自 file 还是 stdin。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">afl-fuzz -i in -o out -- ./hello</span><br></pre></td></tr></table></figure>
+
+<h3 id="4- 结果解读"><a href="#4- 结果解读" class="headerlink" title="4. 结果解读"></a>4. 结果解读</h3><p>AFL 开始运行后，将会看到如下的界面显示：</p>
+<img src="/2023/AFL%E5%8E%9F%E7%90%86%E4%B8%8E%E5%AE%9E%E8%B7%B5/AFL%E8%BF%90%E8%A1%8C%E7%95%8C%E9%9D%A2.png" class title="AFL 运行界面 ">
+
+<p>从这个界面上可以看到 AFL 找到了多少 crash，但还不能直观地显示覆盖率。<a target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/mboehme/pythia">pythia</a>是一款 AFL 的扩展工具，可以查看代码覆盖率的情况。</p>
+<p>AFL 在运行过程中，会不断地产生输出。输出目录结构如下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">out</span><br><span class="line">|-- crashes</span><br><span class="line">|   |-- README.txt</span><br><span class="line">|   |-- id:000000,sig:06,src:000000,op:havoc,rep:64</span><br><span class="line">|   |-- id:000001,sig:06,src:000002+000003,op:splice,rep:128</span><br><span class="line">|   |-- id:000002,sig:06,src:000003,op:havoc,rep:32</span><br><span class="line">|   |-- id:000003,sig:06,src:000002+000003,op:splice,rep:16</span><br><span class="line">|   |-- id:000004,sig:06,src:000004,op:havoc,rep:32</span><br><span class="line">|   |-- id:000005,sig:11,src:000003+000002,op:splice,rep:64</span><br><span class="line">|   `-- id:000006,sig:06,src:000004+000005,op:splice,rep:2</span><br><span class="line">|-- fuzz_bitmap</span><br><span class="line">|-- fuzzer_stats</span><br><span class="line">|-- hangs</span><br><span class="line">|-- plot_data</span><br><span class="line">`-- queue</span><br><span class="line">    |-- id:000000,orig:seed</span><br><span class="line">    |-- id:000001,src:000000,op:havoc,rep:16,+cov</span><br><span class="line">    |-- id:000002,src:000000+000001,op:splice,rep:4,+cov</span><br><span class="line">    |-- id:000003,src:000001,op:arith8,pos:1,val:-5,+cov</span><br><span class="line">    |-- id:000004,src:000001,op:arith8,pos:1,val:-9,+cov</span><br><span class="line">    `-- id:000005,src:000002+000003,op:splice,rep:4,+cov</span><br><span class="line"></span><br><span class="line">3 directories, 17 files</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p><strong>queue&#x2F;</strong> - 存放 AFL 生成的触发新代码路径的测试样本</p>
+</li>
+<li><p><strong>crashes&#x2F;</strong> - 存放能触发待测程序崩溃的测试样本</p>
+</li>
+<li><p><strong>hangs&#x2F;</strong> - 存发导致待测程序超时的测试样本</p>
+</li>
+<li><p><strong>fuzzer_stats</strong> - 文本文件，包含了 fuzzer 的实时统计信息，如执行速度、路径覆盖等度量指标。这个文件不断更新以反映当前的 fuzzing 状态。</p>
+</li>
+<li><p><strong>plot_data</strong> - 文本文件，包含了 AFL 执行过程中的统计数据。使用 AFL 的 <code>afl-plot</code> 工具处理 <code>plot_data</code> 文件，可以生成 fuzz 过程的可视化图像。</p>
+</li>
+<li><p><strong>fuzz_bitmap</strong> - 这是用来记录路径覆盖率的位图（coverage bitmap），非人类可读。AFL 使用这个位图来跟踪程序在处理不同输入时执行的不同分支，用来帮助 AFL 识别新的、唯一的代码路径，以便后续生成更具有探索性的测试样本。</p>
+</li>
+</ul>
+<h2 id="四、AFL 的 QEMU 模式"><a href="# 四、AFL 的 QEMU 模式" class="headerlink" title="四、AFL 的 QEMU 模式"></a>四、AFL 的 QEMU 模式 </h2><p> 前面的例子中，AFL 在对待测程序的源码进行编译时插桩。实际中，我们不一定能拿到待测源码，我们要测的可能是一个已经编译好的二进制文件。这种情况下 Libfuzzer 就无能为力了，但 AFL 还能用，这依赖于 AFL 的 QEMU 模式。</p>
+<p>AFL 的 QEMU 模式，也称为 AFL-QEMU，允许你在二进制模糊测试中使用 AFL，即使源代码不可用。这在对闭源应用进行模糊测试时非常有用。这种模式使用 QEMU 的用户模式仿真，来运行并分析非原生的二进制文件。以下是安装 AFL 的 QEMU 模式和使用步骤的指南：</p>
+<h3 id="1- 编译 QEMU 支持"><a href="#1- 编译 QEMU 支持" class="headerlink" title="1. 编译 QEMU 支持"></a>1. 编译 QEMU 支持 </h3><p> 在 AFL 主目录下有一个专门的 QEMU 模式目录。进入该目录并编译 QEMU 模式，过程中可能缺少依赖项，根据提示进行安装即可：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">cd qemu_mode</span><br><span class="line">./build_qemu_support.sh</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-AFL-QEMU 使用步骤"><a href="#2-AFL-QEMU 使用步骤" class="headerlink" title="2. AFL-QEMU 使用步骤"></a>2. AFL-QEMU 使用步骤 </h3><p> 用法很简单，在 AFL 运行命令中添加 <code>-Q</code> 参数即可：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">afl-fuzz -i input -o output -Q -- /path/to/binary @@</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="五、AFL 的升级版——AFL"><a href="# 五、AFL 的升级版——AFL" class="headerlink" title="五、AFL 的升级版——AFL++"></a>五、AFL 的升级版——AFL++</h2><p>AFL++ 可以看作是原始 AFL 的”增强版”，对 AFL 的调度策略和变异算法进行了很多改进，同时还引入了很多新特性，如 CMPLOG 和持久化这样的特性。</p>
+<h3 id="1-CMPLOG"><a href="#1-CMPLOG" class="headerlink" title="1. CMPLOG"></a>1. CMPLOG</h3><p>CMPLOG 是 AFL++ 引入的一个新功能，类似于 Libfuzzer 中的 trace-cmp，它可以极大地提高代码覆盖率。CMPLOG 的主要作用是对程序中的所有比较操作进行记录，包括等于、不等于、小于等逻辑比较。当 fuzzer 执行时，CMPLOG 能够捕获比较操作的参数，并将对应的值添加到 fuzzer 的输入测试用例中。这个过程实际上帮助 fuzzer 更好地理解代码中期待的输入，特别是那些用于逻辑分支的字面值和魔法数字。这种理解能够导向更深入的路径覆盖，进而揭露隐藏更深的潜在缺陷。</p>
+<h3 id="2- 持久化模式"><a href="#2- 持久化模式" class="headerlink" title="2. 持久化模式"></a>2. 持久化模式</h3><p>AFL 的持久化（persistent）模式允许目标程序在单个进程周期内重复执行多次模糊测试用例。这对性能产生了显著的提升，因为它减少了程序启动和终止的开销，特别是当测试的目标程序需要很大的初始化成本时。在 AFL++ 中，持久化模式的执行更为高效，它允许模糊器在目标程序中一次性执行多个测试用例，而非每次执行一个用例都重启目标程序。有了持久化模式，AFL++ 能够在相同的时间内执行更多的测试迭代，从而提高漏洞检测的速度。</p>
+<h2 id="六、小结"><a href="# 六、小结" class="headerlink" title="六、小结"></a>六、小结</h2><p>AFL 是一款强大的模糊测试工具，实践中 AFL++ 的应用非常广泛。相比 Libfuzzer，AFL++ 不局限于源码，并且支持多种 cpu 架构，还有丰富的插件生态可以使用。</p>
+<p>但模糊测试本身存在覆盖率瓶颈的问题，难以探索复杂的程序路径，这时候可以结合其他的技术，如符号执行来突破。</p>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/AFL/" rel="tag">AFL</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/Fuzz/" rel="tag">Fuzz</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/LibAFL%E7%AE%80%E4%BB%8B/" data-tooltip="LibAFL 简介" aria-label="上一篇: LibAFL 简介">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/LibFuzzer%E7%BC%96%E8%AF%91%E6%8C%87%E5%8D%97/" data-tooltip="LibFuzzer 编译指南" aria-label="下一篇: LibFuzzer 编译指南">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/LibAFL%E7%AE%80%E4%BB%8B/" data-tooltip="LibAFL 简介" aria-label="上一篇: LibAFL 简介">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/LibFuzzer%E7%BC%96%E8%AF%91%E6%8C%87%E5%8D%97/" data-tooltip="LibFuzzer 编译指南" aria-label="下一篇: LibFuzzer 编译指南">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2023/AFL原理与实践/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

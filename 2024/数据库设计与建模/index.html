@@ -1,0 +1,945 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>数据库设计与建模 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、数据库结构  典型的数据库结构可归纳为“三级模式，两级映射”：\n\n\n（一）三级模式\n外模式：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。\n概念（逻辑）模式：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。\n内模式：是数据物理结构和存储方式的描述，数据在数据库内部的表示方式。对应物理文件，面向系统程序员。\n\n（二）两级映射\n外模式 - 模式映射 ：保证 逻辑独立性，即当逻辑模式发生改变时，应用程序不用修改。\n模式 - 内模式映射 ：保证 物理独立性，即当内模式发生改变时，应用程序不用修改。\n\n两级映射保证了逻辑独立性和物理独立性，逻辑独立比物理独立更难实现。\n二、数据库理论  关系型数据库中的  关系  是指由行列组成的二维表文件，每行表示一条记录，每列表示一个属性。关系模型  是关系的逻辑描述，可以表示为：关系名(属性 1, 属性 2, …, 属性 N)。\n（一）关系运算  关系代数的基本运算主要有交、并、差、笛卡尔积、选择、投影、连接和除法运算。\n交、并、差、笛卡尔积  跟集合论中的运算是一个意思，就是把每张数据表视为行的集合，然后做运算。\n选择  是指从数据表中找出符合条件的行（记录）。\n投影  是指从数据表中抽取指定的列（属性）。\n连接  分为两种：\n\nθ连接：从两个关系的笛卡尔积中选取属性满足一定条件的元组\n自然连接（⊳⊲连接）：两个关系中进行比较的分量必须是相同的属性，并且在结果中将重复的属性去掉\n\n（二）函数依赖  函数依赖（Functional Dependency）是数据库理论中的一个重要概念，用于描述属性之间的关系。在关系数据库中，如果属性集 X 的值能够唯一地决定属性集 Y 的值，我们就说Y 函数依赖于 X，记作 X→Y。\n函数依赖的定义：\n给定一个关系 R，如果对于关系 R 中的任意两个元组 t1 和 t2，若 t1 和 t2 在属性集 X 上的值相同，则它们在属性集 Y 上的值也必须相同，那么我们就说 Y 函数依赖于 X。\n函数依赖的类型：\n\n平凡函数依赖：如果属性集 Y 是属性集 X 的一个子集，则称 X 决定 Y 的依赖关系为平凡依赖。例如 X→X\n非平凡函数依赖：属性 Y 不是属性 X 的子集，则称 X 决定 Y 的依赖关系为非平凡依赖。可以进一步分类：\n完全函数依赖：如果在一个复合属性集 X 中，Y 仅依赖于 X 的全部属性，而不依赖于 X 的任何真子集。\n部分函数依赖：如果 Y 依赖于 X 的某个真子集。\n传递函数依赖：如果 X 函数依赖于 Y，而 Y 又函数依赖于 Z，那么可以说 X 传递函数依赖于 Z。\n\n\n\n简单点说：左右包含是平凡，左右互斥非平凡，若无子集是完全，若有子集是部分，环环相连是传递。\n（三）Armstrong 公理Armstrong 公理是一组用于推导关系数据库中函数依赖的基本规则，通过这些规则，可以推导出任意一组函数依赖的所有隐含依赖。\n\n自反性：若 X⊇Y，则 X→Y。即一个属性集必然决定其子集。\n增广性：若 X→Y，则 XZ→YZ。即如果 X 决定 Y，那么 X 与 Z 的组合也决定 Y 与 Z 的组合。\n传递性：若 X→Y 且 Y→Z，则 X→Z。即如果 X 决定 Y，且 Y 决定 Z，那么 X 也决定 Z。\n合并性：若 X→Y 且 X→Z，则 X→YZ。即如果 X 决定 Y，且 X 也决定 Z，那么 X 决定 YZ。\n分解性：若 X→Y 且 Y⊇Z，则存在 X→Z。即如果 X 决定 Y，而 Z 是 Y 的子集，那么 X 决定 Z。\n\n（四）关系分解  在数据库关系分解中，有两个重要概念：\n1. 无损连接  无损链接指的是将一个关系分解成多个子关系后，通过对这些子关系进行自然连接操作，可以无损地恢复原始关系。换句话说，在连接后得到的结果应该与原始关系完全相同，没有任何信息增加或丢失。\n无损连接分解的  判定方法  为：\n设ρ&#x3D;{R1, R2}是 R 的一个分解，F 是 R 上的函数依赖集。那么分解ρ相对于 F 是无损级联分解的充要条件为 (R1∩R2)→(R1−R2) 或 (R1∩R2)→(R2−R1) 。 注意两个条件只要有任意一个条件成立即可。\n2. 保持依赖  保持依赖指的是在关系分解后，仍然能够通过子关系中的函数依赖来推导出原始关系中的所有函数依赖。换句话说，分解后的子关系应该能够保持原始关系中的所有重要的依赖关系。\n举例来说，假设有一个关系 R(A, B, C)，并且它有函数依赖：A→B 和 B→C。\n\n如果将关系 R 分解为 R1(A, B)和 R2(B, C):\n通过属性 B 连接 R1 和 R2，可以恢复 R，因此是无损分解。\n关系 R1 保留了 A→B，关系 R2 保留了 B→C，因此是保持依赖。\n\n\n如果将关系 R 分解为 R1(A, B)和 R3(A, C):\n通过属性 A 连接 R1 和 R3，可以恢复 R，因此是无损分解。\n关系 R1 保留了 A→B，关系 R3 保留了 A→C，但是 B→C 丢失，因此不是保持依赖。\n\n\n\n（五）设计范式  数据库设计范式是指在设计数据库时遵循的一系列规范和原则，以确保数据的组织、存储和管理高效、合理。数据库主要范式包括：\n1. 第一范式（1NF）每个字段的值都是原子值，不能有重复的列或多值字段。\n不符合 1NF 的表：\n\n\n\n学生 ID\n学生姓名\n课程\n\n\n\n1\n张三\n数学, 物理\n\n\n在这个例子中，“课程”属性是个多值字段。需要重新设计成符合 1NF 的表：\n\n\n\n学生 ID\n学生姓名\n课程\n\n\n\n1\n张三\n数学\n\n\n1\n张三\n物理\n\n\n2. 第二范式（2NF）在满足 1NF 的基础上，要求消除部分依赖，即每个非主键字段必须完全依赖于主键，而不是主键的一部分。\n不符合 2NF 的表：\n\n\n\n学生 ID\n课程\n学生姓名\n\n\n\n1\n数学\n张三\n\n\n1\n物理\n张三\n\n\n2\n语文\n李四\n\n\n在这个例子中，“学生姓名”只依赖于“学生 ID”，而不依赖于“课程”。我们可以分成两个符合 2NF 的表：\n学生表：\n\n\n\n学生 ID\n学生姓名\n\n\n\n1\n张三\n\n\n2\n李四\n\n\n选课表：\n\n\n\n学生 ID\n课程\n\n\n\n1\n数学\n\n\n1\n物理\n\n\n2\n语文\n\n\n3. 第三范式（3NF）在满足 2NF 的基础上，要求消除传递依赖，即非主键字段不能依赖于其他非主键字段。\n不符合 3NF 的表：\n\n\n\n学生 ID\n学生姓名\n班级\n班主任\n\n\n\n1\n张三\n一班\n王老师\n\n\n2\n李四\n一班\n王老师\n\n\n在这个例子中，“班主任”依赖于“班级”，而不是“学生 ID”。可以进一步分成两个符合 3NF 的表：\n学生表：\n\n\n\n学生 ID\n学生姓名\n班级\n\n\n\n1\n张三\n一班\n\n\n2\n李四\n一班\n\n\n班级表：\n\n\n\n班级\n班主任\n\n\n\n一班\n王老师\n\n\n4. 博茨 - 科得范式（BCNF）3NF 的强化版本，要求每个决定因素（函数依赖的左侧）必须是超键，进一步消除所有依赖问题。\n不符合 BCNF 的表：\n\n\n\n学生 ID\n课程\n教师\n\n\n\n1\n数学\n李老师\n\n\n1\n物理\n李老师\n\n\n2\n数学\n张老师\n\n\n在这个例子中，“教师”依赖于“课程”，而“课程”不是超键。可以将其分为两个符合 BCNF 的表：\n课程表：\n\n\n\n课程\n教师\n\n\n\n数学\n李老师\n\n\n物理\n李老师\n\n\n语文\n张老师\n\n\n选课表：\n\n\n\n学生 ID\n课程\n\n\n\n1\n数学\n\n\n1\n物理\n\n\n2\n数学\n\n\n5. 第四范式（4NF）解决多值依赖的问题，要求每个表只能包含一个多值依赖。\n不符合 4NF 的表：\n\n\n\n学生 ID\n课程\n兴趣\n\n\n\n1\n数学\n足球\n\n\n1\n物理\n篮球\n\n\n在这个例子中，“课程”和“兴趣”之间存在多值依赖。可以将其分为两个符合 4NF 的表：\n选课表：\n\n\n\n学生 ID\n课程\n\n\n\n1\n数学\n\n\n1\n物理\n\n\n兴趣表：\n\n\n\n学生 ID\n兴趣\n\n\n\n1\n足球\n\n\n1\n篮球\n\n\n三、数据库设计  数据库设计主要包含如下阶段：\n\n需求分析阶段：通过结构化分析，得到数据流图和数据字典。\n概念设计阶段：根据功能模型，创建局部 ER 图，并合并为全局 ER 图（建立外模式）。\n逻辑设计阶段：将 ER 图转换为数据库的关系模型（建立逻辑模式）。\n物理设计阶段：根据数据逻辑模式，选择高效的存储结构和存储方法（建立内模式）。\n\n\n\n（一）概念设计  在结构化分析阶段，我们通过自顶向下的方式建立的系统的功能模型，以数据流图和数据字典表示。数据库的概念设计阶段，实际上就是建立系统的数据模型。\n数据库的概念设计采用  自底向上  的方式，其任务是建立系统的数据模型（通常以 ER 图表示），主要步骤为：\n\n选择局部应用\n设计局部 ER 图\n合并得到全局 ER 图\n优化全局 ER 图\n\n1. ER 图元素ER 图用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：\n\n实体：系统中的对象或概念，用矩形框表示。\n属性：实体具有的特性，用椭圆形表示。\n联系：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系。\n1:1 表示一对一关系\n1:n 表示一对多关系\nm:n 表示多对多关系\n\n\n\n\n\n2. ER 图合并  在合并 ER 图时，需要解决局部 ER 图之间的冲突问题，与合并之后全局 ER 图的冗余问题。\n冲突有三种类型：\n\n属性冲突：属性名和属性含义相同，但属性的取值类型或取值范围不同。\n命名冲突 ： 异名同义 （不同属性名表示同一种属性含义），或是 同名异义（同一属性名表示不同的属性含义）。\n结构冲突：\n同一对象在不同 ER 图中具有不同的抽象。例如某个对象在一个 ER 图中是实体，在另一个 ER 图中是属性。\n同一实体在不同 ER 图中所包含的属性个数和属性排列次序不完全相同。\n实体之间的关系在不同 ER 图中呈现为不同的联系。\n\n\n\n冗余有两种类型：\n\n冗余属性：可由基本数据导出的属性。\n冗余联系：可由其他联系导出的联系。\n\n消除冲突通常是结合业务需求，通过讨论与协商来处理。消除冗余通常是以数据流图和数据字典为依据，通过分析数据项之间的逻辑关系来处理。\n（二）逻辑设计  数据库的逻辑设计是指将 ER 图中的实体、属性、联系转换为 DBMS 数据库的关系模式，并进行范式规约。\n1. ER 图转换ER 图中的实体和属性可以直接转换为数据库中的一个关系模式（一张表），主键为实体，其他字段为属性。\nER 图中的联系，根据不同的类型，有不同的转换方式：\n(1) 1:1 联系\n\n\n转换方式：\n\n转换为一个独立的关系模式：联系两端的实体主键作为属性。ER 图转换结果：\n员工(工号，姓名，性别)\n办公电脑(电脑编号，电脑配置)\n使用(工号，电脑编号)\n\n\n与任意一端实体的关系模式合并：将一个实体的主键作为另一个实体的外键。ER 图转换结果：\n员工(工号，姓名，性别，电脑编号)\n办公电脑(电脑编号，电脑配置)\n\n\n\n(2) 1:n 联系\n\n\n转换方式：\n\n转换为一个独立的关系模式：联系两端的实体主键作为属性。ER 图转换结果：\n班级(编号，年级，人数)\n学生(学号，姓名，性别)\n隶属(学号，编号)\n\n\n与多端的实体的关系模式合并：在多端实体关系模式中，添加一端实体主键作为外键。ER 图转换结果：\n班级(编号，年级，人数)\n学生(学号，姓名，性别，编号)\n\n\n\n(3) m:n 联系\n\n\n转换方式：\n\n转换为一个独立的关系模式：联系两端的实体主键作为属性。ER 图转换结果：\n员工(工号，姓名，性别)\n角色(角色编号，角色名称，角色权限)\n使用(工号，角色编号)\n\n\n\n2. 范式规约  在转换为数据库的关系模式后，还要对关系模式进行规范化。不规范的关系模式会出现以下问题：\n\n数据冗余：重复存储相同的数据，浪费存储空间，并增加维护的复杂性。\n修改异常：数据在多个地方被重复存储时，若更新某一处而未同步其他地方，可能导致信息不一致。\n插入异常：需要插入新数据时，可能由于缺乏某些信息而无法完成插入。\n删除异常：删除某条记录可能会意外删除有用的信息。\n\n数据库规范化，通常是从 1NF 开始，逐步推进到更高级的设计范式。主要步骤包括：\n\n分析现有数据结构：查看当前的数据模型，识别实体、属性及其关系。\n识别主键：为每个表选择适当的主键。\n应用每一范式的规则：逐步应用上述每一范式的规则，检查和修改表结构。\n拆分和重组表：根据依赖关系，将数据拆分到多个表中，确保每个表遵循相关的范式。\n设置外键：为建立表之间的关系，添加外键约束，确保数据的完整性。\n验证和测试：在设计完成后，进行测试，确保数据完整性、查询效率和操作便利性。\n","dateCreated":"2024-10-23T09:27:29+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-10-23T09:27:29+08:00","description":"数据库的概念设计和逻辑设计","headline":"数据库设计与建模","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/","keywords":"软件工程, 数据库"}</script>
+    <meta name="description" content="数据库的概念设计和逻辑设计">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="数据库设计与建模">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="数据库的概念设计和逻辑设计">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1.jpg">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/ERD.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E4%B8%80.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E5%A4%9A.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E5%A4%9A%E5%AF%B9%E5%A4%9A.png">
+<meta property="article:published_time" content="2024-10-23T01:27:29.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.688Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="软件工程">
+<meta property="article:tag" content="数据库">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            数据库设计与建模
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-10-23T09:27:29+08:00">
+	
+		    2024 年 10 月 23 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/">软考</a>, <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="一、数据库结构"><a href="# 一、数据库结构" class="headerlink" title="一、数据库结构"></a>一、数据库结构 </h2><p> 典型的数据库结构可归纳为“<strong>三级模式，两级映射</strong>”：</p>
+<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg" class title=" 数据库结构 ">
+
+<h3 id="（一）三级模式"><a href="#（一）三级模式" class="headerlink" title="（一）三级模式"></a>（一）三级模式</h3><ol>
+<li><strong>外模式</strong>：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。</li>
+<li><strong>概念（逻辑）模式</strong>：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。</li>
+<li><strong>内模式</strong>：是数据物理结构和存储方式的描述，数据在数据库内部的表示方式。对应物理文件，面向系统程序员。</li>
+</ol>
+<h3 id="（二）两级映射"><a href="#（二）两级映射" class="headerlink" title="（二）两级映射"></a>（二）两级映射</h3><ol>
+<li><strong>外模式 - 模式映射 </strong>：保证<strong> 逻辑独立性</strong>，即当逻辑模式发生改变时，应用程序不用修改。</li>
+<li><strong>模式 - 内模式映射 </strong>：保证<strong> 物理独立性</strong>，即当内模式发生改变时，应用程序不用修改。</li>
+</ol>
+<p>两级映射保证了逻辑独立性和物理独立性，逻辑独立比物理独立更难实现。</p>
+<h2 id="二、数据库理论"><a href="# 二、数据库理论" class="headerlink" title="二、数据库理论"></a>二、数据库理论 </h2><p> 关系型数据库中的 <strong> 关系 </strong> 是指由行列组成的二维表文件，每行表示一条记录，每列表示一个属性。<strong>关系模型 </strong> 是关系的逻辑描述，可以表示为：关系名(属性 1, 属性 2, …, 属性 N)。</p>
+<h3 id="（一）关系运算"><a href="#（一）关系运算" class="headerlink" title="（一）关系运算"></a>（一）关系运算 </h3><p> 关系代数的基本运算主要有交、并、差、笛卡尔积、选择、投影、连接和除法运算。</p>
+<p><strong>交、并、差、笛卡尔积 </strong> 跟集合论中的运算是一个意思，就是把每张数据表视为行的集合，然后做运算。</p>
+<p><strong>选择 </strong> 是指从数据表中找出符合条件的行（记录）。</p>
+<p><strong>投影 </strong> 是指从数据表中抽取指定的列（属性）。</p>
+<p><strong>连接 </strong> 分为两种：</p>
+<ol>
+<li><strong>θ连接</strong>：从两个关系的笛卡尔积中选取属性满足一定条件的元组</li>
+<li><strong>自然连接（⊳⊲连接）</strong>：两个关系中进行比较的分量必须是相同的属性，并且在结果中将重复的属性去掉</li>
+</ol>
+<h3 id="（二）函数依赖"><a href="#（二）函数依赖" class="headerlink" title="（二）函数依赖"></a>（二）函数依赖 </h3><p> 函数依赖（Functional Dependency）是数据库理论中的一个重要概念，用于描述属性之间的关系。在关系数据库中，如果属性集 X 的值能够唯一地决定属性集 Y 的值，我们就说<strong>Y 函数依赖于 X</strong>，记作 X→Y。</p>
+<p>函数依赖的定义：</p>
+<p>给定一个关系 R，如果对于关系 R 中的任意两个元组 t1 和 t2，若 t1 和 t2 在属性集 X 上的值相同，则它们在属性集 Y 上的值也必须相同，那么我们就说 Y 函数依赖于 X。</p>
+<p>函数依赖的类型：</p>
+<ul>
+<li><strong>平凡函数依赖</strong>：如果属性集 Y 是属性集 X 的一个子集，则称 X 决定 Y 的依赖关系为平凡依赖。例如 X→X</li>
+<li><strong>非平凡函数依赖</strong>：属性 Y 不是属性 X 的子集，则称 X 决定 Y 的依赖关系为非平凡依赖。可以进一步分类：<ul>
+<li><strong>完全函数依赖</strong>：如果在一个复合属性集 X 中，Y 仅依赖于 X 的全部属性，而不依赖于 X 的任何真子集。</li>
+<li><strong>部分函数依赖</strong>：如果 Y 依赖于 X 的某个真子集。</li>
+<li><strong>传递函数依赖</strong>：如果 X 函数依赖于 Y，而 Y 又函数依赖于 Z，那么可以说 X 传递函数依赖于 Z。</li>
+</ul>
+</li>
+</ul>
+<p>简单点说：<strong>左右包含是平凡，左右互斥非平凡，若无子集是完全，若有子集是部分，环环相连是传递</strong>。</p>
+<h3 id="（三）Armstrong 公理"><a href="#（三）Armstrong 公理" class="headerlink" title="（三）Armstrong 公理"></a>（三）Armstrong 公理</h3><p>Armstrong 公理是一组用于推导关系数据库中函数依赖的基本规则，通过这些规则，可以推导出任意一组函数依赖的所有隐含依赖。</p>
+<ul>
+<li><strong>自反性</strong>：若 X⊇Y，则 X→Y。即一个属性集必然决定其子集。</li>
+<li><strong>增广性</strong>：若 X→Y，则 XZ→YZ。即如果 X 决定 Y，那么 X 与 Z 的组合也决定 Y 与 Z 的组合。</li>
+<li><strong>传递性</strong>：若 X→Y 且 Y→Z，则 X→Z。即如果 X 决定 Y，且 Y 决定 Z，那么 X 也决定 Z。</li>
+<li><strong>合并性</strong>：若 X→Y 且 X→Z，则 X→YZ。即如果 X 决定 Y，且 X 也决定 Z，那么 X 决定 YZ。</li>
+<li><strong>分解性</strong>：若 X→Y 且 Y⊇Z，则存在 X→Z。即如果 X 决定 Y，而 Z 是 Y 的子集，那么 X 决定 Z。</li>
+</ul>
+<h3 id="（四）关系分解"><a href="#（四）关系分解" class="headerlink" title="（四）关系分解"></a>（四）关系分解 </h3><p> 在数据库关系分解中，有两个重要概念：</p>
+<h4 id="1- 无损连接"><a href="#1- 无损连接" class="headerlink" title="1. 无损连接"></a>1. 无损连接 </h4><p> 无损链接指的是将一个关系分解成多个子关系后，通过对这些子关系进行自然连接操作，可以无损地恢复原始关系。换句话说，在连接后得到的结果应该与原始关系完全相同，没有任何信息增加或丢失。</p>
+<p>无损连接分解的 <strong> 判定方法 </strong> 为：</p>
+<p>设ρ&#x3D;{R1, R2}是 R 的一个分解，F 是 R 上的函数依赖集。那么分解ρ相对于 F 是无损级联分解的充要条件为 <strong>(R1∩R2)→(R1−R2)</strong> 或 <strong>(R1∩R2)→(R2−R1)</strong> 。 注意两个条件只要有任意一个条件成立即可。</p>
+<h4 id="2- 保持依赖"><a href="#2- 保持依赖" class="headerlink" title="2. 保持依赖"></a>2. 保持依赖 </h4><p> 保持依赖指的是在关系分解后，仍然能够通过子关系中的函数依赖来推导出原始关系中的所有函数依赖。换句话说，分解后的子关系应该能够保持原始关系中的所有重要的依赖关系。</p>
+<p>举例来说，假设有一个关系 R(A, B, C)，并且它有函数依赖：A→B 和 B→C。</p>
+<ul>
+<li>如果将关系 R 分解为 R1(A, B)和 R2(B, C):<ul>
+<li>通过属性 B 连接 R1 和 R2，可以恢复 R，因此是无损分解。</li>
+<li>关系 R1 保留了 A→B，关系 R2 保留了 B→C，因此是保持依赖。</li>
+</ul>
+</li>
+<li>如果将关系 R 分解为 R1(A, B)和 R3(A, C):<ul>
+<li>通过属性 A 连接 R1 和 R3，可以恢复 R，因此是无损分解。</li>
+<li>关系 R1 保留了 A→B，关系 R3 保留了 A→C，但是 B→C 丢失，因此不是保持依赖。</li>
+</ul>
+</li>
+</ul>
+<h3 id="（五）设计范式"><a href="#（五）设计范式" class="headerlink" title="（五）设计范式"></a>（五）设计范式 </h3><p> 数据库设计范式是指在设计数据库时遵循的一系列规范和原则，以确保数据的组织、存储和管理高效、合理。数据库主要范式包括：</p>
+<h4 id="1- 第一范式（1NF）"><a href="#1- 第一范式（1NF）" class="headerlink" title="1. 第一范式（1NF）"></a>1. 第一范式（1NF）</h4><p><strong>每个字段的值都是原子值，不能有重复的列或多值字段。</strong></p>
+<p>不符合 1NF 的表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>学生姓名</th>
+<th>课程</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>张三</td>
+<td>数学, 物理</td>
+</tr>
+</tbody></table>
+<p>在这个例子中，“课程”属性是个多值字段。需要重新设计成符合 1NF 的表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>学生姓名</th>
+<th>课程</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>张三</td>
+<td>数学</td>
+</tr>
+<tr>
+<td>1</td>
+<td>张三</td>
+<td>物理</td>
+</tr>
+</tbody></table>
+<h4 id="2- 第二范式（2NF）"><a href="#2- 第二范式（2NF）" class="headerlink" title="2. 第二范式（2NF）"></a>2. 第二范式（2NF）</h4><p><strong>在满足 1NF 的基础上，要求消除部分依赖，即每个非主键字段必须完全依赖于主键，而不是主键的一部分。</strong></p>
+<p>不符合 2NF 的表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>课程</th>
+<th>学生姓名</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>数学</td>
+<td>张三</td>
+</tr>
+<tr>
+<td>1</td>
+<td>物理</td>
+<td>张三</td>
+</tr>
+<tr>
+<td>2</td>
+<td>语文</td>
+<td>李四</td>
+</tr>
+</tbody></table>
+<p>在这个例子中，“学生姓名”只依赖于“学生 ID”，而不依赖于“课程”。我们可以分成两个符合 2NF 的表：</p>
+<p>学生表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>学生姓名</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>张三</td>
+</tr>
+<tr>
+<td>2</td>
+<td>李四</td>
+</tr>
+</tbody></table>
+<p>选课表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>课程</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>数学</td>
+</tr>
+<tr>
+<td>1</td>
+<td>物理</td>
+</tr>
+<tr>
+<td>2</td>
+<td>语文</td>
+</tr>
+</tbody></table>
+<h4 id="3- 第三范式（3NF）"><a href="#3- 第三范式（3NF）" class="headerlink" title="3. 第三范式（3NF）"></a>3. 第三范式（3NF）</h4><p><strong>在满足 2NF 的基础上，要求消除传递依赖，即非主键字段不能依赖于其他非主键字段。</strong></p>
+<p>不符合 3NF 的表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>学生姓名</th>
+<th>班级</th>
+<th>班主任</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>张三</td>
+<td>一班</td>
+<td>王老师</td>
+</tr>
+<tr>
+<td>2</td>
+<td>李四</td>
+<td>一班</td>
+<td>王老师</td>
+</tr>
+</tbody></table>
+<p>在这个例子中，“班主任”依赖于“班级”，而不是“学生 ID”。可以进一步分成两个符合 3NF 的表：</p>
+<p>学生表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>学生姓名</th>
+<th>班级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>张三</td>
+<td>一班</td>
+</tr>
+<tr>
+<td>2</td>
+<td>李四</td>
+<td>一班</td>
+</tr>
+</tbody></table>
+<p>班级表：</p>
+<table>
+<thead>
+<tr>
+<th>班级</th>
+<th>班主任</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一班</td>
+<td>王老师</td>
+</tr>
+</tbody></table>
+<h4 id="4- 博茨 - 科得范式（BCNF）"><a href="#4- 博茨 - 科得范式（BCNF）" class="headerlink" title="4. 博茨 - 科得范式（BCNF）"></a>4. 博茨 - 科得范式（BCNF）</h4><p><strong>3NF 的强化版本，要求每个决定因素（函数依赖的左侧）必须是超键，进一步消除所有依赖问题。</strong></p>
+<p>不符合 BCNF 的表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>课程</th>
+<th>教师</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>数学</td>
+<td>李老师</td>
+</tr>
+<tr>
+<td>1</td>
+<td>物理</td>
+<td>李老师</td>
+</tr>
+<tr>
+<td>2</td>
+<td>数学</td>
+<td>张老师</td>
+</tr>
+</tbody></table>
+<p>在这个例子中，“教师”依赖于“课程”，而“课程”不是超键。可以将其分为两个符合 BCNF 的表：</p>
+<p>课程表：</p>
+<table>
+<thead>
+<tr>
+<th>课程</th>
+<th>教师</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数学</td>
+<td>李老师</td>
+</tr>
+<tr>
+<td>物理</td>
+<td>李老师</td>
+</tr>
+<tr>
+<td>语文</td>
+<td>张老师</td>
+</tr>
+</tbody></table>
+<p>选课表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>课程</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>数学</td>
+</tr>
+<tr>
+<td>1</td>
+<td>物理</td>
+</tr>
+<tr>
+<td>2</td>
+<td>数学</td>
+</tr>
+</tbody></table>
+<h4 id="5- 第四范式（4NF）"><a href="#5- 第四范式（4NF）" class="headerlink" title="5. 第四范式（4NF）"></a>5. 第四范式（4NF）</h4><p><strong>解决多值依赖的问题，要求每个表只能包含一个多值依赖。</strong></p>
+<p>不符合 4NF 的表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>课程</th>
+<th>兴趣</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>数学</td>
+<td>足球</td>
+</tr>
+<tr>
+<td>1</td>
+<td>物理</td>
+<td>篮球</td>
+</tr>
+</tbody></table>
+<p>在这个例子中，“课程”和“兴趣”之间存在多值依赖。可以将其分为两个符合 4NF 的表：</p>
+<p>选课表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>课程</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>数学</td>
+</tr>
+<tr>
+<td>1</td>
+<td>物理</td>
+</tr>
+</tbody></table>
+<p>兴趣表：</p>
+<table>
+<thead>
+<tr>
+<th>学生 ID</th>
+<th>兴趣</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>足球</td>
+</tr>
+<tr>
+<td>1</td>
+<td>篮球</td>
+</tr>
+</tbody></table>
+<h2 id="三、数据库设计"><a href="# 三、数据库设计" class="headerlink" title="三、数据库设计"></a>三、数据库设计 </h2><p> 数据库设计主要包含如下阶段：</p>
+<ol>
+<li><strong>需求分析阶段</strong>：通过结构化分析，得到数据流图和数据字典。</li>
+<li><strong>概念设计阶段</strong>：根据功能模型，创建局部 ER 图，并合并为全局 ER 图（建立外模式）。</li>
+<li><strong>逻辑设计阶段</strong>：将 ER 图转换为数据库的关系模型（建立逻辑模式）。</li>
+<li><strong>物理设计阶段</strong>：根据数据逻辑模式，选择高效的存储结构和存储方法（建立内模式）。</li>
+</ol>
+<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1.jpg" class title=" 数据库设计 ">
+
+<h3 id="（一）概念设计"><a href="#（一）概念设计" class="headerlink" title="（一）概念设计"></a>（一）概念设计 </h3><p> 在结构化分析阶段，我们通过自顶向下的方式建立的系统的功能模型，以数据流图和数据字典表示。数据库的概念设计阶段，实际上就是建立系统的数据模型。</p>
+<p>数据库的概念设计采用 <strong> 自底向上 </strong> 的方式，其任务是建立系统的数据模型（通常以 ER 图表示），主要步骤为：</p>
+<ol>
+<li>选择局部应用</li>
+<li>设计局部 ER 图</li>
+<li>合并得到全局 ER 图</li>
+<li>优化全局 ER 图</li>
+</ol>
+<h4 id="1-ER 图元素"><a href="#1-ER 图元素" class="headerlink" title="1. ER 图元素"></a>1. ER 图元素</h4><p>ER 图用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：</p>
+<ul>
+<li><strong>实体</strong>：系统中的对象或概念，用矩形框表示。</li>
+<li><strong>属性</strong>：实体具有的特性，用椭圆形表示。</li>
+<li><strong>联系</strong>：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系。<ul>
+<li><strong>1:1</strong> 表示一对一关系</li>
+<li><strong>1:n</strong> 表示一对多关系</li>
+<li><strong>m:n</strong> 表示多对多关系</li>
+</ul>
+</li>
+</ul>
+<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/ERD.png" class title="ER 图 ">
+
+<h4 id="2-ER 图合并"><a href="#2-ER 图合并" class="headerlink" title="2. ER 图合并"></a>2. ER 图合并 </h4><p> 在合并 ER 图时，需要解决局部 ER 图之间的冲突问题，与合并之后全局 ER 图的冗余问题。</p>
+<p>冲突有三种类型：</p>
+<ol>
+<li><strong>属性冲突</strong>：属性名和属性含义相同，但属性的取值类型或取值范围不同。</li>
+<li><strong>命名冲突 </strong>：<strong> 异名同义 </strong>（不同属性名表示同一种属性含义），或是<strong> 同名异义</strong>（同一属性名表示不同的属性含义）。</li>
+<li><strong>结构冲突</strong>：<ol>
+<li>同一对象在不同 ER 图中具有不同的抽象。例如某个对象在一个 ER 图中是实体，在另一个 ER 图中是属性。</li>
+<li>同一实体在不同 ER 图中所包含的属性个数和属性排列次序不完全相同。</li>
+<li>实体之间的关系在不同 ER 图中呈现为不同的联系。</li>
+</ol>
+</li>
+</ol>
+<p>冗余有两种类型：</p>
+<ol>
+<li><strong>冗余属性</strong>：可由基本数据导出的属性。</li>
+<li><strong>冗余联系</strong>：可由其他联系导出的联系。</li>
+</ol>
+<p>消除冲突通常是结合业务需求，通过讨论与协商来处理。<br>消除冗余通常是以数据流图和数据字典为依据，通过分析数据项之间的逻辑关系来处理。</p>
+<h3 id="（二）逻辑设计"><a href="#（二）逻辑设计" class="headerlink" title="（二）逻辑设计"></a>（二）逻辑设计 </h3><p> 数据库的逻辑设计是指将 ER 图中的实体、属性、联系转换为 DBMS 数据库的关系模式，并进行范式规约。</p>
+<h4 id="1-ER 图转换"><a href="#1-ER 图转换" class="headerlink" title="1. ER 图转换"></a>1. ER 图转换</h4><p>ER 图中的实体和属性可以直接转换为数据库中的一个关系模式（一张表），主键为实体，其他字段为属性。</p>
+<p>ER 图中的联系，根据不同的类型，有不同的转换方式：</p>
+<p>(1) 1:1 联系</p>
+<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E4%B8%80.png" class title=" 一对一 ">
+
+<p>转换方式：</p>
+<ul>
+<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
+<li>员工(工号，姓名，性别)</li>
+<li>办公电脑(电脑编号，电脑配置)</li>
+<li>使用(工号，电脑编号)</li>
+</ul>
+</li>
+<li><strong>与任意一端实体的关系模式合并</strong>：将一个实体的主键作为另一个实体的外键。ER 图转换结果：<ul>
+<li>员工(工号，姓名，性别，电脑编号)</li>
+<li>办公电脑(电脑编号，电脑配置)</li>
+</ul>
+</li>
+</ul>
+<p>(2) 1:n 联系</p>
+<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E5%A4%9A.png" class title=" 一对多 ">
+
+<p>转换方式：</p>
+<ul>
+<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
+<li>班级(编号，年级，人数)</li>
+<li>学生(学号，姓名，性别)</li>
+<li>隶属(学号，编号)</li>
+</ul>
+</li>
+<li><strong>与多端的实体的关系模式合并</strong>：在多端实体关系模式中，添加一端实体主键作为外键。ER 图转换结果：<ul>
+<li>班级(编号，年级，人数)</li>
+<li>学生(学号，姓名，性别，编号)</li>
+</ul>
+</li>
+</ul>
+<p>(3) m:n 联系</p>
+<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E5%A4%9A%E5%AF%B9%E5%A4%9A.png" class title=" 多对多 ">
+
+<p>转换方式：</p>
+<ul>
+<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
+<li>员工(工号，姓名，性别)</li>
+<li>角色(角色编号，角色名称，角色权限)</li>
+<li>使用(工号，角色编号)</li>
+</ul>
+</li>
+</ul>
+<h4 id="2- 范式规约"><a href="#2- 范式规约" class="headerlink" title="2. 范式规约"></a>2. 范式规约 </h4><p> 在转换为数据库的关系模式后，还要对关系模式进行规范化。不规范的关系模式会出现以下问题：</p>
+<ul>
+<li><strong>数据冗余</strong>：重复存储相同的数据，浪费存储空间，并增加维护的复杂性。</li>
+<li><strong>修改异常</strong>：数据在多个地方被重复存储时，若更新某一处而未同步其他地方，可能导致信息不一致。</li>
+<li><strong>插入异常</strong>：需要插入新数据时，可能由于缺乏某些信息而无法完成插入。</li>
+<li><strong>删除异常</strong>：删除某条记录可能会意外删除有用的信息。</li>
+</ul>
+<p>数据库规范化，通常是从 1NF 开始，逐步推进到更高级的设计范式。主要步骤包括：</p>
+<ol>
+<li>分析现有数据结构：查看当前的数据模型，识别实体、属性及其关系。</li>
+<li>识别主键：为每个表选择适当的主键。</li>
+<li>应用每一范式的规则：逐步应用上述每一范式的规则，检查和修改表结构。</li>
+<li>拆分和重组表：根据依赖关系，将数据拆分到多个表中，确保每个表遵循相关的范式。</li>
+<li>设置外键：为建立表之间的关系，添加外键约束，确保数据的完整性。</li>
+<li>验证和测试：在设计完成后，进行测试，确保数据完整性、查询效率和操作便利性。</li>
+</ol>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/" rel="tag">数据库</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/" rel="tag">软件工程</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" data-tooltip="数据库的控制功能" aria-label="上一篇: 数据库的控制功能">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" data-tooltip="系统分析与设计：结构化与面向对象" aria-label="下一篇: 系统分析与设计：结构化与面向对象">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" data-tooltip="数据库的控制功能" aria-label="上一篇: 数据库的控制功能">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" data-tooltip="系统分析与设计：结构化与面向对象" aria-label="下一篇: 系统分析与设计：结构化与面向对象">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/数据库设计与建模/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

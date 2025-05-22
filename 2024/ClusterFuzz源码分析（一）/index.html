@@ -1,0 +1,570 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>ClusterFuzz 源码分析（一） - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\nClusterFuzz是 Google 开源的一个模糊测试平台，它集成了多种 Fuzz 引擎，如 Libfuzzer、AFL、Honggfuzz 等，支持跨平台，且具有高度可扩展性。\n一、简介ClusterFuzz 官网的运作流程图如下：\n\n\nFuzz 测试中，编写 fuzzer 和修复 bug 需要人工操作，ClusterFuzz 将这两个环节之外的部分都给自动化了，包括 Fuzz 执行、crash 去重、testcase 精简等。\nClusterFuzz 有两个核心组件：\n\nApp Engine instance：App 引擎，提供一个 web 界面，供用户提交任务、查看结果、展示统计数据等，此外这个 App 引擎还负责调度定时任务。\nFuzz Bots pool：实际执行 Fuzz 的一组 Bot，每个 Bot 从任务队列中挑出任务并执行，这些任务包括但不限于：\nfuzz：执行一次 fuzz 测试 session\nprogression：检查一个 testcase 是否可复现，或者已修复\nregression：查找 crash 被引入的版本范围\nminimize：最小化 testcase\ncorpus_pruning：精简 corpus 语料库（仅限 Libfuzzer）\nanalyze：检查手动上传的 testcase 是否引发 crash\n\n\n\nClusterFuzz 定义的 Fuzz Bot 有两种类型：\n\n可抢占的：机器可以随时关闭，且只能运行 fuzz 任务\n不可抢占的：机器不会关闭，能不间断运行各种类型的任务\n\n二、代码概览 Google 开源了 ClusterFuzz 的 代码仓，项目 python 为主，读起来相对容易。\n代码结构大致为：\n\nbot：bot 相关文件\nconfigs：配置文件\ndocker：docker 镜像文件\ndocs：官方说明文档\nlocal：本地运行时需要的文件\nresources：bot 依赖的外部资源文件\nsrc：源码根目录\nappengine：App Engine 组件\nhandlers：处理 web 请求\nlibs：web 后端的公共库文件\nprivate：web 前端模板代码\nresources：web 前端使用的资源\n\n\nclusterfuzz\n_internal：核心代码\nbase：通用基础模块\nbot：\nfuzzers：封装各种 fuzzer 引擎，如 Libfuzzer、AFL、Honggfuzz\ninit_scripts：各 os 平台的初始化脚本\nminimizer：最小化 testcase\ntasks：定义各项任务\ntokenizer：分词工具\nweb_server：在 bot 上启动一个 server，处理 testcase 相关请求\n\n\nbuild_management：根据用户上传的文件，创建 fuzz 任务\nconfig：读取配置文件，获取配置项\ncrash_analysis：crash 的分析、比较和分级\ndatastore：基于 ndb 定义数据结构和处理操作\nfuzzer_utils：提供 fuzz 基础操作，如 mutator 算子和 testcase 处理\nfuzzing：提供 fuzz 高级操作，如管理 fuzz 产生的 corpus、设置 fuzz 策略、挑选 fuzz 任务等\ngoogle_cloud_utils：基于 gcs 封装 clusterfuzz 与存储相关的接口\nmetrics：监控运行数据，提供统计报表\nplatforms：封装各 os 平台的键鼠操作\nprotos：gRPC 的 proto 文件\nscripts：脚本\nsystem：封装各 os 平台的系统操作\ntests：测试\n\n\nenvironment：初始化 fuzz 相关的环境变量\nfuzz：启动 fuzz 任务，实际由 bot 中定义的 fuzzer 执行\nprune：启动 corpus 精简任务\nreproduce：启动 testcase 复现任务\nstracktraces：分析 crash 调用栈\ntests：测试\n\n\nlocal\nbulter：接受外层 bulter 的调用，实际执行具体的任务\nremote：对不同的 os 平台 bot 进行配置\n\n\npython\nbot：启动 bot\n\n\nplatform_requirements.txt：python 依赖的三方库\n\n\nbower.json：web 前端依赖的组件\nbutler.py：命令行模式启动 clusterfuzz 的 server、bot、web_server、cron_server、remote 等任务，具体任务的启动脚本在 scr/local/bulter 中\n","dateCreated":"2024-09-30T10:51:56+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-09-30T10:51:56+08:00","description":"Clusterfuzz 源码概览","headline":"ClusterFuzz 源码分析（一）","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/","keywords":"Fuzz, 源码"}</script>
+    <meta name="description" content="Clusterfuzz 源码概览">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="ClusterFuzz 源码分析（一）">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="Clusterfuzz 源码概览">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/overview.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/task.png">
+<meta property="article:published_time" content="2024-09-30T02:51:56.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.373Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="Fuzz">
+<meta property="article:tag" content="源码">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/overview.png">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            ClusterFuzz 源码分析（一）
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-09-30T10:51:56+08:00">
+	
+		    2024 年 9 月 30 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/">模糊测试</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<p><a target="_blank" rel="external nofollow noopener noreferrer" href="https://google.github.io/clusterfuzz/">ClusterFuzz</a>是 Google 开源的一个模糊测试平台，它集成了多种 Fuzz 引擎，如 Libfuzzer、AFL、Honggfuzz 等，支持跨平台，且具有高度可扩展性。</p>
+<h2 id="一、简介"><a href="# 一、简介" class="headerlink" title="一、简介"></a>一、简介</h2><p>ClusterFuzz 官网的运作流程图如下：</p>
+<img src="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/overview.png" class title="ClusterFuzz 流程 ">
+
+<p>Fuzz 测试中，编写 fuzzer 和修复 bug 需要人工操作，ClusterFuzz 将这两个环节之外的部分都给自动化了，包括 Fuzz 执行、crash 去重、testcase 精简等。</p>
+<p>ClusterFuzz 有两个核心组件：</p>
+<ul>
+<li>App Engine instance：App 引擎，提供一个 web 界面，供用户提交任务、查看结果、展示统计数据等，此外这个 App 引擎还负责调度定时任务。</li>
+<li>Fuzz Bots pool：实际执行 Fuzz 的一组 Bot，每个 Bot 从任务队列中挑出任务并执行，这些任务包括但不限于：<ul>
+<li>fuzz：执行一次 fuzz 测试 session</li>
+<li>progression：检查一个 testcase 是否可复现，或者已修复</li>
+<li>regression：查找 crash 被引入的版本范围</li>
+<li>minimize：最小化 testcase</li>
+<li>corpus_pruning：精简 corpus 语料库（仅限 Libfuzzer）</li>
+<li>analyze：检查手动上传的 testcase 是否引发 crash</li>
+</ul>
+</li>
+</ul>
+<p>ClusterFuzz 定义的 Fuzz Bot 有两种类型：</p>
+<ul>
+<li>可抢占的：机器可以随时关闭，且只能运行 fuzz 任务</li>
+<li>不可抢占的：机器不会关闭，能不间断运行各种类型的任务<img src="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/task.png" class title="Fuzz Bot"></li>
+</ul>
+<h2 id="二、代码概览"><a href="# 二、代码概览" class="headerlink" title="二、代码概览"></a>二、代码概览 </h2><p>Google 开源了 ClusterFuzz 的<a target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/google/clusterfuzz"> 代码仓</a>，项目 python 为主，读起来相对容易。</p>
+<p>代码结构大致为：</p>
+<ul>
+<li>bot：bot 相关文件</li>
+<li>configs：配置文件</li>
+<li>docker：docker 镜像文件</li>
+<li>docs：官方说明文档</li>
+<li>local：本地运行时需要的文件</li>
+<li>resources：bot 依赖的外部资源文件</li>
+<li>src：源码根目录<ul>
+<li>appengine：App Engine 组件<ul>
+<li>handlers：处理 web 请求</li>
+<li>libs：web 后端的公共库文件</li>
+<li>private：web 前端模板代码</li>
+<li>resources：web 前端使用的资源</li>
+</ul>
+</li>
+<li>clusterfuzz<ul>
+<li>_internal：核心代码<ul>
+<li>base：通用基础模块</li>
+<li>bot：<ul>
+<li>fuzzers：封装各种 fuzzer 引擎，如 Libfuzzer、AFL、Honggfuzz</li>
+<li>init_scripts：各 os 平台的初始化脚本</li>
+<li>minimizer：最小化 testcase</li>
+<li>tasks：定义各项任务</li>
+<li>tokenizer：分词工具</li>
+<li>web_server：在 bot 上启动一个 server，处理 testcase 相关请求</li>
+</ul>
+</li>
+<li>build_management：根据用户上传的文件，创建 fuzz 任务</li>
+<li>config：读取配置文件，获取配置项</li>
+<li>crash_analysis：crash 的分析、比较和分级</li>
+<li>datastore：基于 ndb 定义数据结构和处理操作</li>
+<li>fuzzer_utils：提供 fuzz 基础操作，如 mutator 算子和 testcase 处理</li>
+<li>fuzzing：提供 fuzz 高级操作，如管理 fuzz 产生的 corpus、设置 fuzz 策略、挑选 fuzz 任务等</li>
+<li>google_cloud_utils：基于 gcs 封装 clusterfuzz 与存储相关的接口</li>
+<li>metrics：监控运行数据，提供统计报表</li>
+<li>platforms：封装各 os 平台的键鼠操作</li>
+<li>protos：gRPC 的 proto 文件</li>
+<li>scripts：脚本</li>
+<li>system：封装各 os 平台的系统操作</li>
+<li>tests：测试</li>
+</ul>
+</li>
+<li>environment：初始化 fuzz 相关的环境变量</li>
+<li>fuzz：启动 fuzz 任务，实际由 bot 中定义的 fuzzer 执行</li>
+<li>prune：启动 corpus 精简任务</li>
+<li>reproduce：启动 testcase 复现任务</li>
+<li>stracktraces：分析 crash 调用栈</li>
+<li>tests：测试</li>
+</ul>
+</li>
+<li>local<ul>
+<li>bulter：接受外层 bulter 的调用，实际执行具体的任务</li>
+<li>remote：对不同的 os 平台 bot 进行配置</li>
+</ul>
+</li>
+<li>python<ul>
+<li>bot：启动 bot</li>
+</ul>
+</li>
+<li>platform_requirements.txt：python 依赖的三方库</li>
+</ul>
+</li>
+<li>bower.json：web 前端依赖的组件</li>
+<li>butler.py：命令行模式启动 clusterfuzz 的 server、bot、web_server、cron_server、remote 等任务，具体任务的启动脚本在 <code>scr/local/bulter</code> 中</li>
+</ul>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/Fuzz/" rel="tag">Fuzz</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%BA%90%E7%A0%81/" rel="tag">源码</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/" data-tooltip="ClusterFuzz 源码分析（二）" aria-label="上一篇: ClusterFuzz 源码分析（二）">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E8%A6%86%E7%9B%96%E7%8E%87/" data-tooltip="AFL++ 源码分析——覆盖率" aria-label="下一篇: AFL++ 源码分析——覆盖率">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/" data-tooltip="ClusterFuzz 源码分析（二）" aria-label="上一篇: ClusterFuzz 源码分析（二）">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E8%A6%86%E7%9B%96%E7%8E%87/" data-tooltip="AFL++ 源码分析——覆盖率" aria-label="下一篇: AFL++ 源码分析——覆盖率">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/ClusterFuzz源码分析（一）/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

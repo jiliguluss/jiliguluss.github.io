@@ -1,0 +1,521 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>C++ 构造函数：默认构造和拷贝构造 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n定义 C++ 是一种面向对象编程语言，在设计时，将具有共同特征的对象抽象成类，在使用时，通过将类实例化得到不同的对象。创建一个实例对象的时候，就需要用到构造函数。 创建一个实例有两种方法：(1) 通过初始化成员变量的来构造实例对象，这时候调用普通构造函数。(2) 通过复制已有的实例化对象来构造新的实例对象，这时候调用拷贝构造函数。\n构造函数的函数名与类名相同，没有返回值，可以通过不同的参数值实现重载。定义 Object 类如下：\n12345678class Object&#123;public:    int d;    Object() &#123; std::cout &lt;&lt; &quot;default constructor&quot; &lt;&lt; std::endl; &#125;  // 默认构造函数，调用时可不提供参数的构造函数，即 Object obj    Object(int k) &#123; d = k; std::cout &lt;&lt; &quot;defined constructor&quot; &lt;&lt; std::endl; &#125;  // 普通构造函数    Object(const Object&amp; obj) &#123; d = obj.d; std::cout &lt;&lt; &quot;copy constructor&quot; &lt;&lt; std::endl; &#125;  // 拷贝构造函数，定义时需要以当前类对象的 const 引用作为入参，即 const Object&amp; obj&#125;;\n定义 Object 对象如下：\n123Object obj1 = Object();  // default constructorObject obj2 = Object(3);  // defined constructorObject obj3 = obj1;  // copy constructor，注意不是重载 = 的赋值函数\n\n合成  当程序中没有显示定义默认和拷贝构造函数时，逻辑上编译器会自己定义默认和拷贝构造函数。编译器自己定义的构造函数可以分为无用的 (trivial) 和有用的(non-trivial)。编译器通过实现优化，仅在有限的几种情况下，编译器才会将定义的有用的构造函数真正合成出来。\n默认构造函数C++ 默认构造函数有两个重要作用：\n一是提供成员变量初始化的方法，默认构造函数并不会申请成员变量所需的内存空间，也不会主动给成员变量赋初值，而只是提供了给成员变量赋初值的一种途径。\n二是在 virtual 场景下，完成虚函数表指针和虚基类指针的设置，使得在运行时可以通过指针或引用访问到正确的函数实现，呈现出多态的特性。\n鉴于此，C++ 编译器会在以下场景合成 non-trivial 的默认构造函数：\n1、virtual 场景，即  定义了虚函数或虚继承  的情形，此时需要合成默认构造函数，以正确设置虚函数表指针和虚基类指针。\n2、组合或继承场景下，被组合的类或被继承的类中显式定义了默认构造函数，需要在合成的默认构造函数中递归调用被组合类或被继承类的构造函数。\n注：非 virtual 场景，C++ 构造函数类似于 Python 的__init__方法，区别在于 C++ 编译器会在构造函数中自动插入父类的构造函数，而 Python 需要通过 super 显式调用父类的构造函数。\n拷贝构造函数C 语言中的拷贝是 bitwise 拷贝（内存上存的是啥就拷贝啥），C++ 如果用 bitwise 拷贝，可能会导致程序出问题，例如：\n1、在 virtual 场景下，如果用派生类对象初始化父类对象（Base base_obj &#x3D; derived_obj 对象模型会发生切割），bitwise 拷贝使得 base_obj 的 vptr 指向 Derived 的虚函数表，导致程序异常。\n2、在非 virtual 场景下，如果类中有指针类型的成员对象，bitwise 拷贝使得两个对象的成员变量指向同一处内存（浅拷贝），析构时由于内存被重复释放导致程序崩溃，此时需要定义拷贝构造函数使得拷贝结果位于一处新内存上（深拷贝）。\n因此，C++ 编译器会在以下场景合成 non-trivial 的拷贝构造函数：\n1、virtual 场景，即  定义了虚函数或虚继承  的情形，此时需要合成拷贝构造函数，保证在复制过程（特别是用派生类对象初始化基类对象）中正确设置虚函数表指针和虚基类指针。\n2、组合或继承场景下，被组合的类或被继承的类中显式定义了拷贝构造函数，需要在合成的默认构造函数中递归调用被组合类或被继承类的拷贝构造函数。\n应用  设计模式中有一种单例模式，意思就是在程序中有且仅有唯一的实例。要实现单例模式，需要解决两个问题：\n(1) 创建一个实例：解决存在性问题\n(2) 禁止多个实例：解决唯一性问题\n定义 SingleInstance 类如下：\n1class SingleInstance;\n\n先看问题(2)，要避免出现多个实例，首先要禁止通过已有实例复制得到新实例，其次要防止反复调用普通或默认构造函数创建多个对象。通过将 SingleInstance 类的默认构造函数、拷贝构造函数都声明为 private，可以实现这两个目标。\n123456class SingleInstance&#123;private:    SingleInstance() &#123; std::cout &lt;&lt; &quot;default constructor&quot; &lt;&lt; std::endl; &#125;;    SingleInstance(const SingleInstance&amp; obj) &#123; std::cout &lt;&lt; &quot;copy constructor&quot; &lt;&lt; std::endl; &#125;;&#125;;\n\n再看问题 (1)，为解决唯一性问题，默认构造函数被设为 private，无法通过 auto ins &#x3D; SingleInstance() 的方式来创造实例。为解决这个问题，需要在 SingleInstance 类中增加一个 public 方法，在这个方法中调用默认构造函数来完成实例的创建。\n1234567891011class SingleInstance&#123;private:    SingleInstance() &#123; std::cout &lt;&lt; &quot;default constructor&quot; &lt;&lt; std::endl; &#125;;    SingleInstance(const SingleInstance&amp; obj) &#123; std::cout &lt;&lt; &quot;copy constructor&quot; &lt;&lt; std::endl; &#125;;public:    SingleInstance&amp; GetInstance() &#123;        auto ins = SingleInstance();        return ins;    &#125;&#125;;\n\n上述代码有两个问题：\n一是 GetInstance 是普通成员方法，需要在实例化后才能调用，而这个方法需要在实例创建之前调用（这个方法就是要创建一个实例），出现矛盾，因此需要声明为静态成员方法；\n二是多次调用 GetInstance 将返回多个 ins 实例，破坏了唯一性，为保证多次调用只产生一次，需要将 ins 声明为静态变量。\n代码修改后如下：\n1234567891011class SingleInstance&#123;private:    SingleInstance() &#123; std::cout &lt;&lt; &quot;default constructor&quot; &lt;&lt; std::endl; &#125;;    SingleInstance(const SingleInstance&amp; obj) &#123; std::cout &lt;&lt; &quot;copy constructor&quot; &lt;&lt; std::endl; &#125;;public:    static SingleInstance&amp; GetInstance() &#123;        static auto ins = SingleInstance();        return ins;    &#125;&#125;;\n\n测试单例模式如下：\n123456int main()&#123;    auto&amp; ins = SingleInstance::GetInstance();  // 这里必须定义为引用，&amp; 号不能去掉，否则会报错     auto&amp; ins1 = SingleInstance::GetInstance();//    auto ins2 = SingleInstance::GetInstance();  // 这句话的含义是要通过 GetInstance() 得到实例 ins_tmp，然后调用拷贝构造函数创建 ins，因此会报错&#125;\n\n可以看到，最后只打印了一条记录：\n\ndefault constructor\n","dateCreated":"2023-04-27T14:30:54+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2023-04-27T14:30:54+08:00","description":"浅析 C++ 的默认构造函数与拷贝构造函数","headline":"C++ 构造函数：默认构造和拷贝构造","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2023/CPP%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2023/CPP%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0/","keywords":"C++"}</script>
+    <meta name="description" content="浅析 C++ 的默认构造函数与拷贝构造函数">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="C++ 构造函数：默认构造和拷贝构造">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2023/CPP%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="浅析 C++ 的默认构造函数与拷贝构造函数">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-04-27T06:30:54.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.365Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            C++ 构造函数：默认构造和拷贝构造
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2023-04-27T14:30:54+08:00">
+	
+		    2023 年 4 月 27 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/">开发</a>, <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80/">编程语言</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="定义"><a href="# 定义" class="headerlink" title="定义"></a>定义 </h2><p>C++ 是一种面向对象编程语言，在设计时，将具有共同特征的对象抽象成类，在使用时，通过将类实例化得到不同的对象。创建一个实例对象的时候，就需要用到构造函数。<br> 创建一个实例有两种方法：<br>(1) 通过初始化成员变量的来构造实例对象，这时候调用普通构造函数。<br>(2) 通过复制已有的实例化对象来构造新的实例对象，这时候调用拷贝构造函数。</p>
+<p>构造函数的函数名与类名相同，没有返回值，可以通过不同的参数值实现重载。定义 Object 类如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Object</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">int</span> d;</span><br><span class="line">    <span class="built_in">Object</span>() &#123; std::cout &lt;&lt; <span class="string">&quot;default constructor&quot;</span> &lt;&lt; std::endl; &#125;  <span class="comment">// 默认构造函数，调用时可不提供参数的构造函数，即 Object obj</span></span><br><span class="line">    <span class="built_in">Object</span>(<span class="type">int</span> k) &#123; d = k; std::cout &lt;&lt; <span class="string">&quot;defined constructor&quot;</span> &lt;&lt; std::endl; &#125;  <span class="comment">// 普通构造函数</span></span><br><span class="line">    <span class="built_in">Object</span>(<span class="type">const</span> Object&amp; obj) &#123; d = obj.d; std::cout &lt;&lt; <span class="string">&quot;copy constructor&quot;</span> &lt;&lt; std::endl; &#125;  <span class="comment">// 拷贝构造函数，定义时需要以当前类对象的 const 引用作为入参，即 const Object&amp; obj</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>定义 Object 对象如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Object obj1 = <span class="built_in">Object</span>();  <span class="comment">// default constructor</span></span><br><span class="line">Object obj2 = <span class="built_in">Object</span>(<span class="number">3</span>);  <span class="comment">// defined constructor</span></span><br><span class="line">Object obj3 = obj1;  <span class="comment">// copy constructor，注意不是重载 = 的赋值函数</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="合成"><a href="# 合成" class="headerlink" title="合成"></a>合成 </h2><p> 当程序中没有显示定义默认和拷贝构造函数时，逻辑上编译器会自己定义默认和拷贝构造函数。编译器自己定义的构造函数可以分为无用的 (trivial) 和有用的(non-trivial)。编译器通过实现优化，仅在有限的几种情况下，编译器才会将定义的有用的构造函数真正合成出来。</p>
+<h3 id="默认构造函数"><a href="# 默认构造函数" class="headerlink" title="默认构造函数"></a>默认构造函数</h3><p>C++ 默认构造函数有两个重要作用：</p>
+<p>一是提供成员变量初始化的方法，默认构造函数并不会申请成员变量所需的内存空间，也不会主动给成员变量赋初值，而只是提供了给成员变量赋初值的一种途径。</p>
+<p>二是在 virtual 场景下，完成虚函数表指针和虚基类指针的设置，使得在运行时可以通过指针或引用访问到正确的函数实现，呈现出多态的特性。</p>
+<p>鉴于此，C++ 编译器会在以下场景合成 non-trivial 的默认构造函数：</p>
+<p>1、virtual 场景，即 <strong> 定义了虚函数或虚继承 </strong> 的情形，此时需要合成默认构造函数，以正确设置虚函数表指针和虚基类指针。</p>
+<p>2、组合或继承场景下，<strong>被组合的类或被继承的类中显式定义了默认构造函数</strong>，需要在合成的默认构造函数中递归调用被组合类或被继承类的构造函数。</p>
+<p><strong>注：</strong><br>非 virtual 场景，C++ 构造函数类似于 Python 的__init__方法，区别在于 C++ 编译器会在构造函数中自动插入父类的构造函数，而 Python 需要通过 super 显式调用父类的构造函数。</p>
+<h3 id="拷贝构造函数"><a href="# 拷贝构造函数" class="headerlink" title="拷贝构造函数"></a>拷贝构造函数</h3><p>C 语言中的拷贝是 bitwise 拷贝（内存上存的是啥就拷贝啥），C++ 如果用 bitwise 拷贝，可能会导致程序出问题，例如：</p>
+<p>1、在 virtual 场景下，如果用派生类对象初始化父类对象（Base base_obj &#x3D; derived_obj 对象模型会发生切割），bitwise 拷贝使得 base_obj 的 vptr 指向 Derived 的虚函数表，导致程序异常。</p>
+<p>2、在非 virtual 场景下，如果类中有指针类型的成员对象，bitwise 拷贝使得两个对象的成员变量指向同一处内存（浅拷贝），析构时由于内存被重复释放导致程序崩溃，此时需要定义拷贝构造函数使得拷贝结果位于一处新内存上（深拷贝）。</p>
+<p>因此，C++ 编译器会在以下场景合成 non-trivial 的拷贝构造函数：</p>
+<p>1、virtual 场景，即 <strong> 定义了虚函数或虚继承 </strong> 的情形，此时需要合成拷贝构造函数，保证在复制过程（特别是用派生类对象初始化基类对象）中正确设置虚函数表指针和虚基类指针。</p>
+<p>2、组合或继承场景下，<strong>被组合的类或被继承的类中显式定义了拷贝构造函数</strong>，需要在合成的默认构造函数中递归调用被组合类或被继承类的拷贝构造函数。</p>
+<h2 id="应用"><a href="# 应用" class="headerlink" title="应用"></a>应用 </h2><p> 设计模式中有一种单例模式，意思就是在程序中有且仅有唯一的实例。要实现单例模式，需要解决两个问题：</p>
+<p>(1) 创建一个实例：解决存在性问题</p>
+<p>(2) 禁止多个实例：解决唯一性问题</p>
+<p>定义 SingleInstance 类如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">SingleInstance</span>;</span><br></pre></td></tr></table></figure>
+
+<p>先看问题(2)，要避免出现多个实例，首先要禁止通过已有实例复制得到新实例，其次要防止反复调用普通或默认构造函数创建多个对象。通过将 SingleInstance 类的默认构造函数、拷贝构造函数都声明为 private，可以实现这两个目标。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">SingleInstance</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="built_in">SingleInstance</span>() &#123; std::cout &lt;&lt; <span class="string">&quot;default constructor&quot;</span> &lt;&lt; std::endl; &#125;;</span><br><span class="line">    <span class="built_in">SingleInstance</span>(<span class="type">const</span> SingleInstance&amp; obj) &#123; std::cout &lt;&lt; <span class="string">&quot;copy constructor&quot;</span> &lt;&lt; std::endl; &#125;;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>再看问题 (1)，为解决唯一性问题，默认构造函数被设为 private，无法通过 auto ins &#x3D; SingleInstance() 的方式来创造实例。为解决这个问题，需要在 SingleInstance 类中增加一个 public 方法，在这个方法中调用默认构造函数来完成实例的创建。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">SingleInstance</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="built_in">SingleInstance</span>() &#123; std::cout &lt;&lt; <span class="string">&quot;default constructor&quot;</span> &lt;&lt; std::endl; &#125;;</span><br><span class="line">    <span class="built_in">SingleInstance</span>(<span class="type">const</span> SingleInstance&amp; obj) &#123; std::cout &lt;&lt; <span class="string">&quot;copy constructor&quot;</span> &lt;&lt; std::endl; &#125;;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function">SingleInstance&amp; <span class="title">GetInstance</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> ins = <span class="built_in">SingleInstance</span>();</span><br><span class="line">        <span class="keyword">return</span> ins;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>上述代码有两个问题：</p>
+<p>一是 GetInstance 是普通成员方法，需要在实例化后才能调用，而这个方法需要在实例创建之前调用（这个方法就是要创建一个实例），出现矛盾，因此需要声明为静态成员方法；</p>
+<p>二是多次调用 GetInstance 将返回多个 ins 实例，破坏了唯一性，为保证多次调用只产生一次，需要将 ins 声明为静态变量。</p>
+<p>代码修改后如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">SingleInstance</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="built_in">SingleInstance</span>() &#123; std::cout &lt;&lt; <span class="string">&quot;default constructor&quot;</span> &lt;&lt; std::endl; &#125;;</span><br><span class="line">    <span class="built_in">SingleInstance</span>(<span class="type">const</span> SingleInstance&amp; obj) &#123; std::cout &lt;&lt; <span class="string">&quot;copy constructor&quot;</span> &lt;&lt; std::endl; &#125;;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">static</span> SingleInstance&amp; <span class="title">GetInstance</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="type">static</span> <span class="keyword">auto</span> ins = <span class="built_in">SingleInstance</span>();</span><br><span class="line">        <span class="keyword">return</span> ins;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>测试单例模式如下：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span>&amp; ins = SingleInstance::<span class="built_in">GetInstance</span>();  <span class="comment">// 这里必须定义为引用，&amp; 号不能去掉，否则会报错 </span></span><br><span class="line">    <span class="keyword">auto</span>&amp; ins1 = SingleInstance::<span class="built_in">GetInstance</span>();</span><br><span class="line"><span class="comment">//    auto ins2 = SingleInstance::GetInstance();  // 这句话的含义是要通过 GetInstance() 得到实例 ins_tmp，然后调用拷贝构造函数创建 ins，因此会报错</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，最后只打印了一条记录：</p>
+<blockquote>
+<p>default constructor</p>
+</blockquote>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/C/" rel="tag">C++</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/" data-tooltip="C++ 对象模型：对象内存布局" aria-label="上一篇: C++ 对象模型：对象内存布局">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E6%99%BA%E8%83%BD%E6%8C%87%E9%92%88/" data-tooltip="C++ 智能指针：shared_ptr 和 weak_ptr" aria-label="下一篇: C++ 智能指针：shared_ptr 和 weak_ptr">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B/" data-tooltip="C++ 对象模型：对象内存布局" aria-label="上一篇: C++ 对象模型：对象内存布局">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/CPP%E6%99%BA%E8%83%BD%E6%8C%87%E9%92%88/" data-tooltip="C++ 智能指针：shared_ptr 和 weak_ptr" aria-label="下一篇: C++ 智能指针：shared_ptr 和 weak_ptr">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2023/CPP构造函数/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

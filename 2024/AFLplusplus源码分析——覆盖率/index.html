@@ -1,0 +1,547 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>AFL++ 源码分析——覆盖率 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n前文 AFL++ 同步机制 提到，执行同步函数 sync_fuzzers 会调用函数 save_if_interesting。顾名思义，这个save_if_interesting 函数是用来保存 interesting 的 corpus。\nAFL++ 认为 corpus 是否 interesting，是基于 corpus 对 binary 的代码覆盖率来判断。在分析 save_if_interesting 的源码之前，有必要了解一下 AFL++ 的覆盖率统计机制。\n一、原理简介  在AFL++ 白皮书  中，对覆盖率的计算有简要说明。\n首先，通过插桩，来跟踪 corpus 在 binary 中走过的路径，并将路径转换为一系列 (branch_src, branch_dst) 元组的集合。例如：\n12corpus 1: A -&gt; B -&gt; C -&gt; D -&gt; E  =&gt;  (AB, BC, CD, DE)corpus 2: A -&gt; B -&gt; D -&gt; C -&gt; E  =&gt;  (AB, BD, DC, CE)\n\n其次，通过一个共享数组 shared_mem 来记录 (branch_src, branch_dst) 元组（可以看作是 CFG 中的 edge 的表示）被命中的次数，伪代码为：\n123cur_location = &lt;COMPILE_TIME_RANDOM&gt;;shared_mem[cur_location ^ prev_location]++; prev_location = cur_location &gt;&gt; 1;\n当 corpus 从 branch_src 走到 branch_dst 时，将 branch_dst 与branch_src进行异或运算的结果作为 shared_mem 的索引，并给索引指向的元素进行加一操作，表示多命中一次(branch_src, branch_dst)。\n值得注意的是最后一行的右移操作。当从 branch_dst 开始找下一个 edge 时，并没有直接把 cur_location 赋值给 pre_location，而是先对cur_location 进行了一次右移操作，再赋值给pre_location。这样处理的好处有两个：\n\n区分 AB 和 BA。如果没有进行右移，那么 A^B 算出的索引，和 B^A 算出的索引，二者是相等的，也就是把 AB 和 BA 看做是同一个 edge。实际上 CFG 中 edge 都是有向边，方向性是一个很重要的信息。\n区分 AA 和 BB。在循环体中，如果 prev_location 与cur_location相等，那么 cur_location^prev_location 的结果将恒等于 0。导致循环体执行不同的 basic block 时，在 shared_mem 中无法得到有效区分。\n\n这种统计方式也是有一定局限性的，例如：\n123corpus 1: A -&gt; B -&gt; C -&gt; D -&gt; E  =&gt;  (AB, BC, CD, DE)corpus 2: A -&gt; B -&gt; C -&gt; A -&gt; E  =&gt;  (AB, BC, CA, AE)corpus 3: A -&gt; B -&gt; C -&gt; A -&gt; B -&gt; C -&gt; A -&gt; B -&gt; C -&gt; D -&gt; E  =&gt;  (AB, BC, CD, DE)\ncorpus 2 与 corpus 1 相比，增加了新的 edge 元组 CA 和 AE。因此 AFL++ 认为 corpus 2 找到一条新的路径。corpus 3 与 corpus 1 相比，没有增加新的 edge 元组。即使 corpus 3 的真实路径与 corpus 1 的真实路径有明显区别，但在 AFL++ 看来，corpus 3 并没有找到一条新路径。\nAFL++ 在判断一个 corpus 是否 interesting 时，除了考虑 corpus 有没有找到新路径（命中新 edge），也会考虑 edge 的命中次数。为了简化命中次数的比较，AFL++ 对次数进行分桶处理，将命中次数分为如下 8 个桶（以 2 的幂次来分割）。当 corpus 使得 edge 的命中次数从一个桶变到另一个桶时，它也会被认为是 interesting。\n11, 2, 3, 4-7, 8-15, 16-31, 32-127, 128+\n\n总结一下，AFL++ 认为一个 corpus 是 interesting，当且仅当 corpus 至少满足以下条件之一：\n\ncorpus 找到了一个新的 edge。\ncorpus 使某个 edge 的命中次数从一个 bucket 转移到另一个 bucket。\n\n二、源码分析 1. save_if_interestingsave_if_interesting 函数位于afl-fuzz-bitmap.c，其签名为：\n1u8 save_if_interesting(afl_state_t *afl, void *mem, u32 len, u8 fault);\n\n在 sync_fuzzers 中调用 save_if_interesting 的代码如下：\n123456789101112131415161718192021222324if (st.st_size &amp;&amp; st.st_size &lt;= MAX_FILE) &#123;    u8  fault;    u8 *mem = mmap(0, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);        if (mem == MAP_FAILED) &#123; PFATAL(&quot;Unable to mmap &#x27;%s&#x27;&quot;, path); &#125;        /* See what happens. We rely on save_if_interesting() to catch major       errors and save the test case. */        u32 new_len = write_to_testcase(afl, (void **)&amp;mem, st.st_size, 1);        fault = fuzz_run_target(afl, &amp;afl-&gt;fsrv, afl-&gt;fsrv.exec_tmout);        if (afl-&gt;stop_soon) &#123; goto close_sync; &#125;        afl-&gt;syncing_party = sd_ent-&gt;d_name;    afl-&gt;queued_imported += save_if_interesting(afl, mem, new_len, fault);    show_stats(afl);    afl-&gt;syncing_party = 0;        munmap(mem, st.st_size);&#125;\n\n可以看到 save_if_interesting 函数的入参分别为：\n1234afl: AFL++ 的全局状态mem: corpus 的内容len: corpus 的长度fault: fuzz_run_target 的执行结果，0 表示正常结束，1 表示运行超时，2 表示出现 crash\n\n在 save_if_interesting 函数体内，主要执行了如下流程：\nsequenceDiagram\n    save_if_interesting ->> has_new_bits: 检查 corpus 是否能更新 bitmap\n    has_new_bits ->> discover_word: 检查 bitmap 是否有变化\n    discover_word -->> has_new_bits: 返回检查结果\n    has_new_bits -->> save_if_interesting: 返回 0 表示无变化，返回 1 表示命中次数的 bucket 有变化，返回 2 表示找到了一个新 edge\n    save_if_interesting ->> describe_op: 创建 corpus 文件名\n    describe_op -->> save_if_interesting: 返回 corpus 文件名\n    save_if_interesting ->> ck_write: 将 corpus 保存为文件\n    save_if_interesting ->> add_to_queue: 将 corpus 添加到 AFL++ 的队列中\n\n2. has_new_bits负责检查整个 bitmap 是否有变化的是 has_new_bits 函数，其代码为：\n123456789101112131415161718192021222324252627282930313233343536373839404142/* Check if the current execution path brings anything new to the table.   Update virgin bits to reflect the finds. Returns 1 if the only change is   the hit-count for a particular tuple; 2 if there are new tuples seen.   Updates the map, so subsequent calls will always return 0.   This function is called after every exec() on a fairly large buffer, so   it needs to be fast. We do this in 32-bit and 64-bit flavors. */inline u8 has_new_bits(afl_state_t *afl, u8 *virgin_map) &#123;#ifdef WORD_SIZE_64  u64 *current = (u64 *)afl-&gt;fsrv.trace_bits;  u64 *virgin = (u64 *)virgin_map;  u32 i = ((afl-&gt;fsrv.real_map_size + 7) &gt;&gt; 3);#else  u32 *current = (u32 *)afl-&gt;fsrv.trace_bits;  u32 *virgin = (u32 *)virgin_map;  u32 i = ((afl-&gt;fsrv.real_map_size + 3) &gt;&gt; 2);#endif                                                     /* ^WORD_SIZE_64 */  u8 ret = 0;  while (i--) &#123;    if (unlikely(*current)) discover_word(&amp;ret, current, virgin);    current++;    virgin++;  &#125;  if (unlikely(ret) &amp;&amp; likely(virgin_map == afl-&gt;virgin_bits))    afl-&gt;bitmap_changed = 1;  return ret;&#125;\n\n在第一部分介绍 AFL++ 统计覆盖率的原理时有讲，AFL++ 将每个 edge 的命中频次进行分桶处理，分成了 8 个桶，每个桶实际上是以一个 bit 位来表示。在 AFL++ 源码中用 afl-&gt;virgin_bits 来记录，对应函数中的形参virgin_map。\n在 virgin_map 中，若virgin_map[12345]=0b10110110，表示 AFL++ 产生的所有 corpus 在 12345 这个 edge 上，有命中 2 次、8-15 次、128+ 次三种情况。\n而 afl-&gt;fsrv.trace_bits 则记录了当前 corpus 走过 edge 的命中频次（分桶后的结果），那么通过位运算即可判断当前 corpus 走过的 edge 是否有变换。\n值得注意的是：在 AFL++ 初始化 afl-&gt;virgin_bits 时，将所有的 bit 位都设为 1，因此 1 表示没有落在这个桶，0 表示落在这个桶。但在 afl-&gt;fsrv.trace_bits 中，bit 为 1 表示落在这个桶，0 表示没有落在这个桶。两者 bit 为 1 的含义刚好相反！\n123memset(afl-&gt;virgin_bits, 255, map_size);  // afl-fuzz.c 设置 virgin_bits 初始值afl-&gt;fsrv.trace_bits = afl_shm_init(&amp;afl-&gt;shm, new_map_size, afl-&gt;non_instrumented_mode);    // afl-fuzz.c 将 fsrv.trace_bits 的值初始化为 0\n函数中为了加速运算（减少循环次数），在 32 位系统和 64 位系统中，分别将 afl-&gt;virgin_bits 和afl-&gt;fsrv.trace_bits转换为对应类型的 virgin 和current。\n在 while 循环中，调用 discover_word 函数来完成 current 和virgin的实际比对操作。\n3. discover_word具体完成某个 edge 的 bitmap 对比的是 discover_word 函数，其代码为：\n123456789101112131415161718192021222324252627282930313233/* Updates the virgin bits, then reflects whether a new count or a new tuple is * seen in ret. */inline void discover_word(u8 *ret, u64 *current, u64 *virgin) &#123;  /* Optimize for (*current &amp; *virgin) == 0 - i.e., no bits in current bitmap     that have not been already cleared from the virgin map - since this will     almost always be the case. */  if (*current &amp; *virgin) &#123;    if (likely(*ret &lt; 2)) &#123;      u8 *cur = (u8 *)current;      u8 *vir = (u8 *)virgin;      /* Looks like we have not found any new bytes yet; see if any non-zero         bytes in current[] are pristine in virgin[]. */      if ((cur[0] &amp;&amp; vir[0] == 0xff) || (cur[1] &amp;&amp; vir[1] == 0xff) ||          (cur[2] &amp;&amp; vir[2] == 0xff) || (cur[3] &amp;&amp; vir[3] == 0xff) ||          (cur[4] &amp;&amp; vir[4] == 0xff) || (cur[5] &amp;&amp; vir[5] == 0xff) ||          (cur[6] &amp;&amp; vir[6] == 0xff) || (cur[7] &amp;&amp; vir[7] == 0xff))        *ret = 2;      else        *ret = 1;    &#125;    *virgin &amp;= ~*current;  &#125;&#125;\n首先，计算 *current &amp; *virgin，即将current 的首元素与 virgin 的首元素进行按位与运算。由于 bit 为 1 在 current 与virgin中的含义是相反的，那么 current 与virgin按位与的结果为 1，说明至少有一个桶，virgin没到过，而 current 到过。\n接着，判断 likely(*ret &lt; 2)，在 AFL++ 看来*ret &lt; 2 是一个很可能出现的情况，current找到一个新的 edge，才会将设置*ret=2。\n判断 current 是否找到一个新的 edge，是通过依次运算 (cur[k] &amp;&amp; vir[k] == 0xff), k=0...7 来实现的，注意 &#x3D;&#x3D; 的优先级比 &amp;&amp; 高。\nvir[k]==0xff表示所有桶的 bit 位为 1，即这个 edge 从来没到过。而 cur[k]==1 表示当前 corpus 到了这个 edge，从而认为 corpus 找到了新 edge。\nk=0...7是由于将 u64 转为 u8，即 virgin 和current的每个元素实际上对应了 8 个 edge。\n4. describe_op在 AFL++ 获得一个 interesting 的 corpus 之后，会将其保存为文件。在保存之前，通过 describe_op 函数来生成文件名，在文件名中记录一些关键信息：\n1234567id: 记录 corpus 的 id 编号sync: 从哪个目录同步过来src: 从哪个 corpus 演化而来，记录来源 corpus 的 idtime: AFL++ 的运行时间execs: AFL++ 的运行次数+cov: 当前 corpus 找到了新 edge，即 has_new_bits 返回 2+tout: 当前 corpus 运行超时\n\n三、参考资料\nAFL 源码阅读（六）：队列、变异、同步\nAFL++ 白皮书和源码阅读\n","dateCreated":"2024-08-15T17:28:52+08:00","dateModified":"2024-12-26T17:49:24+08:00","datePublished":"2024-08-15T17:28:52+08:00","description":"分析 AFL++ 度量覆盖率的相关代码","headline":"AFL++ 源码分析——覆盖率","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E8%A6%86%E7%9B%96%E7%8E%87/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E8%A6%86%E7%9B%96%E7%8E%87/","keywords":"AFL++, Fuzz, 源码"}</script>
+    <meta name="description" content="分析 AFL++ 度量覆盖率的相关代码">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="AFL++ 源码分析——覆盖率">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E8%A6%86%E7%9B%96%E7%8E%87/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="分析 AFL++ 度量覆盖率的相关代码">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2024-08-15T09:28:52.000Z">
+<meta property="article:modified_time" content="2024-12-26T09:49:24.718Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="AFL++">
+<meta property="article:tag" content="Fuzz">
+<meta property="article:tag" content="源码">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            AFL++ 源码分析——覆盖率
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-08-15T17:28:52+08:00">
+	
+		    2024 年 8 月 15 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/">模糊测试</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<p>前文 <a href="../AFLplusplus%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E2%80%94%E2%80%94%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/index.html">AFL++ 同步机制</a> 提到，执行同步函数 <code>sync_fuzzers</code> 会调用函数 <code>save_if_interesting</code>。顾名思义，这个<code>save_if_interesting</code> 函数是用来保存 interesting 的 corpus。</p>
+<p>AFL++ 认为 corpus 是否 interesting，是基于 corpus 对 binary 的代码覆盖率来判断。在分析 <code>save_if_interesting</code> 的源码之前，有必要了解一下 AFL++ 的覆盖率统计机制。</p>
+<h2 id="一、原理简介"><a href="# 一、原理简介" class="headerlink" title="一、原理简介"></a>一、原理简介 </h2><p> 在<a target="_blank" rel="external nofollow noopener noreferrer" href="https://lcamtuf.coredump.cx/afl/technical_details.txt">AFL++ 白皮书 </a> 中，对覆盖率的计算有简要说明。</p>
+<p>首先，通过插桩，来跟踪 corpus 在 binary 中走过的路径，并将路径转换为一系列 <code>(branch_src, branch_dst)</code> 元组的集合。例如：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">corpus 1: A -&gt; B -&gt; C -&gt; D -&gt; E  =&gt;  (AB, BC, CD, DE)</span><br><span class="line">corpus 2: A -&gt; B -&gt; D -&gt; C -&gt; E  =&gt;  (AB, BD, DC, CE)</span><br></pre></td></tr></table></figure>
+
+<p>其次，通过一个共享数组 <code>shared_mem</code> 来记录 <code>(branch_src, branch_dst)</code> 元组（可以看作是 CFG 中的 edge 的表示）被命中的次数，伪代码为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">cur_location = &lt;COMPILE_TIME_RANDOM&gt;;</span><br><span class="line">shared_mem[cur_location ^ prev_location]++; </span><br><span class="line">prev_location = cur_location &gt;&gt; <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+<p>当 corpus 从 <code>branch_src</code> 走到 <code>branch_dst</code> 时，将 <code>branch_dst</code> 与<code>branch_src</code>进行异或运算的结果作为 <code>shared_mem</code> 的索引，并给索引指向的元素进行加一操作，表示多命中一次<code>(branch_src, branch_dst)</code>。</p>
+<p>值得注意的是最后一行的右移操作。当从 <code>branch_dst</code> 开始找下一个 edge 时，并没有直接把 <code>cur_location</code> 赋值给 <code>pre_location</code>，而是先对<code>cur_location</code> 进行了一次右移操作，再赋值给<code>pre_location</code>。这样处理的好处有两个：</p>
+<ol>
+<li>区分 AB 和 BA。如果没有进行右移，那么 <code>A^B</code> 算出的索引，和 <code>B^A</code> 算出的索引，二者是相等的，也就是把 AB 和 BA 看做是同一个 edge。实际上 CFG 中 edge 都是有向边，方向性是一个很重要的信息。</li>
+<li>区分 AA 和 BB。在循环体中，如果 <code>prev_location</code> 与<code>cur_location</code>相等，那么 <code>cur_location^prev_location</code> 的结果将恒等于 0。导致循环体执行不同的 basic block 时，在 <code>shared_mem</code> 中无法得到有效区分。</li>
+</ol>
+<p>这种统计方式也是有一定局限性的，例如：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">corpus 1: A -&gt; B -&gt; C -&gt; D -&gt; E  =&gt;  (AB, BC, CD, DE)</span><br><span class="line">corpus 2: A -&gt; B -&gt; C -&gt; A -&gt; E  =&gt;  (AB, BC, CA, AE)</span><br><span class="line">corpus 3: A -&gt; B -&gt; C -&gt; A -&gt; B -&gt; C -&gt; A -&gt; B -&gt; C -&gt; D -&gt; E  =&gt;  (AB, BC, CD, DE)</span><br></pre></td></tr></table></figure>
+<p>corpus 2 与 corpus 1 相比，增加了新的 edge 元组 CA 和 AE。因此 AFL++ 认为 corpus 2 找到一条新的路径。<br>corpus 3 与 corpus 1 相比，没有增加新的 edge 元组。即使 corpus 3 的真实路径与 corpus 1 的真实路径有明显区别，但在 AFL++ 看来，corpus 3 并没有找到一条新路径。</p>
+<p>AFL++ 在判断一个 corpus 是否 interesting 时，除了考虑 corpus 有没有找到新路径（命中新 edge），也会考虑 edge 的命中次数。为了简化命中次数的比较，AFL++ 对次数进行分桶处理，将命中次数分为如下 8 个桶（以 2 的幂次来分割）。当 corpus 使得 edge 的命中次数从一个桶变到另一个桶时，它也会被认为是 interesting。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1, 2, 3, 4-7, 8-15, 16-31, 32-127, 128+</span><br></pre></td></tr></table></figure>
+
+<p>总结一下，<strong>AFL++ 认为一个 corpus 是 interesting，当且仅当 corpus 至少满足以下条件之一</strong>：</p>
+<ol>
+<li><strong>corpus 找到了一个新的 edge</strong>。</li>
+<li><strong>corpus 使某个 edge 的命中次数从一个 bucket 转移到另一个 bucket</strong>。</li>
+</ol>
+<h2 id="二、源码分析"><a href="# 二、源码分析" class="headerlink" title="二、源码分析"></a>二、源码分析 </h2><h3 id="1-save-if-interesting"><a href="#1-save-if-interesting" class="headerlink" title="1. save_if_interesting"></a>1. save_if_interesting</h3><p><code>save_if_interesting</code> 函数位于<code>afl-fuzz-bitmap.c</code>，其签名为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">u8 <span class="title function_">save_if_interesting</span><span class="params">(<span class="type">afl_state_t</span> *afl, <span class="type">void</span> *mem, u32 len, u8 fault)</span>;</span><br></pre></td></tr></table></figure>
+
+<p>在 <code>sync_fuzzers</code> 中调用 <code>save_if_interesting</code> 的代码如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (st.st_size &amp;&amp; st.st_size &lt;= MAX_FILE) &#123;</span><br><span class="line"></span><br><span class="line">    u8  fault;</span><br><span class="line">    u8 *mem = mmap(<span class="number">0</span>, st.st_size, PROT_READ, MAP_PRIVATE, fd, <span class="number">0</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (mem == MAP_FAILED) &#123; PFATAL(<span class="string">&quot;Unable to mmap &#x27;%s&#x27;&quot;</span>, path); &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* See what happens. We rely on save_if_interesting() to catch major</span></span><br><span class="line"><span class="comment">       errors and save the test case. */</span></span><br><span class="line">    </span><br><span class="line">    u32 new_len = write_to_testcase(afl, (<span class="type">void</span> **)&amp;mem, st.st_size, <span class="number">1</span>);</span><br><span class="line">    </span><br><span class="line">    fault = fuzz_run_target(afl, &amp;afl-&gt;fsrv, afl-&gt;fsrv.exec_tmout);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (afl-&gt;stop_soon) &#123; <span class="keyword">goto</span> close_sync; &#125;</span><br><span class="line">    </span><br><span class="line">    afl-&gt;syncing_party = sd_ent-&gt;d_name;</span><br><span class="line">    afl-&gt;queued_imported += save_if_interesting(afl, mem, new_len, fault);</span><br><span class="line">    show_stats(afl);</span><br><span class="line">    afl-&gt;syncing_party = <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    munmap(mem, st.st_size);</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到 <code>save_if_interesting</code> 函数的入参分别为：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">afl: AFL++ 的全局状态</span><br><span class="line">mem: corpus 的内容</span><br><span class="line">len: corpus 的长度</span><br><span class="line">fault: fuzz_run_target 的执行结果，0 表示正常结束，1 表示运行超时，2 表示出现 crash</span><br></pre></td></tr></table></figure>
+
+<p>在 <code>save_if_interesting</code> 函数体内，主要执行了如下流程：</p>
+<pre class="mermaid">sequenceDiagram
+    save_if_interesting ->> has_new_bits: 检查 corpus 是否能更新 bitmap
+    has_new_bits ->> discover_word: 检查 bitmap 是否有变化
+    discover_word -->> has_new_bits: 返回检查结果
+    has_new_bits -->> save_if_interesting: 返回 0 表示无变化，返回 1 表示命中次数的 bucket 有变化，返回 2 表示找到了一个新 edge
+    save_if_interesting ->> describe_op: 创建 corpus 文件名
+    describe_op -->> save_if_interesting: 返回 corpus 文件名
+    save_if_interesting ->> ck_write: 将 corpus 保存为文件
+    save_if_interesting ->> add_to_queue: 将 corpus 添加到 AFL++ 的队列中</pre>
+
+<h3 id="2-has-new-bits"><a href="#2-has-new-bits" class="headerlink" title="2. has_new_bits"></a>2. has_new_bits</h3><p>负责检查整个 bitmap 是否有变化的是 <code>has_new_bits</code> 函数，其代码为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* Check if the current execution path brings anything new to the table.</span></span><br><span class="line"><span class="comment">   Update virgin bits to reflect the finds. Returns 1 if the only change is</span></span><br><span class="line"><span class="comment">   the hit-count for a particular tuple; 2 if there are new tuples seen.</span></span><br><span class="line"><span class="comment">   Updates the map, so subsequent calls will always return 0.</span></span><br><span class="line"><span class="comment"></span></span><br><span class="line"><span class="comment">   This function is called after every exec() on a fairly large buffer, so</span></span><br><span class="line"><span class="comment">   it needs to be fast. We do this in 32-bit and 64-bit flavors. */</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">inline</span> u8 <span class="title function_">has_new_bits</span><span class="params">(<span class="type">afl_state_t</span> *afl, u8 *virgin_map)</span> &#123;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> WORD_SIZE_64</span></span><br><span class="line"></span><br><span class="line">  u64 *current = (u64 *)afl-&gt;fsrv.trace_bits;</span><br><span class="line">  u64 *virgin = (u64 *)virgin_map;</span><br><span class="line"></span><br><span class="line">  u32 i = ((afl-&gt;fsrv.real_map_size + <span class="number">7</span>) &gt;&gt; <span class="number">3</span>);</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">else</span></span></span><br><span class="line"></span><br><span class="line">  u32 *current = (u32 *)afl-&gt;fsrv.trace_bits;</span><br><span class="line">  u32 *virgin = (u32 *)virgin_map;</span><br><span class="line"></span><br><span class="line">  u32 i = ((afl-&gt;fsrv.real_map_size + <span class="number">3</span>) &gt;&gt; <span class="number">2</span>);</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span>                                                     <span class="comment">/* ^WORD_SIZE_64 */</span></span></span><br><span class="line"></span><br><span class="line">  u8 ret = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">while</span> (i--) &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (unlikely(*current)) discover_word(&amp;ret, current, virgin);</span><br><span class="line"></span><br><span class="line">    current++;</span><br><span class="line">    virgin++;</span><br><span class="line"></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (unlikely(ret) &amp;&amp; likely(virgin_map == afl-&gt;virgin_bits))</span><br><span class="line">    afl-&gt;bitmap_changed = <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> ret;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在第一部分介绍 AFL++ 统计覆盖率的原理时有讲，AFL++ 将每个 edge 的命中频次进行分桶处理，分成了 8 个桶，每个桶实际上是以一个 bit 位来表示。在 AFL++ 源码中用 <code>afl-&gt;virgin_bits</code> 来记录，对应函数中的形参<code>virgin_map</code>。</p>
+<p>在 <code>virgin_map</code> 中，若<code>virgin_map[12345]=0b10110110</code>，表示 AFL++ 产生的所有 corpus 在 12345 这个 edge 上，有命中 2 次、8-15 次、128+ 次三种情况。</p>
+<p>而 <code>afl-&gt;fsrv.trace_bits</code> 则记录了当前 corpus 走过 edge 的命中频次（分桶后的结果），那么通过位运算即可判断当前 corpus 走过的 edge 是否有变换。</p>
+<p>值得注意的是：在 AFL++ 初始化 <code>afl-&gt;virgin_bits</code> 时，将所有的 bit 位都设为 1，因此 1 表示没有落在这个桶，0 表示落在这个桶。但在 <code>afl-&gt;fsrv.trace_bits</code> 中，bit 为 1 表示落在这个桶，0 表示没有落在这个桶。<strong>两者 bit 为 1 的含义刚好相反！</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">memset</span>(afl-&gt;virgin_bits, <span class="number">255</span>, map_size);  <span class="comment">// afl-fuzz.c 设置 virgin_bits 初始值</span></span><br><span class="line"></span><br><span class="line">afl-&gt;fsrv.trace_bits = afl_shm_init(&amp;afl-&gt;shm, new_map_size, afl-&gt;non_instrumented_mode);    <span class="comment">// afl-fuzz.c 将 fsrv.trace_bits 的值初始化为 0</span></span><br></pre></td></tr></table></figure>
+<p>函数中为了加速运算（减少循环次数），在 32 位系统和 64 位系统中，分别将 <code>afl-&gt;virgin_bits</code> 和<code>afl-&gt;fsrv.trace_bits</code>转换为对应类型的 <code>virgin</code> 和<code>current</code>。</p>
+<p>在 <code>while</code> 循环中，调用 <code>discover_word</code> 函数来完成 <code>current</code> 和<code>virgin</code>的实际比对操作。</p>
+<h3 id="3-discover-word"><a href="#3-discover-word" class="headerlink" title="3. discover_word"></a>3. discover_word</h3><p>具体完成某个 edge 的 bitmap 对比的是 <code>discover_word</code> 函数，其代码为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* Updates the virgin bits, then reflects whether a new count or a new tuple is</span></span><br><span class="line"><span class="comment"> * seen in ret. */</span></span><br><span class="line"><span class="keyword">inline</span> <span class="type">void</span> <span class="title function_">discover_word</span><span class="params">(u8 *ret, u64 *current, u64 *virgin)</span> &#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* Optimize for (*current &amp; *virgin) == 0 - i.e., no bits in current bitmap</span></span><br><span class="line"><span class="comment">     that have not been already cleared from the virgin map - since this will</span></span><br><span class="line"><span class="comment">     almost always be the case. */</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (*current &amp; *virgin) &#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (likely(*ret &lt; <span class="number">2</span>)) &#123;</span><br><span class="line"></span><br><span class="line">      u8 *cur = (u8 *)current;</span><br><span class="line">      u8 *vir = (u8 *)virgin;</span><br><span class="line"></span><br><span class="line">      <span class="comment">/* Looks like we have not found any new bytes yet; see if any non-zero</span></span><br><span class="line"><span class="comment">         bytes in current[] are pristine in virgin[]. */</span></span><br><span class="line"></span><br><span class="line">      <span class="keyword">if</span> ((cur[<span class="number">0</span>] &amp;&amp; vir[<span class="number">0</span>] == <span class="number">0xff</span>) || (cur[<span class="number">1</span>] &amp;&amp; vir[<span class="number">1</span>] == <span class="number">0xff</span>) ||</span><br><span class="line">          (cur[<span class="number">2</span>] &amp;&amp; vir[<span class="number">2</span>] == <span class="number">0xff</span>) || (cur[<span class="number">3</span>] &amp;&amp; vir[<span class="number">3</span>] == <span class="number">0xff</span>) ||</span><br><span class="line">          (cur[<span class="number">4</span>] &amp;&amp; vir[<span class="number">4</span>] == <span class="number">0xff</span>) || (cur[<span class="number">5</span>] &amp;&amp; vir[<span class="number">5</span>] == <span class="number">0xff</span>) ||</span><br><span class="line">          (cur[<span class="number">6</span>] &amp;&amp; vir[<span class="number">6</span>] == <span class="number">0xff</span>) || (cur[<span class="number">7</span>] &amp;&amp; vir[<span class="number">7</span>] == <span class="number">0xff</span>))</span><br><span class="line">        *ret = <span class="number">2</span>;</span><br><span class="line">      <span class="keyword">else</span></span><br><span class="line">        *ret = <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    *virgin &amp;= ~*current;</span><br><span class="line"></span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>首先，计算 <code>*current &amp; *virgin</code>，即将<code>current</code> 的首元素与 <code>virgin</code> 的首元素进行按位与运算。由于 bit 为 1 在 <code>current</code> 与<code>virgin</code>中的含义是相反的，那么 <code>current</code> 与<code>virgin</code>按位与的结果为 1，说明至少有一个桶，<code>virgin</code>没到过，而 <code>current</code> 到过。</p>
+<p>接着，判断 <code>likely(*ret &lt; 2)</code>，在 AFL++ 看来<code>*ret &lt; 2</code> 是一个很可能出现的情况，<code>current</code>找到一个新的 edge，才会将设置<code>*ret=2</code>。</p>
+<p>判断 <code>current</code> 是否找到一个新的 edge，是通过依次运算 <code>(cur[k] &amp;&amp; vir[k] == 0xff), k=0...7</code> 来实现的，<strong>注意 &#x3D;&#x3D; 的优先级比 &amp;&amp; 高</strong>。</p>
+<p><code>vir[k]==0xff</code>表示所有桶的 bit 位为 1，即这个 edge 从来没到过。而 <code>cur[k]==1</code> 表示当前 corpus 到了这个 edge，从而认为 corpus 找到了新 edge。</p>
+<p><code>k=0...7</code>是由于将 u64 转为 u8，即 <code>virgin</code> 和<code>current</code>的每个元素实际上对应了 8 个 edge。</p>
+<h3 id="4-describe-op"><a href="#4-describe-op" class="headerlink" title="4. describe_op"></a>4. describe_op</h3><p>在 AFL++ 获得一个 interesting 的 corpus 之后，会将其保存为文件。在保存之前，通过 <code>describe_op</code> 函数来生成文件名，在文件名中记录一些关键信息：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">id: 记录 corpus 的 id 编号</span><br><span class="line">sync: 从哪个目录同步过来</span><br><span class="line">src: 从哪个 corpus 演化而来，记录来源 corpus 的 id</span><br><span class="line">time: AFL++ 的运行时间</span><br><span class="line">execs: AFL++ 的运行次数</span><br><span class="line">+cov: 当前 corpus 找到了新 edge，即 has_new_bits 返回 2</span><br><span class="line">+tout: 当前 corpus 运行超时</span><br></pre></td></tr></table></figure>
+
+<h2 id="三、参考资料"><a href="# 三、参考资料" class="headerlink" title="三、参考资料"></a>三、参考资料</h2><ol>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.ruanx.net/afl-source-6/">AFL 源码阅读（六）：队列、变异、同步</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.jianshu.com/p/069946b8f313">AFL++ 白皮书和源码阅读</a></li>
+</ol>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/AFL/" rel="tag">AFL++</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/Fuzz/" rel="tag">Fuzz</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%BA%90%E7%A0%81/" rel="tag">源码</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/" data-tooltip="ClusterFuzz 源码分析（一）" aria-label="上一篇: ClusterFuzz 源码分析（一）">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/" data-tooltip="由 subprocess.PIPE 引发的血案" aria-label="下一篇: 由 subprocess.PIPE 引发的血案">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/" data-tooltip="ClusterFuzz 源码分析（一）" aria-label="上一篇: ClusterFuzz 源码分析（一）">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%94%B1subprocess-PIPE%E5%BC%95%E5%8F%91%E7%9A%84%E8%A1%80%E6%A1%88/" data-tooltip="由 subprocess.PIPE 引发的血案" aria-label="下一篇: 由 subprocess.PIPE 引发的血案">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/AFLplusplus源码分析——覆盖率/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

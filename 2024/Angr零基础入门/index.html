@@ -1,0 +1,759 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>符号执行工具——Angr 零基础入门 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、Angr 简介Angr 是一个由 Python 语言编写的开源二进制分析框架，它主要用于静态分析、符号执行、逆向工程等安全研究领域。Angr 支持多种操作系统和硬件架构，包括 Windows、Linux、macOS 以及 x86、ARM 等。\n二、Angr 整体架构1、核心组件Angr 是一个复杂的二进制分析框架，其初始的整体架构设计如下图：\n\n\nAngr 的核心组件自下而上依次为：\n\nCLE：加载可执行文件和库文件\n\narchinfo：获取架构信息\n\nPyVEX：将指令转换成 VEX 这种中间语言（IR）\n\nSimuVEX：模拟执行引擎，负责在虚拟环境中执行 VEX\n\nClaripy：用于创建和管理符号变量及条件约束，传递给 Z3 求解器进行求解\n\nAngr：将各个组件集成起来，提供一套整体的二进制分析和符号执行框架\n\nanalysis：提供一套分析工具，通过 CFG、DDG 等对程序进行分析\n\nsurveyors：用于记录和跟踪程序的可执行路径\n\n\n随着 Angr 的发展，部分组件有更新和迭代：\n\nSimuVEX 被移除，其组件已集成到 Angr 中\n\nsurveyors 被移除，被 SimulationManager 所取代\n\n\n2、运作流程Angr 的整体运作流程如图：\n\n\n使用 Angr 进行二进制分析时，各组件的运行步骤为：\n\nCLE 加载二进制，获取机器指令\n\nArchinfo 分析二进制的架构类型\n\nPyVEX 根据架构类型，将机器指令转换为 VEX 中间表达\n\nSimEngine 基于 VEX 来模拟程序执行\n\nClarify 创建和管理执行过程中的符号变量和约束条件，转化为 SMT 表达式，传递给 Z3 求解\n\nSimOS（SimProcedures） 模拟程序与系统的交互，如标准 io 流、文件读写、系统调用等操作\n\n\n三、Angr 使用说明1. 安装Angr 需要 python 3.8 以上的运行环境，需要先装 3.8 版本以上的 python。\n安装 Angr 有两种推荐方式：\n\npip 安装\n1pip install Angr\n\n源码安装\n123git clone https://github.com/Angr/Angr-dev.gitcd Angr-dev./setup.sh -i -e Angr\n\n2. 运行  建议在虚拟环境中运行 Angr。源码安装的方式可以自动创建名为 Angr 的虚拟环境。手动创建虚拟环境的命令为：\n1python3 -m venv Angr\n\n启动虚拟环境：\n1source Angr/bin/active\n\n3. 使用Angr 作为 python 的三方库，通过 import 进行调用：\n1import Angr\n\nAngr 的顶层 API 围绕着 Angr 的核心组件来设计，包含一组常用的 Python 类和对象，它们提供了二进制分析、符号执行和其他功能。\n以下是 Angr 的一些常用 API 组件：\n\nProject（项目）：\n\nProject是 Angr 的中心组件，它代表了用户所要处理的二进制文件。\n创建一个 Project 实例是使用 Angr 进行分析的第一步，Project对象提供了对二进制文件的操作和分析的接口。\n\n\nFactory（工厂）：\n\nFactory对象通过 Project 的factory属性来访问，它提供了快速访问 Angr 的各种分析技术的接口，避免复杂的实例化操作。\n\n\nSimState（模拟状态）：\n\nSimState代表程序的一个瞬时状态，它包含寄存器、内存、堆栈、文件系统等运行时的上下文环境状态，可用于执行符号执行和具体执行。\nSimState对象通过 Project 的factory属性的方法来访问，这些方法包括 entry_state、blank_state、full_init_state 等。\n\n\nSimulationManager（模拟管理器）：\n\nSimulationManager用来跟踪程序执行过程中的路径探索和 SimState 演化，并对这些路径和 SimState 进行管理。\nSimulationManager对象通过 Project 的factory属性的 simulation_manager 方法实例化。\n\n\nLoader（加载器）：\n\nLoader负责将二进制文件载入内存，并处理符号以及它们的地址空间，为后续分析提供详细信息，如入口点、可执行段、符号表等。\nLoader对象通过 Project 的loader属性的方法来访问。\n\n\nBlock（块）：\n\nBlock表示程序基本块，是 Angr 分析的基本单位。每个 Block 是一组顺序执行代码片段，具有原子性，以分支或跳转结尾。\nBlock对象通过 Project 的factory属性的 block 方法实例化。\n\n\n\n四、Angr 实践应用example.c 源码：\n12345678910111213141516171819202122232425262728293031323334#include &lt;stdio.h&gt;#include &lt;string.h&gt;#include &lt;stdint.h&gt;#include &lt;assert.h&gt;#define MAX_LEN 100int calculate(int number)&#123;    return number * number;&#125;int main()&#123;    char input[MAX_LEN];    printf(&quot;Enter the string: &quot;);    fgets(input, MAX_LEN, stdin);    int len = strlen(input);    int num = 0;    for(int i = 0; i &lt; len; i++) &#123;        if(input[i] &gt;= &#x27;0&#x27; &amp;&amp; input[i] &lt;= &#x27;9&#x27;)&#123;            num = num * 10 + (input[i] - &#x27;0&#x27;);        &#125;    &#125;    int res = calculate(num);    assert(res != 65536);    return 0;&#125;\n\n将 example.c 编译为 example_binary ：\n1gcc example.c -o example_binary\n\n以 example_binary 为例，演示 Angr 用法。\n1. 静态程序分析  首先用 Angr 定位程序入口：\n12345678910111213&gt;&gt;&gt; import angr&gt;&gt;&gt; project = angr.Project(&#x27;example_binary&#x27;, load_options=&#123;&#x27;auto_load_libs&#x27;: False&#125;)&gt;&gt;&gt; project.filename&#x27;example_binary&#x27;&gt;&gt;&gt; project.arch&lt;Arch AMD64 (LE)&gt;&gt;&gt;&gt; project.entry4198624&gt;&gt;&gt; bb = project.factory.block(4198624)&gt;&gt;&gt; bb.instructions12&gt;&gt;&gt; hex(bb.addr)&#x27;0x4010e0&#x27;\n\n这个 0x4010e0 地址对应的是程序的入口 block ，包括 12 条指令，在 CFG 中表示为如下节点，可以看到 block 的名字并不是 main，而是 _start ：\n\n\n接着从 _start 开始执行，执行一次后到达 ___libc_start_main ，然而再执行一次后并没有到达 main ：\n123456789101112&gt;&gt;&gt; st_0 = project.factory.entry_state()&gt;&gt;&gt; hex(st_0.addr)&#x27;0x4010e0&#x27;&gt;&gt;&gt; nx  = st_0.step()&gt;&gt;&gt; nx.successors[&lt;SimState @ 0x500000&gt;]&gt;&gt;&gt; st_1 = nx.successors[0]&gt;&gt;&gt; hex(st_1.addr)&#x27;0x500000&#x27;&gt;&gt;&gt; nx = st_1.step()&gt;&gt;&gt; nx.successors[&lt;SimState @ 0x4012e0&gt;]\n\n为了获取 main 这个 block 的状态，可以使用 SimulationManager 来执行：\n12345678&gt;&gt;&gt; simgr = project.factory.simulation_manager(st_0)&gt;&gt;&gt; main_obj = project.loader.main_object.get_symbol(&#x27;main&#x27;)&gt;&gt;&gt; hex(main_obj.rebased_addr)&#x27;0x4011dc&#x27;&gt;&gt;&gt; simgr.explore(find=main_obj.rebased_addr)&lt;SimulationManager with 1 found&gt;&gt;&gt;&gt; simgr.found[&lt;SimState @ 0x4011dc&gt;]\n\n\n\n2. 静态符号执行example_binary 接受一个最长为 100 位的字符串作为输入，提取字符串中的数字，转换成数值，然后进行平方运算，结果等于 65536 时出现断言错误。反推回来，当输入字符串中包含 2、5、6 这三个数字时，就能导致AssertionError。\n要让程序自动找到触发 example_binary 中 AssertionError 的 input，可以用 Angr 符号执行来求解。\n首先引入claripy，创建符号变量：\n1234&gt;&gt;&gt; import claripy&gt;&gt;&gt; input_size = 100&gt;&gt;&gt; symbolic_buffer = claripy.BVS(&#x27;input&#x27;, 8 * (input_size - 1))&gt;&gt;&gt; entry_state = project.factory.entry_state(stdin=claripy.Concat(symbolic_buffer, claripy.BVV(b&#x27;\\n&#x27;)))\n\n通过 CFG 可以找到 AssertionError 的 block 地址为0x4010c0：\n\n\n然后用 SimulationManager 控制程序朝 AssertionError 开始探索：\n1234567891011121314151617181920212223&gt;&gt;&gt; simgr = project.factory.simulation_manager(entry_state)&gt;&gt;&gt; simgr.explore(find=0x4010c0)WARNING  | 2024-03-11 17:27:02,034 | angr.storage.memory_mixins.default_filler_mixin | The program is accessing memory with an unspecified value. This could indicate unwanted behavior.WARNING  | 2024-03-11 17:27:03,808 | angr.storage.memory_mixins.default_filler_mixin | angr will cope with this by generating an unconstrained symbolic variable and continuing. You can resolve this by:WARNING  | 2024-03-11 17:27:03,808 | angr.storage.memory_mixins.default_filler_mixin | 1) setting a value to the initial stateWARNING  | 2024-03-11 17:27:03,808 | angr.storage.memory_mixins.default_filler_mixin | 2) adding the state option ZERO_FILL_UNCONSTRAINED_&#123;MEMORY,REGISTERS&#125;, to make unknown regions hold nullWARNING  | 2024-03-11 17:27:03,808 | angr.storage.memory_mixins.default_filler_mixin | 3) adding the state option SYMBOL_FILL_UNCONSTRAINED_&#123;MEMORY,REGISTERS&#125;, to suppress these messages.WARNING  | 2024-03-11 17:27:03,994 | angr.storage.memory_mixins.default_filler_mixin | Filling memory at 0x7fffffffffeff70 with 1 unconstrained bytes referenced from 0x500010 (strlen+0x0 in extern-address space (0x10))&lt;SimulationManager with 829 active, 20 deadended, 1 found&gt;&gt;&gt;&gt;&gt;&gt;&gt; simgr.found[&lt;SimState @ 0x4010c0&gt;]&gt;&gt;&gt; found_state = simgr.found[0]&gt;&gt;&gt; found_state&lt;SimState @ 0x4010c0&gt;&gt;&gt;&gt; found_state.solver.eval(symbolic_buffer, cast_to=bytes)b&#x27;256\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x80\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00@ \\x08\\x08\\x00\\x02\\x00 \\x00\\x00\\x80\\x00\\x00\\x00@\\x00\\x01 \\x02\\x10\\x00\\x01 \\x10\\x00@\\x04\\x80\\x80\\x01\\x80\\x01@\\x02\\x08\\x08\\x04\\x80\\x01@\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00&#x27;&gt;&gt;&gt; len(found_state.solver.eval(symbolic_buffer, cast_to=bytes))99&gt;&gt;&gt; found_state.solver.constraints[&lt;Bool !(input_3_792[791:784] == 10)&gt;, &lt;Bool !(input_3_792[783:776] == 10)&gt;, &lt;Bool !(input_3_792[775:768] == 10)&gt;, &lt;Bool !(input_3_792[767:760] == 10)&gt;, &lt;Bool !(input_3_792[759:752] == 10)&gt;, &lt;Bool !(input_3_792[751:744] == 10)&gt;, &lt;Bool !(input_3_792[743:736] == 10)&gt;, &lt;Bool !(input_3_792[735:728] == 10)&gt;, &lt;Bool !(input_3_792[727:720] == 10)&gt;, &lt;Bool !(input_3_792[719:712] == 10)&gt;, &lt;Bool !(input_3_792[711:704] == 10)&gt;, &lt;Bool !(input_3_792[703:696] == 10)&gt;, &lt;Bool !……\n\n可以看到虽然很慢，但是 Angr 成功地算出了一个可以触发 AssertionError 的输入。计算结果保存在 SimulationManager 的found属性中，每个结果是一个 SimState 实例，通过 SimState 的solver属性可以查看可行解与约束条件。\n五、同类工具\n\n\n特性 \\ 工具\nAngr\nBAP\nTriton\nBinary Ninja\nGhidra\n\n\n\n发布年份\n2015\n2011\n2015\n2016\n2019\n\n\n开发语言\nPython\nOCaml (接口: C&#x2F;Python)\nC++ (接口: Python)\nC++\nJava\n\n\n模块化\n✅\n✅\n❌\n✅\n✅\n\n\n插件系统\n✅\n✅\n❌\n✅\n✅\n\n\n符号执行\n✅\n✅\n✅\n❌\n✅\n\n\n污点分析\n✅\n部分支持\n✅\n✅\n✅\n\n\n动静态分析\n均支持\n主要是静态分析\n主要是动态分析\n主要静态分析\n均支持\n\n\n形式化验证\n有限支持\n✅\n❌\n❌\n通过插件\n\n\n中间表示\nVEX IR\nMicrocode\nTriton IR\nLLIL&#x2F;MLIL&#x2F;HLIL\nP-Code\n\n\n社区活跃度\n高\n中\n低\n高\n高\n\n\n专长领域\n全栈式分析\n可扩展性与形式化验证\n动态分析与污点追踪\n逆向工程\n逆向工程\n\n\n跨平台支持\n广泛\n广泛\n有限\n广泛\n广泛\n\n\n学习曲线\n中等\n较高\n中等\n中等\n中等\n\n\n应用场景\nCTF&#x2F; 漏洞研究 &#x2F; 二进制加固\n安全研究 &#x2F; 形式化验证\n精确污点追踪 &#x2F; 变量跟踪\n逆向工程\n逆向工程\n\n\n开源\n✅\n部分开源\n✅\n社区版开源\n✅\n\n\n六、参考资料\nangr 原理与实践（一）——原理\nangr 官方文档\nangr 系列教程(一）核心概念及模块解读\nAngr 初学笔记\nBinary 自动分析的那些事\n","dateCreated":"2024-01-23T13:45:08+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-01-23T13:45:08+08:00","description":"Angr 是一款二进制分析和符号执行工具，常用于 CTF 和安全测试领域","headline":"符号执行工具——Angr 零基础入门","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/","keywords":"符号执行, Angr"}</script>
+    <meta name="description" content="Angr 是一款二进制分析和符号执行工具，常用于 CTF 和安全测试领域">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="符号执行工具——Angr 零基础入门">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="Angr 是一款二进制分析和符号执行工具，常用于 CTF 和安全测试领域">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/Angr%E6%A0%B8%E5%BF%83%E7%BB%84%E4%BB%B6.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/Angr%E8%BF%90%E4%BD%9C%E6%B5%81%E7%A8%8B.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/%E6%89%A7%E8%A1%8Cblock.png">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/AssertError%E8%8A%82%E7%82%B9.png">
+<meta property="article:published_time" content="2024-01-23T05:45:08.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.233Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="符号执行">
+<meta property="article:tag" content="Angr">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/Angr%E6%A0%B8%E5%BF%83%E7%BB%84%E4%BB%B6.png">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            符号执行工具——Angr 零基础入门
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-01-23T13:45:08+08:00">
+	
+		    2024 年 1 月 23 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C/">符号执行</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="一、Angr 简介"><a href="# 一、Angr 简介" class="headerlink" title="一、Angr 简介"></a>一、Angr 简介</h2><p>Angr 是一个由 Python 语言编写的开源二进制分析框架，它主要用于静态分析、符号执行、逆向工程等安全研究领域。Angr 支持多种操作系统和硬件架构，包括 Windows、Linux、macOS 以及 x86、ARM 等。</p>
+<h2 id="二、Angr 整体架构"><a href="# 二、Angr 整体架构" class="headerlink" title="二、Angr 整体架构"></a>二、Angr 整体架构</h2><h3 id="1、核心组件"><a href="#1、核心组件" class="headerlink" title="1、核心组件"></a>1、核心组件</h3><p>Angr 是一个复杂的二进制分析框架，其初始的整体架构设计如下图：</p>
+<img src="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/Angr%E6%A0%B8%E5%BF%83%E7%BB%84%E4%BB%B6.png" class title="Angr 架构设计 ">
+
+<p>Angr 的核心组件自下而上依次为：</p>
+<ol>
+<li><p>CLE：加载可执行文件和库文件</p>
+</li>
+<li><p>archinfo：获取架构信息</p>
+</li>
+<li><p>PyVEX：将指令转换成 VEX 这种中间语言（IR）</p>
+</li>
+<li><p>SimuVEX：模拟执行引擎，负责在虚拟环境中执行 VEX</p>
+</li>
+<li><p>Claripy：用于创建和管理符号变量及条件约束，传递给 Z3 求解器进行求解</p>
+</li>
+<li><p>Angr：将各个组件集成起来，提供一套整体的二进制分析和符号执行框架</p>
+</li>
+<li><p>analysis：提供一套分析工具，通过 CFG、DDG 等对程序进行分析</p>
+</li>
+<li><p>surveyors：用于记录和跟踪程序的可执行路径</p>
+</li>
+</ol>
+<p>随着 Angr 的发展，部分组件有更新和迭代：</p>
+<ul>
+<li><p>SimuVEX 被移除，其组件已集成到 Angr 中</p>
+</li>
+<li><p>surveyors 被移除，被 SimulationManager 所取代</p>
+</li>
+</ul>
+<h3 id="2、运作流程"><a href="#2、运作流程" class="headerlink" title="2、运作流程"></a>2、运作流程</h3><p>Angr 的整体运作流程如图：</p>
+<img src="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/Angr%E8%BF%90%E4%BD%9C%E6%B5%81%E7%A8%8B.png" class title="Angr 运作流程 ">
+
+<p>使用 Angr 进行二进制分析时，各组件的运行步骤为：</p>
+<ol>
+<li><p>CLE 加载二进制，获取机器指令</p>
+</li>
+<li><p>Archinfo 分析二进制的架构类型</p>
+</li>
+<li><p>PyVEX 根据架构类型，将机器指令转换为 VEX 中间表达</p>
+</li>
+<li><p>SimEngine 基于 VEX 来模拟程序执行</p>
+</li>
+<li><p>Clarify 创建和管理执行过程中的符号变量和约束条件，转化为 SMT 表达式，传递给 Z3 求解</p>
+</li>
+<li><p>SimOS（SimProcedures） 模拟程序与系统的交互，如标准 io 流、文件读写、系统调用等操作</p>
+</li>
+</ol>
+<h2 id="三、Angr 使用说明"><a href="# 三、Angr 使用说明" class="headerlink" title="三、Angr 使用说明"></a>三、Angr 使用说明</h2><h3 id="1- 安装"><a href="#1- 安装" class="headerlink" title="1. 安装"></a>1. 安装</h3><p>Angr 需要 python 3.8 以上的运行环境，需要先装 3.8 版本以上的 python。</p>
+<p>安装 Angr 有两种推荐方式：</p>
+<ul>
+<li><p>pip 安装</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pip install Angr</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>源码安装</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git clone https://github.com/Angr/Angr-dev.git</span><br><span class="line">cd Angr-dev</span><br><span class="line">./setup.sh -i -e Angr</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h3 id="2- 运行"><a href="#2- 运行" class="headerlink" title="2. 运行"></a>2. 运行 </h3><p> 建议在虚拟环境中运行 Angr。源码安装的方式可以自动创建名为 Angr 的虚拟环境。手动创建虚拟环境的命令为：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python3 -m venv Angr</span><br></pre></td></tr></table></figure>
+
+<p>启动虚拟环境：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">source Angr/bin/active</span><br></pre></td></tr></table></figure>
+
+<h3 id="3- 使用"><a href="#3- 使用" class="headerlink" title="3. 使用"></a>3. 使用</h3><p>Angr 作为 python 的三方库，通过 import 进行调用：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> Angr</span><br></pre></td></tr></table></figure>
+
+<p>Angr 的顶层 API 围绕着 Angr 的核心组件来设计，包含一组常用的 Python 类和对象，它们提供了二进制分析、符号执行和其他功能。</p>
+<p>以下是 Angr 的一些常用 API 组件：</p>
+<ol>
+<li><p><strong>Project（项目）</strong>：</p>
+<ul>
+<li><code>Project</code>是 Angr 的中心组件，它代表了用户所要处理的二进制文件。</li>
+<li>创建一个 <code>Project</code> 实例是使用 Angr 进行分析的第一步，<code>Project</code>对象提供了对二进制文件的操作和分析的接口。</li>
+</ul>
+</li>
+<li><p><strong>Factory（工厂）</strong>：</p>
+<ul>
+<li><code>Factory</code>对象通过 <code>Project</code> 的<code>factory</code>属性来访问，它提供了快速访问 Angr 的各种分析技术的接口，避免复杂的实例化操作。</li>
+</ul>
+</li>
+<li><p><strong>SimState（模拟状态）</strong>：</p>
+<ul>
+<li><code>SimState</code>代表程序的一个瞬时状态，它包含寄存器、内存、堆栈、文件系统等运行时的上下文环境状态，可用于执行符号执行和具体执行。</li>
+<li><code>SimState</code>对象通过 <code>Project</code> 的<code>factory</code>属性的方法来访问，这些方法包括 <code>entry_state</code>、<code>blank_state</code>、<code>full_init_state</code> 等。</li>
+</ul>
+</li>
+<li><p><strong>SimulationManager（模拟管理器）</strong>：</p>
+<ul>
+<li><code>SimulationManager</code>用来跟踪程序执行过程中的路径探索和 <code>SimState</code> 演化，并对这些路径和 <code>SimState</code> 进行管理。</li>
+<li><code>SimulationManager</code>对象通过 <code>Project</code> 的<code>factory</code>属性的 <code>simulation_manager</code> 方法实例化。</li>
+</ul>
+</li>
+<li><p><strong>Loader（加载器）</strong>：</p>
+<ul>
+<li><code>Loader</code>负责将二进制文件载入内存，并处理符号以及它们的地址空间，为后续分析提供详细信息，如入口点、可执行段、符号表等。</li>
+<li><code>Loader</code>对象通过 <code>Project</code> 的<code>loader</code>属性的方法来访问。</li>
+</ul>
+</li>
+<li><p><strong>Block（块）</strong>：</p>
+<ul>
+<li><code>Block</code>表示程序基本块，是 Angr 分析的基本单位。每个 <code>Block</code> 是一组顺序执行代码片段，具有原子性，以分支或跳转结尾。</li>
+<li><code>Block</code>对象通过 <code>Project</code> 的<code>factory</code>属性的 <code>block</code> 方法实例化。</li>
+</ul>
+</li>
+</ol>
+<h2 id="四、Angr 实践应用"><a href="# 四、Angr 实践应用" class="headerlink" title="四、Angr 实践应用"></a>四、Angr 实践应用</h2><p>example.c 源码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdint.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;assert.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> MAX_LEN 100</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">calculate</span><span class="params">(<span class="type">int</span> number)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">return</span> number * number;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">char</span> input[MAX_LEN];</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Enter the string: &quot;</span>);</span><br><span class="line">    fgets(input, MAX_LEN, <span class="built_in">stdin</span>);</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> len = <span class="built_in">strlen</span>(input);</span><br><span class="line">    <span class="type">int</span> num = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i = <span class="number">0</span>; i &lt; len; i++) &#123;</span><br><span class="line">        <span class="keyword">if</span>(input[i] &gt;= <span class="string">&#x27;0&#x27;</span> &amp;&amp; input[i] &lt;= <span class="string">&#x27;9&#x27;</span>)&#123;</span><br><span class="line">            num = num * <span class="number">10</span> + (input[i] - <span class="string">&#x27;0&#x27;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> res = calculate(num);</span><br><span class="line">    assert(res != <span class="number">65536</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>将 example.c 编译为 example_binary ：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcc example.c -o example_binary</span><br></pre></td></tr></table></figure>
+
+<p>以 example_binary 为例，演示 Angr 用法。</p>
+<h3 id="1- 静态程序分析"><a href="#1- 静态程序分析" class="headerlink" title="1. 静态程序分析"></a>1. 静态程序分析 </h3><p> 首先用 Angr 定位程序入口：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="keyword">import</span> angr</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>project = angr.Project(<span class="string">&#x27;example_binary&#x27;</span>, load_options=&#123;<span class="string">&#x27;auto_load_libs&#x27;</span>: <span class="literal">False</span>&#125;)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>project.filename</span><br><span class="line"><span class="string">&#x27;example_binary&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>project.arch</span><br><span class="line">&lt;Arch AMD64 (LE)&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>project.entry</span><br><span class="line"><span class="number">4198624</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>bb = project.factory.block(<span class="number">4198624</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>bb.instructions</span><br><span class="line"><span class="number">12</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">hex</span>(bb.addr)</span><br><span class="line"><span class="string">&#x27;0x4010e0&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>这个 <code>0x4010e0</code> 地址对应的是程序的入口 block ，包括 12 条指令，在 CFG 中表示为如下节点，可以看到 block 的名字并不是 main，而是 _start ：</p>
+<img src="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/%E6%89%A7%E8%A1%8Cblock.png" class>
+
+<p>接着从 _start 开始执行，执行一次后到达 ___libc_start_main ，然而再执行一次后并没有到达 main ：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>st_0 = project.factory.entry_state()</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">hex</span>(st_0.addr)</span><br><span class="line"><span class="string">&#x27;0x4010e0&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>nx  = st_0.step()</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>nx.successors</span><br><span class="line">[&lt;SimState @ <span class="number">0x500000</span>&gt;]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>st_1 = nx.successors[<span class="number">0</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">hex</span>(st_1.addr)</span><br><span class="line"><span class="string">&#x27;0x500000&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>nx = st_1.step()</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>nx.successors</span><br><span class="line">[&lt;SimState @ <span class="number">0x4012e0</span>&gt;]</span><br></pre></td></tr></table></figure>
+
+<p>为了获取 main 这个 block 的状态，可以使用 <code>SimulationManager</code> 来执行：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>simgr = project.factory.simulation_manager(st_0)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>main_obj = project.loader.main_object.get_symbol(<span class="string">&#x27;main&#x27;</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">hex</span>(main_obj.rebased_addr)</span><br><span class="line"><span class="string">&#x27;0x4011dc&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>simgr.explore(find=main_obj.rebased_addr)</span><br><span class="line">&lt;SimulationManager <span class="keyword">with</span> <span class="number">1</span> found&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>simgr.found</span><br><span class="line">[&lt;SimState @ <span class="number">0x4011dc</span>&gt;]</span><br></pre></td></tr></table></figure>
+
+
+
+<h3 id="2- 静态符号执行"><a href="#2- 静态符号执行" class="headerlink" title="2. 静态符号执行"></a>2. 静态符号执行</h3><p>example_binary 接受一个最长为 100 位的字符串作为输入，提取字符串中的数字，转换成数值，然后进行平方运算，结果等于 65536 时出现断言错误。反推回来，当输入字符串中包含 2、5、6 这三个数字时，就能导致<code>AssertionError</code>。</p>
+<p>要让程序自动找到触发 example_binary 中 <code>AssertionError</code> 的 input，可以用 Angr 符号执行来求解。</p>
+<p>首先引入<code>claripy</code>，创建符号变量：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="keyword">import</span> claripy</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>input_size = <span class="number">100</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>symbolic_buffer = claripy.BVS(<span class="string">&#x27;input&#x27;</span>, <span class="number">8</span> * (input_size - <span class="number">1</span>))</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>entry_state = project.factory.entry_state(stdin=claripy.Concat(symbolic_buffer, claripy.BVV(<span class="string">b&#x27;\n&#x27;</span>)))</span><br></pre></td></tr></table></figure>
+
+<p>通过 CFG 可以找到 <code>AssertionError</code> 的 block 地址为<code>0x4010c0</code>：</p>
+<img src="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/AssertError%E8%8A%82%E7%82%B9.png" class>
+
+<p>然后用 <code>SimulationManager</code> 控制程序朝 <code>AssertionError</code> 开始探索：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>simgr = project.factory.simulation_manager(entry_state)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>simgr.explore(find=<span class="number">0x4010c0</span>)</span><br><span class="line">WARNING  | <span class="number">2024</span>-03-<span class="number">11</span> <span class="number">17</span>:<span class="number">27</span>:02,034 | angr.storage.memory_mixins.default_filler_mixin | The program <span class="keyword">is</span> accessing memory <span class="keyword">with</span> an unspecified value. This could indicate unwanted behavior.</span><br><span class="line">WARNING  | <span class="number">2024</span>-03-<span class="number">11</span> <span class="number">17</span>:<span class="number">27</span>:03,<span class="number">808</span> | angr.storage.memory_mixins.default_filler_mixin | angr will cope <span class="keyword">with</span> this by generating an unconstrained symbolic variable <span class="keyword">and</span> continuing. You can resolve this by:</span><br><span class="line">WARNING  | <span class="number">2024</span>-03-<span class="number">11</span> <span class="number">17</span>:<span class="number">27</span>:03,<span class="number">808</span> | angr.storage.memory_mixins.default_filler_mixin | <span class="number">1</span>) setting a value to the initial state</span><br><span class="line">WARNING  | <span class="number">2024</span>-03-<span class="number">11</span> <span class="number">17</span>:<span class="number">27</span>:03,<span class="number">808</span> | angr.storage.memory_mixins.default_filler_mixin | <span class="number">2</span>) adding the state option ZERO_FILL_UNCONSTRAINED_&#123;MEMORY,REGISTERS&#125;, to make unknown regions hold null</span><br><span class="line">WARNING  | <span class="number">2024</span>-03-<span class="number">11</span> <span class="number">17</span>:<span class="number">27</span>:03,<span class="number">808</span> | angr.storage.memory_mixins.default_filler_mixin | <span class="number">3</span>) adding the state option SYMBOL_FILL_UNCONSTRAINED_&#123;MEMORY,REGISTERS&#125;, to suppress these messages.</span><br><span class="line">WARNING  | <span class="number">2024</span>-03-<span class="number">11</span> <span class="number">17</span>:<span class="number">27</span>:03,<span class="number">994</span> | angr.storage.memory_mixins.default_filler_mixin | Filling memory at <span class="number">0x7fffffffffeff70</span> <span class="keyword">with</span> <span class="number">1</span> unconstrained <span class="built_in">bytes</span> referenced <span class="keyword">from</span> <span class="number">0x500010</span> (strlen+<span class="number">0x0</span> <span class="keyword">in</span> extern-address space (<span class="number">0x10</span>))</span><br><span class="line"></span><br><span class="line">&lt;SimulationManager <span class="keyword">with</span> <span class="number">829</span> active, <span class="number">20</span> deadended, <span class="number">1</span> found&gt;</span><br><span class="line">&gt;&gt;&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>simgr.found</span><br><span class="line">[&lt;SimState @ <span class="number">0x4010c0</span>&gt;]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>found_state = simgr.found[<span class="number">0</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>found_state</span><br><span class="line">&lt;SimState @ <span class="number">0x4010c0</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>found_state.solver.<span class="built_in">eval</span>(symbolic_buffer, cast_to=<span class="built_in">bytes</span>)</span><br><span class="line"><span class="string">b&#x27;256\x00\x00\x00\x01\x00\x00\x00\x80\x01\x00\x00\x00\x00\x00\x00\x00\x00@ \x08\x08\x00\x02\x00 \x00\x00\x80\x00\x00\x00@\x00\x01 \x02\x10\x00\x01 \x10\x00@\x04\x80\x80\x01\x80\x01@\x02\x08\x08\x04\x80\x01@\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">len</span>(found_state.solver.<span class="built_in">eval</span>(symbolic_buffer, cast_to=<span class="built_in">bytes</span>))</span><br><span class="line"><span class="number">99</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>found_state.solver.constraints</span><br><span class="line">[&lt;Bool !(input_3_792[<span class="number">791</span>:<span class="number">784</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">783</span>:<span class="number">776</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">775</span>:<span class="number">768</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">767</span>:<span class="number">760</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">759</span>:<span class="number">752</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">751</span>:<span class="number">744</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">743</span>:<span class="number">736</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">735</span>:<span class="number">728</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">727</span>:<span class="number">720</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">719</span>:<span class="number">712</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">711</span>:<span class="number">704</span>] == <span class="number">10</span>)&gt;, &lt;Bool !(input_3_792[<span class="number">703</span>:<span class="number">696</span>] == <span class="number">10</span>)&gt;, &lt;Bool !</span><br><span class="line">……</span><br></pre></td></tr></table></figure>
+
+<p>可以看到虽然很慢，但是 Angr 成功地算出了一个可以触发 <code>AssertionError</code> 的输入。计算结果保存在 <code>SimulationManager</code> 的<code>found</code>属性中，每个结果是一个 <code>SimState</code> 实例，通过 <code>SimState</code> 的<code>solver</code>属性可以查看可行解与约束条件。</p>
+<h2 id="五、同类工具"><a href="# 五、同类工具" class="headerlink" title="五、同类工具"></a>五、同类工具</h2><table>
+<thead>
+<tr>
+<th>特性 \ 工具</th>
+<th>Angr</th>
+<th>BAP</th>
+<th>Triton</th>
+<th>Binary Ninja</th>
+<th>Ghidra</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>发布年份</td>
+<td>2015</td>
+<td>2011</td>
+<td>2015</td>
+<td>2016</td>
+<td>2019</td>
+</tr>
+<tr>
+<td>开发语言</td>
+<td>Python</td>
+<td>OCaml (接口: C&#x2F;Python)</td>
+<td>C++ (接口: Python)</td>
+<td>C++</td>
+<td>Java</td>
+</tr>
+<tr>
+<td>模块化</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>插件系统</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>符号执行</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>污点分析</td>
+<td>✅</td>
+<td>部分支持</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>动静态分析</td>
+<td>均支持</td>
+<td>主要是静态分析</td>
+<td>主要是动态分析</td>
+<td>主要静态分析</td>
+<td>均支持</td>
+</tr>
+<tr>
+<td>形式化验证</td>
+<td>有限支持</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>通过插件</td>
+</tr>
+<tr>
+<td>中间表示</td>
+<td>VEX IR</td>
+<td>Microcode</td>
+<td>Triton IR</td>
+<td>LLIL&#x2F;MLIL&#x2F;HLIL</td>
+<td>P-Code</td>
+</tr>
+<tr>
+<td>社区活跃度</td>
+<td>高</td>
+<td>中</td>
+<td>低</td>
+<td>高</td>
+<td>高</td>
+</tr>
+<tr>
+<td>专长领域</td>
+<td>全栈式分析</td>
+<td>可扩展性与形式化验证</td>
+<td>动态分析与污点追踪</td>
+<td>逆向工程</td>
+<td>逆向工程</td>
+</tr>
+<tr>
+<td>跨平台支持</td>
+<td>广泛</td>
+<td>广泛</td>
+<td>有限</td>
+<td>广泛</td>
+<td>广泛</td>
+</tr>
+<tr>
+<td>学习曲线</td>
+<td>中等</td>
+<td>较高</td>
+<td>中等</td>
+<td>中等</td>
+<td>中等</td>
+</tr>
+<tr>
+<td>应用场景</td>
+<td>CTF&#x2F; 漏洞研究 &#x2F; 二进制加固</td>
+<td>安全研究 &#x2F; 形式化验证</td>
+<td>精确污点追踪 &#x2F; 变量跟踪</td>
+<td>逆向工程</td>
+<td>逆向工程</td>
+</tr>
+<tr>
+<td>开源</td>
+<td>✅</td>
+<td>部分开源</td>
+<td>✅</td>
+<td>社区版开源</td>
+<td>✅</td>
+</tr>
+</tbody></table>
+<h2 id="六、参考资料"><a href="# 六、参考资料" class="headerlink" title="六、参考资料"></a>六、参考资料</h2><ol>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.cnblogs.com/welkinchan/p/16483119.html">angr 原理与实践（一）——原理</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://docs.angr.io/en/latest/">angr 官方文档</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://xz.aliyun.com/t/7117?time__1311=n4+xnD0GDtKYqAKAx05+bDyiDu7DgiiegjjYD&alichlgref=https://www.google.com/">angr 系列教程(一）核心概念及模块解读</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://www.kn0sky.com/?p=0e2f9462-df20-4705-83c2-4ff36b5b0c40#angr-%E5%88%9D%E5%AD%A6%E7%AC%94%E8%AE%B0">Angr 初学笔记</a></li>
+<li><a target="_blank" rel="external nofollow noopener noreferrer" href="https://hitcon.org/2016/CMT/slide/day1-r1-a-1.pdf">Binary 自动分析的那些事</a></li>
+</ol>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/Angr/" rel="tag">Angr</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C/" rel="tag">符号执行</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Symbion%E5%88%9D%E6%8E%A2/" data-tooltip="交替符号执行工具——Symbion 初探" aria-label="上一篇: 交替符号执行工具——Symbion 初探">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C%E4%B8%8E%E6%B7%B7%E5%90%88%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/" data-tooltip="符号执行与混合模糊测试" aria-label="下一篇: 符号执行与混合模糊测试">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Symbion%E5%88%9D%E6%8E%A2/" data-tooltip="交替符号执行工具——Symbion 初探" aria-label="上一篇: 交替符号执行工具——Symbion 初探">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2023/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C%E4%B8%8E%E6%B7%B7%E5%90%88%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/" data-tooltip="符号执行与混合模糊测试" aria-label="下一篇: 符号执行与混合模糊测试">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/Angr零基础入门/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>

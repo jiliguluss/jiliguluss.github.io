@@ -1,0 +1,517 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>污点分析工具——libdft64 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\nlibdft64 简介libdft64 一款基于 Intel Pin 开发的动态污点分析工具。\n1. 污点分析  污点分析（Taint Analysis）是一种跟踪并分析污点信息（通常指程序接受的外部输入）在程序中流动的技术。污点分析过程通常包括三个步骤：\n\n识别并标记污点源（Source）\n跟踪污点在程序中的传播（propagation）\n在关键的程序点（Sink）检测是否受到污点的影响\n\n动态污点分析（Dynamic Taint Analysis, DTA）是一种用于确定在程序运行时，运行环境中哪些寄存器和内存区域，可以由外部输入来进行控制的技术。\n动态污点分析与静态污点分析的主要区别在于，静态污点分析是模拟程序运行，而动态污点分析需要实际运行程序。动态污点分析的优缺点为：\n\n优点：误报率较低，检测结果的可信度较高。\n缺点：\n漏报率较高：由程序动态运行时的代码覆盖率决定\n平台相关性较高：特定的动态污点分析工具只能够解决在特定平台上运行的程序\n资源消耗大：包括空间复杂度和时间复杂度\n\n\n\n2. Intel PinIntel Pin 是一个动态二进制插桩（Dynamic Binary Instrumentation, DBI）框架，由英特尔公司开发。它允许用户在程序运行时（即不需要源代码）对程序的二进制代码进行插桩和分析。\nIntel Pin 提供了丰富的 API 库，供开发者编写和构建自己的 Pintool，用来完成特定的分析任务。\nlibdft64 安装和使用1. 安装和构建libdft64 是一款开源工具，它依赖于 Intel Pin。使用时需要下载源码，安装依赖，执行构建：\n12345git clone https://github.com/AngoraFuzzer/libdft64.gitcd libdft64PREFIX=~/pin ./install_pin.shexport PIN_ROOT=~/pin/pin-3.20-98437-gf02b61307-gcc-linuxmake\n\n2. 示例解析(1) 使用演示libdft64 给出的示例用法如下：\n12cd toolsmake test_mini\n执行结果为：\n\n\n(2) 源码解读 libdft64 测试对象的源码为mini_test.cpp。在main 函数中，调用一些自定义的函数(__libdft_set_taint, __libdft_get_taint, __libdft_getval_taint)，来进行污点数据的设置和获取操作。\n1234567891011121314151617181920212223242526272829303132333435363738394041int main(int argc, char **argv) &#123;  if (argc &lt; 2)    return 0;  FILE *fp;  char buf[255];  size_t ret;  fp = fopen(argv[1], &quot;rb&quot;);  if (!fp) &#123;    printf(&quot;st err\\n&quot;);    return 0;  &#125;  int len = 20;  // dfsan_read_label(&amp;(len), sizeof *buf);  ret = fread(buf, sizeof *buf, len, fp);  fclose(fp);  // printf(&quot;len is :%d\\n&quot;, len);  if (ret &lt; len) &#123;    // printf(&quot;input fail \\n&quot;);    return 0;  &#125;  uint64_t m = 0;  __libdft_set_taint(&amp;m, 8);  __libdft_get_taint(&amp;m);  __libdft_getval_taint(m);  uint16_t x = 0;  __libdft_get_taint(&amp;x);  memcpy(&amp;x, buf + 5, 2); // x 1 - 2  __libdft_get_taint(&amp;x);  __libdft_getval_taint(x);  uint64_t y = x + 2;  __libdft_getval_taint(y);  return 0;&#125;\n\n使用 libdft64 进行污点追踪的代码为 track.cpp。通过 Intel Pin 的 API 函数RTN_FindByName 来定位 mini_test.cpp 中的函数 (__libdft_set_taint, __libdft_get_taint, __libdft_getval_taint)，并通过 Intel Pin 的 API 函数RTN_InsertCall 来对这些定位到的函数进行插桩。当运行到目标函数时，会调用相应的 handler 函数 (TestSetHandler, TestGetHandler, TestGetValHandler) 执行额外操作。\n123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475VOID TestGetHandler(void *p) &#123;  uint64_t v = *((uint64_t *)p);  tag_t t = tagmap_getn((ADDRINT)p, 8);  printf(&quot;[PIN][GET] addr: %p, v: %lu, lb: %d, taint: %s\\n&quot;, p, v, t,         tag_sprint(t).c_str());&#125;VOID TestGetValHandler(THREADID tid, uint64_t v) &#123;  tag_t t = tagmap_getn_reg(tid, X64_ARG0_REG, 8);  printf(&quot;[PIN][GETVAL] v: %lu, lb: %d, taint: %s\\n&quot;, v, t,         tag_sprint(t).c_str());&#125;VOID TestSetHandler(void *p, unsigned int v) &#123;  tag_t t = tag_alloc&lt;tag_t&gt;(v);  tagmap_setb((ADDRINT)p, t);  printf(&quot;[PIN][SET] addr: %p, lb: %d, taint: %d\\n&quot;, p, t, v);&#125;VOID EntryPoint(VOID *v) &#123;  for (IMG img = APP_ImgHead(); IMG_Valid(img); img = IMG_Next(img)) &#123;    RTN test_get_rtn = RTN_FindByName(img, &quot;__libdft_get_taint&quot;);    if (RTN_Valid(test_get_rtn)) &#123;      RTN_Open(test_get_rtn);      RTN_InsertCall(test_get_rtn, IPOINT_BEFORE, (AFUNPTR)TestGetHandler,                     IARG_FUNCARG_ENTRYPOINT_VALUE, 0, IARG_END);      RTN_Close(test_get_rtn);    &#125;    RTN test_set_rtn = RTN_FindByName(img, &quot;__libdft_set_taint&quot;);    if (RTN_Valid(test_set_rtn)) &#123;      RTN_Open(test_set_rtn);      RTN_InsertCall(test_set_rtn, IPOINT_BEFORE, (AFUNPTR)TestSetHandler,                     IARG_FUNCARG_ENTRYPOINT_VALUE, 0,                     IARG_FUNCARG_ENTRYPOINT_VALUE, 1, IARG_END);      RTN_Close(test_set_rtn);    &#125;    RTN test_getval_rtn = RTN_FindByName(img, &quot;__libdft_getval_taint&quot;);    if (RTN_Valid(test_getval_rtn)) &#123;      RTN_Open(test_getval_rtn);      RTN_InsertCall(test_getval_rtn, IPOINT_BEFORE, (AFUNPTR)TestGetValHandler,                     IARG_THREAD_ID, IARG_FUNCARG_ENTRYPOINT_VALUE, 0,                     IARG_END);      RTN_Close(test_getval_rtn);    &#125;  &#125;&#125;int main(int argc, char *argv[]) &#123;  PIN_InitSymbols();  if (unlikely(PIN_Init(argc, argv))) &#123;    std::cerr        &lt;&lt; &quot;Sth error in PIN_Init. Plz use the right command line options.&quot;        &lt;&lt; std::endl;    return -1;  &#125;  if (unlikely(libdft_init() != 0)) &#123;    std::cerr &lt;&lt; &quot;Sth error libdft_init.&quot; &lt;&lt; std::endl;    return -1;  &#125;  PIN_AddApplicationStartFunction(EntryPoint, 0);  hook_file_syscall();  PIN_StartProgram();  return 0;&#125;\n\n根据 Intel Pin 的 API 手册，RTN_InsertCall 原型为：\n123456789101112VOID RTN_InsertCall (    RTN \trtn,    IPOINT \taction,    AFUNPTR \tfunptr,    ... )Parameters    rtn: 需要插桩的目标函数    action: IPOINT_BEFORE 表示在目前函数执行之前插入, IPOINT_AFTER 表示在目标函数执行之后返回之前插入    funptr: 需要调用的 handler 函数    ...: 传递给 funptr 的可变参数\n\n根据官方示例，不难发现，使用 libdft64 的主要步骤为：定位目标函数 -&gt; 对目标函数进行插桩 -&gt; 在插桩的 handler 函数中实现分析需求。","dateCreated":"2024-05-17T14:35:03+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-05-17T14:35:03+08:00","description":"libdft64 是一种数据流追踪工具，可以实现高效并且透明的动态污点分析（DTA），通常用来检测二进制中的安全漏洞","headline":"污点分析工具——libdft64","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/","keywords":"IntelPin, 污点分析"}</script>
+    <meta name="description" content="libdft64 是一种数据流追踪工具，可以实现高效并且透明的动态污点分析（DTA），通常用来检测二进制中的安全漏洞">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="污点分析工具——libdft64">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="libdft64 是一种数据流追踪工具，可以实现高效并且透明的动态污点分析（DTA），通常用来检测二进制中的安全漏洞">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/test_mini%E8%BF%90%E8%A1%8C%E7%BB%93%E6%9E%9C.png">
+<meta property="article:published_time" content="2024-05-17T06:35:03.000Z">
+<meta property="article:modified_time" content="2024-12-11T01:12:23.715Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="IntelPin">
+<meta property="article:tag" content="污点分析">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/test_mini%E8%BF%90%E8%A1%8C%E7%BB%93%E6%9E%9C.png">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            污点分析工具——libdft64
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2024-05-17T14:35:03+08:00">
+	
+		    2024 年 5 月 17 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90/">污点分析</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<h2 id="libdft64 简介"><a href="#libdft64 简介" class="headerlink" title="libdft64 简介"></a>libdft64 简介</h2><p>libdft64 一款基于 Intel Pin 开发的动态污点分析工具。</p>
+<h3 id="1- 污点分析"><a href="#1- 污点分析" class="headerlink" title="1. 污点分析"></a>1. 污点分析 </h3><p> 污点分析（Taint Analysis）是一种跟踪并分析污点信息（通常指程序接受的外部输入）在程序中流动的技术。污点分析过程通常包括三个步骤：</p>
+<ol>
+<li>识别并标记污点源（Source）</li>
+<li>跟踪污点在程序中的传播（propagation）</li>
+<li>在关键的程序点（Sink）检测是否受到污点的影响</li>
+</ol>
+<p>动态污点分析（Dynamic Taint Analysis, DTA）是一种用于确定在程序运行时，运行环境中哪些寄存器和内存区域，可以由外部输入来进行控制的技术。</p>
+<p>动态污点分析与静态污点分析的主要区别在于，静态污点分析是模拟程序运行，而动态污点分析需要实际运行程序。动态污点分析的优缺点为：</p>
+<ul>
+<li>优点：误报率较低，检测结果的可信度较高。</li>
+<li>缺点：<ul>
+<li>漏报率较高：由程序动态运行时的代码覆盖率决定</li>
+<li>平台相关性较高：特定的动态污点分析工具只能够解决在特定平台上运行的程序</li>
+<li>资源消耗大：包括空间复杂度和时间复杂度</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-Intel-Pin"><a href="#2-Intel-Pin" class="headerlink" title="2. Intel Pin"></a>2. Intel Pin</h3><p>Intel Pin 是一个动态二进制插桩（Dynamic Binary Instrumentation, DBI）框架，由英特尔公司开发。它允许用户在程序运行时（即不需要源代码）对程序的二进制代码进行插桩和分析。</p>
+<p>Intel Pin 提供了丰富的 API 库，供开发者编写和构建自己的 Pintool，用来完成特定的分析任务。</p>
+<h2 id="libdft64 安装和使用"><a href="#libdft64 安装和使用" class="headerlink" title="libdft64 安装和使用"></a>libdft64 安装和使用</h2><h3 id="1- 安装和构建"><a href="#1- 安装和构建" class="headerlink" title="1. 安装和构建"></a>1. 安装和构建</h3><p>libdft64 是一款开源工具，它依赖于 Intel Pin。使用时需要下载源码，安装依赖，执行构建：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">git <span class="built_in">clone</span> https://github.com/AngoraFuzzer/libdft64.git</span><br><span class="line"><span class="built_in">cd</span> libdft64</span><br><span class="line">PREFIX=~/pin ./install_pin.sh</span><br><span class="line"><span class="built_in">export</span> PIN_ROOT=~/pin/pin-3.20-98437-gf02b61307-gcc-linux</span><br><span class="line">make</span><br></pre></td></tr></table></figure>
+
+<h3 id="2- 示例解析"><a href="#2- 示例解析" class="headerlink" title="2. 示例解析"></a>2. 示例解析</h3><h4 id="1- 使用演示"><a href="#1- 使用演示" class="headerlink" title="(1) 使用演示"></a>(1) 使用演示</h4><p>libdft64 给出的示例用法如下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> tools</span><br><span class="line">make test_mini</span><br></pre></td></tr></table></figure>
+<p>执行结果为：</p>
+<img src="/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/test_mini%E8%BF%90%E8%A1%8C%E7%BB%93%E6%9E%9C.png" class title="test_mini 运行结果 ">
+
+<h4 id="2- 源码解读"><a href="#2- 源码解读" class="headerlink" title="(2) 源码解读"></a>(2) 源码解读 </h4><p>libdft64 测试对象的源码为<code>mini_test.cpp</code>。在<code>main</code> 函数中，调用一些自定义的函数(<code>__libdft_set_taint</code>, <code>__libdft_get_taint</code>, <code>__libdft_getval_taint</code>)，来进行污点数据的设置和获取操作。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> **argv)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (argc &lt; <span class="number">2</span>)</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">  FILE *fp;</span><br><span class="line">  <span class="type">char</span> buf[<span class="number">255</span>];</span><br><span class="line">  <span class="type">size_t</span> ret;</span><br><span class="line"></span><br><span class="line">  fp = <span class="built_in">fopen</span>(argv[<span class="number">1</span>], <span class="string">&quot;rb&quot;</span>);</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (!fp) &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;st err\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">int</span> len = <span class="number">20</span>;</span><br><span class="line">  <span class="comment">// dfsan_read_label(&amp;(len), sizeof *buf);</span></span><br><span class="line">  ret = <span class="built_in">fread</span>(buf, <span class="keyword">sizeof</span> *buf, len, fp);</span><br><span class="line"></span><br><span class="line">  <span class="built_in">fclose</span>(fp);</span><br><span class="line">  <span class="comment">// printf(&quot;len is :%d\n&quot;, len);</span></span><br><span class="line">  <span class="keyword">if</span> (ret &lt; len) &#123;</span><br><span class="line">    <span class="comment">// printf(&quot;input fail \n&quot;);</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="type">uint64_t</span> m = <span class="number">0</span>;</span><br><span class="line">  __libdft_set_taint(&amp;m, <span class="number">8</span>);</span><br><span class="line">  __libdft_get_taint(&amp;m);</span><br><span class="line">  __libdft_getval_taint(m);</span><br><span class="line"></span><br><span class="line">  <span class="type">uint16_t</span> x = <span class="number">0</span>;</span><br><span class="line">  __libdft_get_taint(&amp;x);</span><br><span class="line">  <span class="built_in">memcpy</span>(&amp;x, buf + <span class="number">5</span>, <span class="number">2</span>); <span class="comment">// x 1 - 2</span></span><br><span class="line">  __libdft_get_taint(&amp;x);</span><br><span class="line">  __libdft_getval_taint(x);</span><br><span class="line"></span><br><span class="line">  <span class="type">uint64_t</span> y = x + <span class="number">2</span>;</span><br><span class="line">  __libdft_getval_taint(y);</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>使用 libdft64 进行污点追踪的代码为 <code>track.cpp</code>。通过 Intel Pin 的 API 函数<code>RTN_FindByName</code> 来定位 <code>mini_test.cpp</code> 中的函数 (<code>__libdft_set_taint</code>, <code>__libdft_get_taint</code>, <code>__libdft_getval_taint</code>)，并通过 Intel Pin 的 API 函数<code>RTN_InsertCall</code> 来对这些定位到的函数进行插桩。当运行到目标函数时，会调用相应的 handler 函数 (<code>TestSetHandler</code>, <code>TestGetHandler</code>, <code>TestGetValHandler</code>) 执行额外操作。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">VOID <span class="title">TestGetHandler</span><span class="params">(<span class="type">void</span> *p)</span> </span>&#123;</span><br><span class="line">  <span class="type">uint64_t</span> v = *((<span class="type">uint64_t</span> *)p);</span><br><span class="line">  <span class="type">tag_t</span> t = <span class="built_in">tagmap_getn</span>((ADDRINT)p, <span class="number">8</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;[PIN][GET] addr: %p, v: %lu, lb: %d, taint: %s\n&quot;</span>, p, v, t,</span><br><span class="line">         <span class="built_in">tag_sprint</span>(t).<span class="built_in">c_str</span>());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">VOID <span class="title">TestGetValHandler</span><span class="params">(THREADID tid, <span class="type">uint64_t</span> v)</span> </span>&#123;</span><br><span class="line">  <span class="type">tag_t</span> t = <span class="built_in">tagmap_getn_reg</span>(tid, X64_ARG0_REG, <span class="number">8</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;[PIN][GETVAL] v: %lu, lb: %d, taint: %s\n&quot;</span>, v, t,</span><br><span class="line">         <span class="built_in">tag_sprint</span>(t).<span class="built_in">c_str</span>());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">VOID <span class="title">TestSetHandler</span><span class="params">(<span class="type">void</span> *p, <span class="type">unsigned</span> <span class="type">int</span> v)</span> </span>&#123;</span><br><span class="line">  <span class="type">tag_t</span> t = <span class="built_in">tag_alloc</span>&lt;<span class="type">tag_t</span>&gt;(v);</span><br><span class="line">  <span class="built_in">tagmap_setb</span>((ADDRINT)p, t);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;[PIN][SET] addr: %p, lb: %d, taint: %d\n&quot;</span>, p, t, v);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">VOID <span class="title">EntryPoint</span><span class="params">(VOID *v)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (IMG img = <span class="built_in">APP_ImgHead</span>(); <span class="built_in">IMG_Valid</span>(img); img = <span class="built_in">IMG_Next</span>(img)) &#123;</span><br><span class="line">    RTN test_get_rtn = <span class="built_in">RTN_FindByName</span>(img, <span class="string">&quot;__libdft_get_taint&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">RTN_Valid</span>(test_get_rtn)) &#123;</span><br><span class="line">      <span class="built_in">RTN_Open</span>(test_get_rtn);</span><br><span class="line">      <span class="built_in">RTN_InsertCall</span>(test_get_rtn, IPOINT_BEFORE, (AFUNPTR)TestGetHandler,</span><br><span class="line">                     IARG_FUNCARG_ENTRYPOINT_VALUE, <span class="number">0</span>, IARG_END);</span><br><span class="line">      <span class="built_in">RTN_Close</span>(test_get_rtn);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    RTN test_set_rtn = <span class="built_in">RTN_FindByName</span>(img, <span class="string">&quot;__libdft_set_taint&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">RTN_Valid</span>(test_set_rtn)) &#123;</span><br><span class="line">      <span class="built_in">RTN_Open</span>(test_set_rtn);</span><br><span class="line">      <span class="built_in">RTN_InsertCall</span>(test_set_rtn, IPOINT_BEFORE, (AFUNPTR)TestSetHandler,</span><br><span class="line">                     IARG_FUNCARG_ENTRYPOINT_VALUE, <span class="number">0</span>,</span><br><span class="line">                     IARG_FUNCARG_ENTRYPOINT_VALUE, <span class="number">1</span>, IARG_END);</span><br><span class="line">      <span class="built_in">RTN_Close</span>(test_set_rtn);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    RTN test_getval_rtn = <span class="built_in">RTN_FindByName</span>(img, <span class="string">&quot;__libdft_getval_taint&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">RTN_Valid</span>(test_getval_rtn)) &#123;</span><br><span class="line">      <span class="built_in">RTN_Open</span>(test_getval_rtn);</span><br><span class="line"></span><br><span class="line">      <span class="built_in">RTN_InsertCall</span>(test_getval_rtn, IPOINT_BEFORE, (AFUNPTR)TestGetValHandler,</span><br><span class="line">                     IARG_THREAD_ID, IARG_FUNCARG_ENTRYPOINT_VALUE, <span class="number">0</span>,</span><br><span class="line">                     IARG_END);</span><br><span class="line">      <span class="built_in">RTN_Close</span>(test_getval_rtn);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">PIN_InitSymbols</span>();</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (<span class="built_in">unlikely</span>(<span class="built_in">PIN_Init</span>(argc, argv))) &#123;</span><br><span class="line">    std::cerr</span><br><span class="line">        &lt;&lt; <span class="string">&quot;Sth error in PIN_Init. Plz use the right command line options.&quot;</span></span><br><span class="line">        &lt;&lt; std::endl;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (<span class="built_in">unlikely</span>(<span class="built_in">libdft_init</span>() != <span class="number">0</span>)) &#123;</span><br><span class="line">    std::cerr &lt;&lt; <span class="string">&quot;Sth error libdft_init.&quot;</span> &lt;&lt; std::endl;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="built_in">PIN_AddApplicationStartFunction</span>(EntryPoint, <span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">  <span class="built_in">hook_file_syscall</span>();</span><br><span class="line"></span><br><span class="line">  <span class="built_in">PIN_StartProgram</span>();</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>根据 Intel Pin 的 <a target="_blank" rel="external nofollow noopener noreferrer" href="https://software.intel.com/sites/landingpage/pintool/docs/98547/Pin/html/group__API__REF.html">API 手册</a>，<code>RTN_InsertCall</code> 原型为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">VOID RTN_InsertCall (</span><br><span class="line">    RTN 	rtn,</span><br><span class="line">    IPOINT 	action,</span><br><span class="line">    AFUNPTR 	funptr,</span><br><span class="line">    ... </span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">Parameters</span><br><span class="line">    rtn: 需要插桩的目标函数</span><br><span class="line">    action: IPOINT_BEFORE 表示在目前函数执行之前插入, IPOINT_AFTER 表示在目标函数执行之后返回之前插入</span><br><span class="line">    funptr: 需要调用的 handler 函数</span><br><span class="line">    ...: 传递给 funptr 的可变参数</span><br></pre></td></tr></table></figure>
+
+<p>根据官方示例，不难发现，使用 libdft64 的主要步骤为：定位目标函数 -&gt; 对目标函数进行插桩 -&gt; 在插桩的 handler 函数中实现分析需求。</p>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/IntelPin/" rel="tag">IntelPin</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90/" rel="tag">污点分析</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Python%E8%BF%9B%E9%98%B6%E2%80%94%E2%80%94%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" data-tooltip="Python 进阶——并发编程" aria-label="上一篇: Python 进阶——并发编程">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/" data-tooltip="Hexo 捣鼓札记" aria-label="下一篇: Hexo 捣鼓札记">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Python%E8%BF%9B%E9%98%B6%E2%80%94%E2%80%94%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" data-tooltip="Python 进阶——并发编程" aria-label="上一篇: Python 进阶——并发编程">
+                    
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/" data-tooltip="Hexo 捣鼓札记" aria-label="下一篇: Hexo 捣鼓札记">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2024/污点分析工具——libdft64/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>
