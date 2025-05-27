@@ -1,0 +1,677 @@
+
+<!DOCTYPE html>
+<html lang="zh-cn">
+    
+<head>
+    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="generator" content="千里之行，始于足下">
+    <title>进程间通信机制 - 千里之行，始于足下</title>
+    <meta name="author" content="一瓢清浅">
+    
+        <meta name="keywords" content="python,AI,安全,算法,编程,">
+    
+    
+    
+    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n在操作系统中，进程是分配资源的最小单位，不同的进程各有其独占的资源。如果要在不同进程之间共享资源，需要利用进程间通信（IPC）机制。常见的 IPC 机制包括：\n\n匿名管道（PIPE）\n命名管道（FIFO）\n共享内存（Shared Memory）\n套接字（Socket）\n消息队列（Message Queue）\n\n下文将针对每种方式介绍其原理与使用方法，并给出相应的代码示例。\n一、匿名管道（PIPE）匿名管道（PIPE）由内核在内存中分配一个有限大小的环形缓冲区（通常为 64KB）。创建管道后，内核返回两个文件描述符：读端（fds[0]）和写端（fds[1]）。\nPIPE 具有以下特点：\n\n半双工：同一时刻只能一个方向传输数据。\n阻塞 &#x2F; 非阻塞：默认读端在缓冲区为空时阻塞；写端在缓冲区满时阻塞。可通过设置 O_NONBLOCK 改为非阻塞。\n局部可见：只能用于有亲缘关系的父子进程或者兄弟进程。\n生命周期：PIPE 在创建进程退出后关闭。\n\nPIPE 的使用方法：\n\n创建：调用pipe(int fds[2])。\n分支：通过fork()，子进程继承文件描述符。\n重定向：使用 dup2() 将fds[0]重定向为标准输入或将 fds[1] 重定向为标准输出。\n读写：父进程或一个子进程写，另一个子进程读；或反之。\n关闭：使用完毕后关闭不需要的端close()，否则可能导致阻塞或死锁。\n\nPIPE 示例：\n\nC 端（父进程）\n1234567891011121314151617181920212223242526#include &lt;unistd.h&gt;#include &lt;stdio.h&gt;#include &lt;stdlib.h&gt;#include &lt;string.h&gt;#include &lt;sys/wait.h&gt;int main() &#123;    int fds[2];    if (pipe(fds) == -1) &#123; perror(&quot;pipe&quot;); exit(1); &#125;    pid_t pid = fork();    if (pid == 0) &#123;        // 子进程：关闭写端，将读端映射到 stdin        close(fds[1]);        dup2(fds[0], STDIN_FILENO);        execlp(&quot;python3&quot;, &quot;python3&quot;, &quot;child.py&quot;, NULL);        perror(&quot;execlp&quot;);         exit(1);    &#125; else &#123;        // 父进程：关闭读端，写入数据        close(fds[0]);        const char *msg = &quot;Hello from C via pipe\\n&quot;;        write(fds[1], msg, strlen(msg));        close(fds[1]);        wait(NULL);    &#125;    return 0;&#125;\n\nPython 端（child.py）\n123import sysfor line in sys.stdin:    print(f&quot;Python child got: &#123;line.strip()&#125;&quot;)\n\n二、命名管道（FIFO）命名管道（FIFO, First In First Out）是内核在文件系统下创建的一个特殊文件节点。它与匿名管道类似，但通过路径使任意进程可打开。\nFIFO 具有以下特点：\n\n半双工：默认单向传输，双向通信需要使用两个 FIFO。\n阻塞：若无写端打开，则读端阻塞；若无读端打开，则写端阻塞。\n全局可见：FIFO 通过文件名访问，可以被多个读写进程打开，进程之间无需亲缘关系。\n生命周期：FIFO 在创建后将存在于文件系统中，直到显式调用 unlink() 或os.remove()删除。\n\nFIFO 的使用方法：\n\n创建：在 C 中使用mkfifo(const char *path, mode_t mode)，在 Python 中使用os.mkfifo(path)。\n打开：读端用open(path, O_RDONLY)，写端用open(path, O_WRONLY)。\n读写：在 C 中读写用 read()/write()，在 Python 中open() 后读写。\n关闭 &#x2F; 删除：close()后可使用 unlink()/os.remove() 删除。\n\nFIFO 示例：\n\nPython 端（写入）\n1234567891011import os, timefifo = &#x27;/tmp/myfifo&#x27;if not os.path.exists(fifo):     os.mkfifo(fifo)with open(fifo, &#x27;w&#x27;) as f:    for i in range(5):        msg = f&quot;Python-&gt;C message &#123;i&#125;\\n&quot;        f.write(msg);        f.flush()        print(f&quot;Sent: &#123;msg.strip()&#125;&quot;)        time.sleep(1)\n\nC 端（读取）\n1234567891011121314151617#include &lt;stdio.h&gt;#include &lt;fcntl.h&gt;#include &lt;unistd.h&gt;int main() &#123;    const char *fifo = &quot;/tmp/myfifo&quot;;    if (access(fifo, F_OK) == -1) return 1;    int fd = open(fifo, O_RDONLY);    char buf[128];    while (1) &#123;        ssize_t n = read(fd, buf, sizeof(buf)-1);        if (n &lt;= 0) break;        buf[n] = &#x27;\\0&#x27;;        printf(&quot;Received: %s&quot;, buf);    &#125;    close(fd);    return 0;&#125;\n\n三、共享内存（Shared Memory）共享内存（Shared Memory）允许多个进程将同一物理页映射到它们的虚拟地址空间，实现零拷贝数据交换。\nShared Memory 具有以下特点：\n\n全双工：任意进程可同时读写共享内存，无方向限制。\n高性能：不涉及内核空间与用户空间拷贝，适合大数据量传输。\n同步要求高：不提供同步机制，必须配合信号量（Semaphore）、互斥锁（Mutex）等原语使用。\n生命周期：共享内存在调用 shm_unlink() 前一直存在，适合较长生命周期的数据共享。\n一致性机制：现代多核系统依赖缓存一致性协议（如 MESI）确保不同 CPU 核心上可见的共享内存视图一致。\n\nShared Memory 的使用方法：\n\n创建：在 C 中使用shm_open(name, flags, mode)，在 Python 中使用SharedMemory(name, create, size)。\n设置大小：在 C 中使用ftruncate()， 在 Python 中设置 size 参数。\n映射：在 C 中使用mmap()，在 Python 中通过 buf 访问。\n删除：在 C 中使用 munmap() 解出映射，并使用 shm_unlink() 删除。\n\nShared Memory 示例：\n\nPython 端（写入）\n1234567891011121314151617181920212223242526272829303132import posix_ipcimport mmapimport time# 1. 创建共享内存和信号量shm = posix_ipc.SharedMemory(&quot;/test&quot;, flags=posix_ipc.O_CREAT, size=128)mem_map = mmap.mmap(shm.fd, shm.size)sem_write = posix_ipc.Semaphore(&quot;/sem_write&quot;, flags=posix_ipc.O_CREAT, initial_value=1)sem_read  = posix_ipc.Semaphore(&quot;/sem_read&quot;,  flags=posix_ipc.O_CREAT, initial_value=0)# 2. 写入共享内存for k in range(5):    sem_write.acquire()  # 获取写锁    mem_map.seek(0)    mem_map.write(f&quot;Hello from Python &#123;k&#125;\\0&quot;.encode())    mem_map.flush()    sem_read.release()  # 释放读锁    time.sleep(1)# 3. 发送退出信号sem_write.acquire()mem_map.seek(0)mem_map.write(b&quot;EXIT\\0&quot;)mem_map.flush()sem_read.release() # 4. 清理资源mem_map.close()shm.close_fd()shm.unlink()sem_write.unlink()sem_read.unlink()\n\nC 端（读取）\n1234567891011121314151617181920212223242526272829303132333435363738394041424344454647484950515253545556575859606162#include &lt;fcntl.h&gt;#include &lt;sys/mman.h&gt;#include &lt;semaphore.h&gt;#include &lt;stdio.h&gt;#include &lt;unistd.h&gt;#include &lt;string.h&gt;#include &lt;stdlib.h&gt;#define SHM_NAME   &quot;/test&quot;#define SEM_W_NAME &quot;/sem_write&quot;#define SEM_R_NAME &quot;/sem_read&quot;#define BUF_SIZE   256int main() &#123;    // 1. 打开信号量和共享内存    sem_t *sem_write = sem_open(SEM_W_NAME, 0);    sem_t *sem_read  = sem_open(SEM_R_NAME, 0);    if (sem_write==SEM_FAILED || sem_read==SEM_FAILED) &#123;        perror(&quot;sem_open&quot;);        return 1;    &#125;    int fd = shm_open(SHM_NAME, O_RDONLY, 0);    if (fd == -1) &#123;        perror(&quot;shm_open&quot;);        return 1;    &#125;    void *addr = mmap(NULL, BUF_SIZE, PROT_READ, MAP_SHARED, fd, 0);    if (addr == MAP_FAILED) &#123;        perror(&quot;mmap&quot;);        return 1;    &#125;    char buffer[BUF_SIZE];    while (1) &#123;        // 2. 等待写端写好        sem_wait(sem_read);        // 3. 读取内容        memcpy(buffer, addr, BUF_SIZE-1);        buffer[BUF_SIZE-1] = &#x27;\\0&#x27;;        // 4. 检查退出标志        if (strcmp(buffer, &quot;EXIT&quot;) == 0) &#123;            printf(&quot;[C] 收到退出信号，结束读取。\\n&quot;);            break;        &#125;        // 5. 打印并允许写端写下一条        printf(&quot;Read: %s\\n&quot;, buffer);        sem_post(sem_write);    &#125;    // 6. 清理（写端负责 unlink，此处无需再 unlink）    munmap(addr, BUF_SIZE);    close(fd);    sem_close(sem_write);    sem_close(sem_read);    return 0;&#125;\n\n四、套接字（Socket）套接字（Socket）是操作系统提供的网络接口，支持多协议族（如 AF_UNIX、AF_INET），可实现全双工字节流或数据报交换。\nSocket 具有以下特点：\n\n全双工：同一套接字描述符可以同时发送和接收数据，读写操作互不干扰。\n阻塞 &#x2F; 非阻塞：套接字默认阻塞，可通过设置 O_NONBLOCK 改为非阻塞。\n跨主机：网络模式支持跨主机通信。\n多路复用：与 select()、poll()、epoll() 结合使用，在单个线程或进程中监控多个套接字的可读、可写或异常事件，高效处理并发连接。\n生命周期：套接字从调用 socket() 创建开始，到调用 close() 关闭结束。\n\nSocket 的使用方法：\n\n创建：socket(domain, type, protocol)\n绑定 &#x2F; 监听 &#x2F; 接受（服务器）：bind()、listen()、accept()\n连接（客户端）：connect()\n读写：send()/recv()或read()/write()\n关闭：close()\n\nSocket 示例：\n\nPython 端（写入）\n12345678910111213import socketSOCKET_PATH = &quot;/tmp/ipc_socket&quot;try:    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:        client.connect(SOCKET_PATH)        client.sendall(b&quot;Hello from Python via UNIX socket&quot;)        print(&quot;Python sent data&quot;)except FileNotFoundError:    print(&quot;Error: Server socket not found. Is the server running?&quot;)except Exception as e:    print(f&quot;Unexpected error: &#123;e&#125;&quot;)\n\nC 端（读取）\n123456789101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960#include &lt;sys/socket.h&gt;#include &lt;sys/un.h&gt;#include &lt;unistd.h&gt;#include &lt;stdio.h&gt;#include &lt;stdlib.h&gt;#include &lt;string.h&gt;#define SOCKET_PATH &quot;/tmp/ipc_socket&quot;#define BACKLOG 5#define BUFFER_SIZE 128void die(const char *msg) &#123;    perror(msg);    exit(EXIT_FAILURE);&#125;int main() &#123;    int sock, conn;    struct sockaddr_un addr;    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)        die(&quot;socket&quot;);    unlink(SOCKET_PATH);  // 删除已有的 socket 文件    memset(&amp;addr, 0, sizeof(addr));    addr.sun_family = AF_UNIX;    strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);    addr.sun_path[sizeof(addr.sun_path) - 1] = &#x27;\\0&#x27;;    if (bind(sock, (struct sockaddr*)&amp;addr, sizeof(addr)) == -1) &#123;        close(sock);        die(&quot;bind&quot;);    &#125;    if (listen(sock, BACKLOG) == -1) &#123;        close(sock);        die(&quot;listen&quot;);    &#125;    printf(&quot;Server listening on %s...\\n&quot;, SOCKET_PATH);    if ((conn = accept(sock, NULL, NULL)) == -1) &#123;        close(sock);        die(&quot;accept&quot;);    &#125;    char buf[BUFFER_SIZE];    ssize_t n = recv(conn, buf, sizeof(buf) - 1, 0);    if (n &gt; 0) &#123;        buf[n] = &#x27;\\0&#x27;;        printf(&quot;Server received: %s\\n&quot;, buf);    &#125;    close(conn);    close(sock);    unlink(SOCKET_PATH);    return 0;&#125;\n\n五、消息队列（Message Queue）消息队列（Message Queue）在内核中维护一个有界队列，用于传递具有某种数据结构的消息，而不是简单的字节流，支持异步发送和接收，并可设置阻塞或非阻塞模式。\nMessage Queue 具有以下特点：\n\n全双工：同一消息队列可用于发送和接收，读写互不干扰。\n消息单元：每条消息为一个独立单元，并可设置不同优先级，优先级高的消息先被接收。\n异步收发：发送方和接收方无需同时在线或保持连接，消息在内核队列中排队等待处理。\n阻塞 &#x2F; 超时：默认阻塞等待消息，可通过设置 O_NONBLOCK 实现非阻塞。\n生命周期：在执行 unlink 后取消引用，实际删除发生在所有引用关闭后。\n\nMessage Queue 的使用方法：\n\n创建：在 C 中使用mq_open()，在 Python 中使用posix_ipc.MessageQueue。\n发送 &#x2F; 接受：用 mq_send() 发送，用 mq_receive() 接收。\n删除：使用 mq_close() 关闭，再用 mq_unlink() 清理。\n\nMessage Queue 示例:\n\nPython 端（发送）\n12345678910111213141516171819import posix_ipc# 创建或打开消息队列mq = posix_ipc.MessageQueue(    &#x27;/mq&#x27;,    posix_ipc.O_CREAT,    max_messages=10,    max_message_size=64)# 发送消息for i in range(3):    msg = f&#x27;msg&#123;i&#125;&#x27;.encode()    mq.send(msg)    print(f&quot;Python sent: &#123;msg.decode()&#125;&quot;)# 关闭并删除队列mq.close()mq.unlink()\n\nC 端（接收）\n12345678910111213141516171819202122232425262728293031#include &lt;mqueue.h&gt;#include &lt;stdio.h&gt;int main() &#123;    // 打开消息队列    mqd_t mq = mq_open(&quot;/mq&quot;, O_RDONLY);    if (mq == (mqd_t)-1) &#123;        perror(&quot;mq_open&quot;);        return 1;    &#125;    char buf[64];    unsigned int prio;    // 确定消息数量    struct mq_attr attr;    mq_getattr(mq, &amp;attr);    // 接收消息    for (unsigned int i = 0; i &lt; attr.mq_curmsgs; i++) &#123;        ssize_t n = mq_receive(mq, buf, sizeof(buf), &amp;prio);        if (n &gt;= 0) &#123;            buf[n] = &#x27;\\0&#x27;;            printf(&quot;C received: %s (priority: %u)\\n&quot;, buf, prio);        &#125;    &#125;    // 关闭并删除队列    mq_close(mq);    mq_unlink(&quot;/mq&quot;);    return 0;&#125;\n\n六、IPC 机制对比\n\n\nIPC 机制\n延迟\n吞吐\n同步需求\n跨主机\n典型场景\n\n\n\n匿名管道（PIPE）\n低\n低\n阻塞\n否\n父子进程通信\n\n\n命名管道（FIFO）\n中等\n中等\n阻塞\n否\n脚本管道、日志传输\n\n\n共享内存（Share Memory）\n极低\n极高\n手动同步\n否\n大数据共享、实时处理\n\n\n套接字（Unix）\n中等\n中等\n阻塞 &#x2F; 多路复用\n否\n本地服务、守护进程\n\n\n套接字（TCP）\n较高\n中等\n阻塞 &#x2F; 多路复用\n是\n分布式服务、微服务\n\n\n消息队列（Message Queue）\n中等\n中等\n异步\n否\n异步任务、事件通知\n\n\n说明：\n\n延迟  表示通信响应速度，越低越实时。\n吞吐  衡量单位时间内数据处理能力。\n同步需求  体现是否需要调用方协调读写时机。\n跨主机  说明机制是否支持分布式部署。\n\n建议：\n\n小数据、结构简单：使用 PIPE 或 FIFO。\n大数据、性能要求高：首选共享内存，搭配同步机制。\n本地复杂通信或服务守护：采用 Unix 套接字。\n分布式通信：使用 TCP 套接字，配合多路复用。\n异步事件通知 &#x2F; 解耦逻辑：消息队列更合适。\n","dateCreated":"2025-05-26T14:24:56+08:00","dateModified":"2025-05-27T17:27:40+08:00","datePublished":"2025-05-26T14:24:56+08:00","description":"常见的进程间通信机制","headline":"进程间通信机制","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/","keywords":"IPC"}</script>
+    <meta name="description" content="常见的进程间通信机制">
+<meta property="og:type" content="blog">
+<meta property="og:title" content="进程间通信机制">
+<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/index.html">
+<meta property="og:site_name" content="千里之行，始于足下">
+<meta property="og:description" content="常见的进程间通信机制">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-05-26T06:24:56.000Z">
+<meta property="article:modified_time" content="2025-05-27T09:27:40.505Z">
+<meta property="article:author" content="一瓢清浅">
+<meta property="article:tag" content="IPC">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+    
+    
+        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
+    
+    
+    
+    
+    <!--STYLES-->
+    
+<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
+
+    <!--STYLES END-->
+    
+
+    
+
+    
+        
+            
+<link rel="stylesheet" href="/assets/css/gitalk.css">
+
+        
+    
+</head>
+
+    <body>
+        <div id="blog">
+            <!-- Define author's picture -->
+
+
+<header id="header" data-behavior="5">
+    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
+    <div class="header-title">
+        <a class="header-title-link" href="/" aria-label>
+            千里之行，始于足下
+        </a>
+    </div>
+    
+        
+            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
+        
+        
+            <i class="fa fa-question fa-lg"></i>
+        
+        </a>
+    
+</header>
+
+            <!-- Define author's picture -->
+
+
+
+        
+    
+
+<nav id="sidebar" data-behavior="5">
+    <div class="sidebar-container">
+        
+            <div class="sidebar-profile">
+                <a href="/#about" aria-label="阅读有关作者的更多信息">
+                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+                </a>
+                <h4 class="sidebar-profile-name">一瓢清浅</h4>
+                
+                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</h5>
+                
+            </div>
+        
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
+                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">首页</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
+                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">分类</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
+                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">标签</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
+                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">归档</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+            <ul class="sidebar-buttons">
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
+                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">关于</span>
+                    </a>
+            </li>
+            
+                <li class="sidebar-button">
+                    
+                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
+                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
+                        <span class="sidebar-button-desc">GitHub</span>
+                    </a>
+            </li>
+            
+        </ul>
+        
+    </div>
+</nav>
+
+            
+            <div id="main" data-behavior="5" class="
+                        hasCoverMetaIn
+                        ">
+                
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
+    <style>
+        #post-toc {
+            position: fixed !important;
+            top: 80px;
+            padding: 10px;
+            z-index: 100;
+            background-color: rgba(255,255,255,0);
+            transform: translateX(0);
+            right: 3%;
+            width: 220px;
+            height: auto;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+    </style>
+    <script>
+        var tocWidth = 220; // TOC的固定宽度
+        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
+        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+
+        // 检查窗口宽度并调整TOC显示
+        function adjustToc() {
+            var toc = document.getElementById('post-toc');
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
+            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
+
+            if (contentWrap) {
+                var contentWidth = contentWrap.offsetWidth;
+                // 计算contentWrap的宽度加上TOC的宽度和内边距
+                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
+
+                if (totalWidth >= screenWidth) {
+                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
+                } else {
+                    toc.style.display = 'block'; // 否则，显示TOC
+                }
+            } else {
+                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
+            }
+        }
+
+        // 监听窗口大小变化事件
+        window.addEventListener('resize', adjustToc);
+
+        // 页面加载完毕时调用adjustToc
+        document.addEventListener('DOMContentLoaded', adjustToc);
+    </script>
+    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
+
+                
+<article class="post">
+    
+    
+        <div class="post-header main-content-wrap text-left">
+    
+        <h1 class="post-title">
+            进程间通信机制
+        </h1>
+    
+    
+        <div class="post-meta">
+    <time datetime="2025-05-26T14:24:56+08:00">
+	
+		    2025 年 5 月 26 日
+    	
+    </time>
+    
+        <span>发布在 </span>
+        
+    <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/">开发</a>, <a class="category-link" href="/categories/%E5%BC%80%E5%8F%91/%E7%BC%96%E7%A8%8B%E6%8A%80%E6%9C%AF/">编程技术</a>
+
+
+    
+</div>
+
+    
+</div>
+
+    
+    <div class="post-content markdown">
+        <div class="main-content-wrap">
+            <!--excerpt-->
+
+<p>在操作系统中，进程是分配资源的最小单位，不同的进程各有其独占的资源。如果要在不同进程之间共享资源，需要利用进程间通信（IPC）机制。常见的 IPC 机制包括：</p>
+<ul>
+<li>匿名管道（PIPE）</li>
+<li>命名管道（FIFO）</li>
+<li>共享内存（Shared Memory）</li>
+<li>套接字（Socket）</li>
+<li>消息队列（Message Queue）</li>
+</ul>
+<p>下文将针对每种方式介绍其原理与使用方法，并给出相应的代码示例。</p>
+<h2 id="一、匿名管道（PIPE）"><a href="# 一、匿名管道（PIPE）" class="headerlink" title="一、匿名管道（PIPE）"></a>一、匿名管道（PIPE）</h2><p>匿名管道（PIPE）由内核在内存中分配一个有限大小的环形缓冲区（通常为 64KB）。创建管道后，内核返回两个文件描述符：读端（fds[0]）和写端（fds[1]）。</p>
+<p>PIPE 具有以下特点：</p>
+<ul>
+<li>半双工：同一时刻只能一个方向传输数据。</li>
+<li>阻塞 &#x2F; 非阻塞：默认读端在缓冲区为空时阻塞；写端在缓冲区满时阻塞。可通过设置 <code>O_NONBLOCK</code> 改为非阻塞。</li>
+<li>局部可见：只能用于有亲缘关系的父子进程或者兄弟进程。</li>
+<li>生命周期：PIPE 在创建进程退出后关闭。</li>
+</ul>
+<p>PIPE 的使用方法：</p>
+<ol>
+<li>创建：调用<code>pipe(int fds[2])</code>。</li>
+<li>分支：通过<code>fork()</code>，子进程继承文件描述符。</li>
+<li>重定向：使用 <code>dup2()</code> 将<code>fds[0]</code>重定向为标准输入或将 <code>fds[1]</code> 重定向为标准输出。</li>
+<li>读写：父进程或一个子进程写，另一个子进程读；或反之。</li>
+<li>关闭：使用完毕后关闭不需要的端<code>close()</code>，否则可能导致阻塞或死锁。</li>
+</ol>
+<p>PIPE 示例：</p>
+<ul>
+<li><p>C 端（父进程）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/wait.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">int</span> fds[<span class="number">2</span>];</span><br><span class="line">    <span class="keyword">if</span> (pipe(fds) == <span class="number">-1</span>) &#123; perror(<span class="string">&quot;pipe&quot;</span>); <span class="built_in">exit</span>(<span class="number">1</span>); &#125;</span><br><span class="line">    <span class="type">pid_t</span> pid = fork();</span><br><span class="line">    <span class="keyword">if</span> (pid == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// 子进程：关闭写端，将读端映射到 stdin</span></span><br><span class="line">        close(fds[<span class="number">1</span>]);</span><br><span class="line">        dup2(fds[<span class="number">0</span>], STDIN_FILENO);</span><br><span class="line">        execlp(<span class="string">&quot;python3&quot;</span>, <span class="string">&quot;python3&quot;</span>, <span class="string">&quot;child.py&quot;</span>, <span class="literal">NULL</span>);</span><br><span class="line">        perror(<span class="string">&quot;execlp&quot;</span>); </span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 父进程：关闭读端，写入数据</span></span><br><span class="line">        close(fds[<span class="number">0</span>]);</span><br><span class="line">        <span class="type">const</span> <span class="type">char</span> *msg = <span class="string">&quot;Hello from C via pipe\n&quot;</span>;</span><br><span class="line">        write(fds[<span class="number">1</span>], msg, <span class="built_in">strlen</span>(msg));</span><br><span class="line">        close(fds[<span class="number">1</span>]);</span><br><span class="line">        wait(<span class="literal">NULL</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>Python 端（child.py）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">import sys</span><br><span class="line">for line in sys.stdin:</span><br><span class="line">    print(f&quot;Python child got: &#123;line.strip()&#125;&quot;)</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="二、命名管道（FIFO）"><a href="# 二、命名管道（FIFO）" class="headerlink" title="二、命名管道（FIFO）"></a>二、命名管道（FIFO）</h2><p>命名管道（FIFO, First In First Out）是内核在文件系统下创建的一个特殊文件节点。它与匿名管道类似，但通过路径使任意进程可打开。</p>
+<p>FIFO 具有以下特点：</p>
+<ul>
+<li>半双工：默认单向传输，双向通信需要使用两个 FIFO。</li>
+<li>阻塞：若无写端打开，则读端阻塞；若无读端打开，则写端阻塞。</li>
+<li>全局可见：FIFO 通过文件名访问，可以被多个读写进程打开，进程之间无需亲缘关系。</li>
+<li>生命周期：FIFO 在创建后将存在于文件系统中，直到显式调用 <code>unlink()</code> 或<code>os.remove()</code>删除。</li>
+</ul>
+<p>FIFO 的使用方法：</p>
+<ol>
+<li>创建：在 C 中使用<code>mkfifo(const char *path, mode_t mode)</code>，在 Python 中使用<code>os.mkfifo(path)</code>。</li>
+<li>打开：读端用<code>open(path, O_RDONLY)</code>，写端用<code>open(path, O_WRONLY)</code>。</li>
+<li>读写：在 C 中读写用 <code>read()/write()</code>，在 Python 中<code>open()</code> 后读写。</li>
+<li>关闭 &#x2F; 删除：<code>close()</code>后可使用 <code>unlink()/os.remove()</code> 删除。</li>
+</ol>
+<p>FIFO 示例：</p>
+<ul>
+<li><p>Python 端（写入）</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">import os, time</span><br><span class="line">fifo = &#x27;/tmp/myfifo&#x27;</span><br><span class="line">if not os.path.exists(fifo): </span><br><span class="line">    os.mkfifo(fifo)</span><br><span class="line">with open(fifo, &#x27;w&#x27;) as f:</span><br><span class="line">    for i in range(5):</span><br><span class="line">        msg = f&quot;Python-&gt;C message &#123;i&#125;\n&quot;</span><br><span class="line">        f.write(msg);</span><br><span class="line">        f.flush()</span><br><span class="line">        print(f&quot;Sent: &#123;msg.strip()&#125;&quot;)</span><br><span class="line">        time.sleep(1)</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>C 端（读取）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;fcntl.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">const</span> <span class="type">char</span> *fifo = <span class="string">&quot;/tmp/myfifo&quot;</span>;</span><br><span class="line">    <span class="keyword">if</span> (access(fifo, F_OK) == <span class="number">-1</span>) <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    <span class="type">int</span> fd = open(fifo, O_RDONLY);</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">128</span>];</span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line">        <span class="type">ssize_t</span> n = read(fd, buf, <span class="keyword">sizeof</span>(buf)<span class="number">-1</span>);</span><br><span class="line">        <span class="keyword">if</span> (n &lt;= <span class="number">0</span>) <span class="keyword">break</span>;</span><br><span class="line">        buf[n] = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Received: %s&quot;</span>, buf);</span><br><span class="line">    &#125;</span><br><span class="line">    close(fd);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="三、共享内存（Shared-Memory）"><a href="# 三、共享内存（Shared-Memory）" class="headerlink" title="三、共享内存（Shared Memory）"></a>三、共享内存（Shared Memory）</h2><p>共享内存（Shared Memory）允许多个进程将同一物理页映射到它们的虚拟地址空间，实现零拷贝数据交换。</p>
+<p>Shared Memory 具有以下特点：</p>
+<ul>
+<li>全双工：任意进程可同时读写共享内存，无方向限制。</li>
+<li>高性能：不涉及内核空间与用户空间拷贝，适合大数据量传输。</li>
+<li>同步要求高：不提供同步机制，必须配合信号量（Semaphore）、互斥锁（Mutex）等原语使用。</li>
+<li>生命周期：共享内存在调用 <code>shm_unlink()</code> 前一直存在，适合较长生命周期的数据共享。</li>
+<li>一致性机制：现代多核系统依赖缓存一致性协议（如 MESI）确保不同 CPU 核心上可见的共享内存视图一致。</li>
+</ul>
+<p>Shared Memory 的使用方法：</p>
+<ol>
+<li>创建：在 C 中使用<code>shm_open(name, flags, mode)</code>，在 Python 中使用<code>SharedMemory(name, create, size)</code>。</li>
+<li>设置大小：在 C 中使用<code>ftruncate()</code>， 在 Python 中设置 size 参数。</li>
+<li>映射：在 C 中使用<code>mmap()</code>，在 Python 中通过 buf 访问。</li>
+<li>删除：在 C 中使用 <code>munmap()</code> 解出映射，并使用 <code>shm_unlink()</code> 删除。</li>
+</ol>
+<p>Shared Memory 示例：</p>
+<ul>
+<li><p>Python 端（写入）</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> posix_ipc</span><br><span class="line"><span class="keyword">import</span> mmap</span><br><span class="line"><span class="keyword">import</span> time</span><br><span class="line"></span><br><span class="line"><span class="comment"># 1. 创建共享内存和信号量</span></span><br><span class="line">shm = posix_ipc.SharedMemory(<span class="string">&quot;/test&quot;</span>, flags=posix_ipc.O_CREAT, size=<span class="number">128</span>)</span><br><span class="line">mem_map = mmap.mmap(shm.fd, shm.size)</span><br><span class="line">sem_write = posix_ipc.Semaphore(<span class="string">&quot;/sem_write&quot;</span>, flags=posix_ipc.O_CREAT, initial_value=<span class="number">1</span>)</span><br><span class="line">sem_read  = posix_ipc.Semaphore(<span class="string">&quot;/sem_read&quot;</span>,  flags=posix_ipc.O_CREAT, initial_value=<span class="number">0</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 写入共享内存</span></span><br><span class="line"><span class="keyword">for</span> k <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">5</span>):</span><br><span class="line">    sem_write.acquire()  <span class="comment"># 获取写锁</span></span><br><span class="line">    mem_map.seek(<span class="number">0</span>)</span><br><span class="line">    mem_map.write(<span class="string">f&quot;Hello from Python <span class="subst">&#123;k&#125;</span>\0&quot;</span>.encode())</span><br><span class="line">    mem_map.flush()</span><br><span class="line">    sem_read.release()  <span class="comment"># 释放读锁</span></span><br><span class="line">    time.sleep(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 发送退出信号</span></span><br><span class="line">sem_write.acquire()</span><br><span class="line">mem_map.seek(<span class="number">0</span>)</span><br><span class="line">mem_map.write(<span class="string">b&quot;EXIT\0&quot;</span>)</span><br><span class="line">mem_map.flush()</span><br><span class="line">sem_read.release() </span><br><span class="line"></span><br><span class="line"><span class="comment"># 4. 清理资源</span></span><br><span class="line">mem_map.close()</span><br><span class="line">shm.close_fd()</span><br><span class="line">shm.unlink()</span><br><span class="line">sem_write.unlink()</span><br><span class="line">sem_read.unlink()</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>C 端（读取）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;fcntl.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/mman.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;semaphore.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> SHM_NAME   <span class="string">&quot;/test&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> SEM_W_NAME <span class="string">&quot;/sem_write&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> SEM_R_NAME <span class="string">&quot;/sem_read&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> BUF_SIZE   256</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="comment">// 1. 打开信号量和共享内存</span></span><br><span class="line">    <span class="type">sem_t</span> *sem_write = sem_open(SEM_W_NAME, <span class="number">0</span>);</span><br><span class="line">    <span class="type">sem_t</span> *sem_read  = sem_open(SEM_R_NAME, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (sem_write==SEM_FAILED || sem_read==SEM_FAILED) &#123;</span><br><span class="line">        perror(<span class="string">&quot;sem_open&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> fd = shm_open(SHM_NAME, O_RDONLY, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (fd == <span class="number">-1</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;shm_open&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">void</span> *addr = mmap(<span class="literal">NULL</span>, BUF_SIZE, PROT_READ, MAP_SHARED, fd, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (addr == MAP_FAILED) &#123;</span><br><span class="line">        perror(<span class="string">&quot;mmap&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">char</span> buffer[BUF_SIZE];</span><br><span class="line">    <span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line">        <span class="comment">// 2. 等待写端写好</span></span><br><span class="line">        sem_wait(sem_read);</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 3. 读取内容</span></span><br><span class="line">        <span class="built_in">memcpy</span>(buffer, addr, BUF_SIZE<span class="number">-1</span>);</span><br><span class="line">        buffer[BUF_SIZE<span class="number">-1</span>] = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 4. 检查退出标志</span></span><br><span class="line">        <span class="keyword">if</span> (<span class="built_in">strcmp</span>(buffer, <span class="string">&quot;EXIT&quot;</span>) == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;[C] 收到退出信号，结束读取。\n&quot;</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 5. 打印并允许写端写下一条</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Read: %s\n&quot;</span>, buffer);</span><br><span class="line">        sem_post(sem_write);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 6. 清理（写端负责 unlink，此处无需再 unlink）</span></span><br><span class="line">    munmap(addr, BUF_SIZE);</span><br><span class="line">    close(fd);</span><br><span class="line">    sem_close(sem_write);</span><br><span class="line">    sem_close(sem_read);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="四、套接字（Socket）"><a href="# 四、套接字（Socket）" class="headerlink" title="四、套接字（Socket）"></a>四、套接字（Socket）</h2><p>套接字（Socket）是操作系统提供的网络接口，支持多协议族（如 AF_UNIX、AF_INET），可实现全双工字节流或数据报交换。</p>
+<p>Socket 具有以下特点：</p>
+<ul>
+<li>全双工：同一套接字描述符可以同时发送和接收数据，读写操作互不干扰。</li>
+<li>阻塞 &#x2F; 非阻塞：套接字默认阻塞，可通过设置 <code>O_NONBLOCK</code> 改为非阻塞。</li>
+<li>跨主机：网络模式支持跨主机通信。</li>
+<li>多路复用：与 <code>select()</code>、<code>poll()</code>、<code>epoll()</code> 结合使用，在单个线程或进程中监控多个套接字的可读、可写或异常事件，高效处理并发连接。</li>
+<li>生命周期：套接字从调用 <code>socket()</code> 创建开始，到调用 <code>close()</code> 关闭结束。</li>
+</ul>
+<p>Socket 的使用方法：</p>
+<ol>
+<li>创建：<code>socket(domain, type, protocol)</code></li>
+<li>绑定 &#x2F; 监听 &#x2F; 接受（服务器）：<code>bind()</code>、<code>listen()</code>、<code>accept()</code></li>
+<li>连接（客户端）：<code>connect()</code></li>
+<li>读写：<code>send()/recv()</code>或<code>read()/write()</code></li>
+<li>关闭：<code>close()</code></li>
+</ol>
+<p>Socket 示例：</p>
+<ul>
+<li><p>Python 端（写入）</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> socket</span><br><span class="line"></span><br><span class="line">SOCKET_PATH = <span class="string">&quot;/tmp/ipc_socket&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">try</span>:</span><br><span class="line">    <span class="keyword">with</span> socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) <span class="keyword">as</span> client:</span><br><span class="line">        client.connect(SOCKET_PATH)</span><br><span class="line">        client.sendall(<span class="string">b&quot;Hello from Python via UNIX socket&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;Python sent data&quot;</span>)</span><br><span class="line"><span class="keyword">except</span> FileNotFoundError:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;Error: Server socket not found. Is the server running?&quot;</span>)</span><br><span class="line"><span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">f&quot;Unexpected error: <span class="subst">&#123;e&#125;</span>&quot;</span>)</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>C 端（读取）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/socket.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/un.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> SOCKET_PATH <span class="string">&quot;/tmp/ipc_socket&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> BACKLOG 5</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> BUFFER_SIZE 128</span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">die</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *msg)</span> &#123;</span><br><span class="line">    perror(msg);</span><br><span class="line">    <span class="built_in">exit</span>(EXIT_FAILURE);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">int</span> sock, conn;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_un</span> <span class="title">addr</span>;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> ((sock = socket(AF_UNIX, SOCK_STREAM, <span class="number">0</span>)) == <span class="number">-1</span>)</span><br><span class="line">        die(<span class="string">&quot;socket&quot;</span>);</span><br><span class="line"></span><br><span class="line">    unlink(SOCKET_PATH);  <span class="comment">// 删除已有的 socket 文件</span></span><br><span class="line"></span><br><span class="line">    <span class="built_in">memset</span>(&amp;addr, <span class="number">0</span>, <span class="keyword">sizeof</span>(addr));</span><br><span class="line">    addr.sun_family = AF_UNIX;</span><br><span class="line">    <span class="built_in">strncpy</span>(addr.sun_path, SOCKET_PATH, <span class="keyword">sizeof</span>(addr.sun_path) - <span class="number">1</span>);</span><br><span class="line">    addr.sun_path[<span class="keyword">sizeof</span>(addr.sun_path) - <span class="number">1</span>] = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (bind(sock, (<span class="keyword">struct</span> sockaddr*)&amp;addr, <span class="keyword">sizeof</span>(addr)) == <span class="number">-1</span>) &#123;</span><br><span class="line">        close(sock);</span><br><span class="line">        die(<span class="string">&quot;bind&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (listen(sock, BACKLOG) == <span class="number">-1</span>) &#123;</span><br><span class="line">        close(sock);</span><br><span class="line">        die(<span class="string">&quot;listen&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Server listening on %s...\n&quot;</span>, SOCKET_PATH);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> ((conn = accept(sock, <span class="literal">NULL</span>, <span class="literal">NULL</span>)) == <span class="number">-1</span>) &#123;</span><br><span class="line">        close(sock);</span><br><span class="line">        die(<span class="string">&quot;accept&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">char</span> buf[BUFFER_SIZE];</span><br><span class="line">    <span class="type">ssize_t</span> n = recv(conn, buf, <span class="keyword">sizeof</span>(buf) - <span class="number">1</span>, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (n &gt; <span class="number">0</span>) &#123;</span><br><span class="line">        buf[n] = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Server received: %s\n&quot;</span>, buf);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    close(conn);</span><br><span class="line">    close(sock);</span><br><span class="line">    unlink(SOCKET_PATH);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="五、消息队列（Message-Queue）"><a href="# 五、消息队列（Message-Queue）" class="headerlink" title="五、消息队列（Message Queue）"></a>五、消息队列（Message Queue）</h2><p>消息队列（Message Queue）在内核中维护一个有界队列，用于传递具有某种数据结构的消息，而不是简单的字节流，支持异步发送和接收，并可设置阻塞或非阻塞模式。</p>
+<p>Message Queue 具有以下特点：</p>
+<ul>
+<li>全双工：同一消息队列可用于发送和接收，读写互不干扰。</li>
+<li>消息单元：每条消息为一个独立单元，并可设置不同优先级，优先级高的消息先被接收。</li>
+<li>异步收发：发送方和接收方无需同时在线或保持连接，消息在内核队列中排队等待处理。</li>
+<li>阻塞 &#x2F; 超时：默认阻塞等待消息，可通过设置 <code>O_NONBLOCK</code> 实现非阻塞。</li>
+<li>生命周期：在执行 <code>unlink</code> 后取消引用，实际删除发生在所有引用关闭后。</li>
+</ul>
+<p>Message Queue 的使用方法：</p>
+<ol>
+<li>创建：在 C 中使用<code>mq_open()</code>，在 Python 中使用<code>posix_ipc.MessageQueue</code>。</li>
+<li>发送 &#x2F; 接受：用 <code>mq_send()</code> 发送，用 <code>mq_receive()</code> 接收。</li>
+<li>删除：使用 <code>mq_close()</code> 关闭，再用 <code>mq_unlink()</code> 清理。</li>
+</ol>
+<p>Message Queue 示例:</p>
+<ul>
+<li><p>Python 端（发送）</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> posix_ipc</span><br><span class="line"></span><br><span class="line"><span class="comment"># 创建或打开消息队列</span></span><br><span class="line">mq = posix_ipc.MessageQueue(</span><br><span class="line">    <span class="string">&#x27;/mq&#x27;</span>,</span><br><span class="line">    posix_ipc.O_CREAT,</span><br><span class="line">    max_messages=<span class="number">10</span>,</span><br><span class="line">    max_message_size=<span class="number">64</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 发送消息</span></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">3</span>):</span><br><span class="line">    msg = <span class="string">f&#x27;msg<span class="subst">&#123;i&#125;</span>&#x27;</span>.encode()</span><br><span class="line">    mq.send(msg)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">f&quot;Python sent: <span class="subst">&#123;msg.decode()&#125;</span>&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 关闭并删除队列</span></span><br><span class="line">mq.close()</span><br><span class="line">mq.unlink()</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>C 端（接收）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;mqueue.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="comment">// 打开消息队列</span></span><br><span class="line">    <span class="type">mqd_t</span> mq = mq_open(<span class="string">&quot;/mq&quot;</span>, O_RDONLY);</span><br><span class="line">    <span class="keyword">if</span> (mq == (<span class="type">mqd_t</span>)<span class="number">-1</span>) &#123;</span><br><span class="line">        perror(<span class="string">&quot;mq_open&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">char</span> buf[<span class="number">64</span>];</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> prio;</span><br><span class="line">    <span class="comment">// 确定消息数量</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">mq_attr</span> <span class="title">attr</span>;</span></span><br><span class="line">    mq_getattr(mq, &amp;attr);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 接收消息</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">unsigned</span> <span class="type">int</span> i = <span class="number">0</span>; i &lt; attr.mq_curmsgs; i++) &#123;</span><br><span class="line">        <span class="type">ssize_t</span> n = mq_receive(mq, buf, <span class="keyword">sizeof</span>(buf), &amp;prio);</span><br><span class="line">        <span class="keyword">if</span> (n &gt;= <span class="number">0</span>) &#123;</span><br><span class="line">            buf[n] = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;C received: %s (priority: %u)\n&quot;</span>, buf, prio);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 关闭并删除队列</span></span><br><span class="line">    mq_close(mq);</span><br><span class="line">    mq_unlink(<span class="string">&quot;/mq&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h2 id="六、IPC 机制对比"><a href="# 六、IPC 机制对比" class="headerlink" title="六、IPC 机制对比"></a>六、IPC 机制对比</h2><table>
+<thead>
+<tr>
+<th>IPC 机制</th>
+<th>延迟</th>
+<th>吞吐</th>
+<th>同步需求</th>
+<th>跨主机</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>匿名管道（PIPE）</td>
+<td>低</td>
+<td>低</td>
+<td>阻塞</td>
+<td>否</td>
+<td>父子进程通信</td>
+</tr>
+<tr>
+<td>命名管道（FIFO）</td>
+<td>中等</td>
+<td>中等</td>
+<td>阻塞</td>
+<td>否</td>
+<td>脚本管道、日志传输</td>
+</tr>
+<tr>
+<td>共享内存（Share Memory）</td>
+<td>极低</td>
+<td>极高</td>
+<td>手动同步</td>
+<td>否</td>
+<td>大数据共享、实时处理</td>
+</tr>
+<tr>
+<td>套接字（Unix）</td>
+<td>中等</td>
+<td>中等</td>
+<td>阻塞 &#x2F; 多路复用</td>
+<td>否</td>
+<td>本地服务、守护进程</td>
+</tr>
+<tr>
+<td>套接字（TCP）</td>
+<td>较高</td>
+<td>中等</td>
+<td>阻塞 &#x2F; 多路复用</td>
+<td>是</td>
+<td>分布式服务、微服务</td>
+</tr>
+<tr>
+<td>消息队列（Message Queue）</td>
+<td>中等</td>
+<td>中等</td>
+<td>异步</td>
+<td>否</td>
+<td>异步任务、事件通知</td>
+</tr>
+</tbody></table>
+<p><strong>说明</strong>：</p>
+<ul>
+<li><strong>延迟 </strong> 表示通信响应速度，越低越实时。</li>
+<li><strong>吞吐 </strong> 衡量单位时间内数据处理能力。</li>
+<li><strong>同步需求 </strong> 体现是否需要调用方协调读写时机。</li>
+<li><strong>跨主机 </strong> 说明机制是否支持分布式部署。</li>
+</ul>
+<p><strong>建议</strong>：</p>
+<ul>
+<li><strong>小数据、结构简单</strong>：使用 PIPE 或 FIFO。</li>
+<li><strong>大数据、性能要求高</strong>：首选共享内存，搭配同步机制。</li>
+<li><strong>本地复杂通信或服务守护</strong>：采用 Unix 套接字。</li>
+<li><strong>分布式通信</strong>：使用 TCP 套接字，配合多路复用。</li>
+<li><strong>异步事件通知 &#x2F; 解耦逻辑</strong>：消息队列更合适。</li>
+</ul>
+            
+
+
+            
+        </div>
+    </div>
+    <div id="post-footer" class="post-footer main-content-wrap">
+        
+            <div class="post-footer-tags">
+                <span class="text-color-light text-small">标签</span><br>
+                
+    <a class="tag tag--primary tag--small t-none-link" href="/tags/IPC/" rel="tag">IPC</a>
+
+            </div>
+        
+        
+            <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/" data-tooltip="Web 应用架构" aria-label="下一篇: Web 应用架构">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+        
+        
+            
+                <div id="gitalk"></div>
+
+            
+        
+    </div>
+</article>
+
+
+
+                <footer id="footer" class="main-content-wrap">
+    <span class="copyrights">
+        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
+    </span>
+</footer>
+
+            </div>
+            
+                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
+                    <div class="post-actions-wrap">
+    <nav>
+        <ul class="post-actions post-action-nav">
+            <li class="post-action">
+                
+                    <a class="post-action-btn btn btn--disabled" aria-hidden="true">
+                        
+                        <i class="fa fa-angle-left" aria-hidden="true"></i>
+                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
+                    </a>
+            </li>
+            <li class="post-action">
+                
+                    
+                <a class="post-action-btn btn btn--default tooltip--top" href="/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/" data-tooltip="Web 应用架构" aria-label="下一篇: Web 应用架构">
+                    
+                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                    </a>
+            </li>
+        </ul>
+    </nav>
+    <ul class="post-actions post-action-share">
+        <li class="post-action hide-lg hide-md hide-sm">
+            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Diesen Beitrag teilen">
+                <i class="fa fa-share-alt" aria-hidden="true"></i>
+            </a>
+        </li>
+        
+	
+        <li class="post-action">
+            
+                <a class="post-action-btn btn btn--default" href="#" aria-label="Nach oben">
+            
+                <i class="fa fa-list" aria-hidden="true"></i>
+            </a>
+        </li>
+    </ul>
+</div>
+
+
+                </div>
+                
+
+            
+        </div>
+        
+
+
+    
+        
+    
+
+<div id="about">
+    <div id="about-card">
+        <div id="about-btn-close">
+            <i class="fa fa-times"></i>
+        </div>
+        
+            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
+        
+            <h4 id="about-card-name">一瓢清浅</h4>
+        
+            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
+</div>
+        
+        
+            <div id="about-card-job">
+                <i class="fa fa-briefcase"></i>
+                <br>
+                <p>IT工程师</p>
+
+            </div>
+        
+        
+            <div id="about-card-location">
+                <i class="fa fa-map-marker-alt"></i>
+                <br>
+                中国
+            </div>
+        
+    </div>
+</div>
+
+        
+        
+<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
+        <!--SCRIPTS-->
+
+<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
+
+<!--SCRIPTS END-->
+
+
+    
+        
+<script src="/assets/js/gitalk.js"></script>
+
+        <script type="text/javascript">
+          (function() {
+            new Gitalk({
+              clientID: 'Ov23li8lUWNadcQIsjjS',
+              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+              repo: 'comment',
+              owner: 'jiliguluss',
+              admin: ['jiliguluss'],
+              id: '2025/进程间通信机制/',
+              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
+            }).render('gitalk')
+          })()
+        </script>
+    
+
+
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
+  <script type="text/javascript">
+      tocbot.init({
+        tocSelector: '#post-toc', // 目录容器的 ID 或 class
+        contentSelector: '.post-content', // 内容容器的 ID 或 class
+        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
+        collapseDepth: '3',
+        scrollSmooth: true, 
+        activeClass: 'active', 
+        orderedList: false
+    });
+  </script> 
+
+
+
+  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
+  <script type="text/javascript">
+      $(document).ready(function() {
+          var mermaid_config = {
+              startOnLoad: true,
+              theme: 'default',
+          }
+          mermaid.initialize(mermaid_config);
+      });
+  </script>
+
+
+    </body>
+</html>
