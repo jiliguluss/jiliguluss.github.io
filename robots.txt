@@ -8,5 +8,5 @@ Allow: /20*/
 
 Disallow: /assets/
 
-Sitemap: https://jiliguluss-github-io.vercel.app/sitemap.xml
+Sitemap: https://jiliguluss.github.io/sitemap.xml
 
