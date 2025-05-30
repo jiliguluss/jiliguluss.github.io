@@ -1,264 +1,167 @@
-
-<!DOCTYPE html>
-<html lang="zh-cn">
-    
-<head>
-    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="generator" content="千里之行，始于足下">
-    <title>数据库设计与建模 - 千里之行，始于足下</title>
-    <meta name="author" content="一瓢清浅">
-    
-        <meta name="keywords" content="python,AI,安全,算法,编程,">
-    
-    
-    
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、数据库结构  典型的数据库结构可归纳为“三级模式，两级映射”：\n\n\n（一）三级模式\n外模式：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。\n概念（逻辑）模式：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。\n内模式：是数据物理结构和存储方式的描述，数据在数据库内部的表示方式。对应物理文件，面向系统程序员。\n\n（二）两级映射\n外模式 - 模式映射 ：保证 逻辑独立性，即当逻辑模式发生改变时，应用程序不用修改。\n模式 - 内模式映射 ：保证 物理独立性，即当内模式发生改变时，应用程序不用修改。\n\n两级映射保证了逻辑独立性和物理独立性，逻辑独立比物理独立更难实现。\n二、数据库理论  关系型数据库中的  关系  是指由行列组成的二维表文件，每行表示一条记录，每列表示一个属性。关系模型  是关系的逻辑描述，可以表示为：关系名(属性 1, 属性 2, …, 属性 N)。\n（一）关系运算  关系代数的基本运算主要有交、并、差、笛卡尔积、选择、投影、连接和除法运算。\n交、并、差、笛卡尔积  跟集合论中的运算是一个意思，就是把每张数据表视为行的集合，然后做运算。\n选择  是指从数据表中找出符合条件的行（记录）。\n投影  是指从数据表中抽取指定的列（属性）。\n连接  分为两种：\n\nθ连接：从两个关系的笛卡尔积中选取属性满足一定条件的元组\n自然连接（⊳⊲连接）：两个关系中进行比较的分量必须是相同的属性，并且在结果中将重复的属性去掉\n\n（二）函数依赖  函数依赖（Functional Dependency）是数据库理论中的一个重要概念，用于描述属性之间的关系。在关系数据库中，如果属性集 X 的值能够唯一地决定属性集 Y 的值，我们就说Y 函数依赖于 X，记作 X→Y。\n函数依赖的定义：\n给定一个关系 R，如果对于关系 R 中的任意两个元组 t1 和 t2，若 t1 和 t2 在属性集 X 上的值相同，则它们在属性集 Y 上的值也必须相同，那么我们就说 Y 函数依赖于 X。\n函数依赖的类型：\n\n平凡函数依赖：如果属性集 Y 是属性集 X 的一个子集，则称 X 决定 Y 的依赖关系为平凡依赖。例如 X→X\n非平凡函数依赖：属性 Y 不是属性 X 的子集，则称 X 决定 Y 的依赖关系为非平凡依赖。可以进一步分类：\n完全函数依赖：如果在一个复合属性集 X 中，Y 仅依赖于 X 的全部属性，而不依赖于 X 的任何真子集。\n部分函数依赖：如果 Y 依赖于 X 的某个真子集。\n传递函数依赖：如果 X 函数依赖于 Y，而 Y 又函数依赖于 Z，那么可以说 X 传递函数依赖于 Z。\n\n\n\n简单点说：左右包含是平凡，左右互斥非平凡，若无子集是完全，若有子集是部分，环环相连是传递。\n（三）Armstrong 公理Armstrong 公理是一组用于推导关系数据库中函数依赖的基本规则，通过这些规则，可以推导出任意一组函数依赖的所有隐含依赖。\n\n自反性：若 X⊇Y，则 X→Y。即一个属性集必然决定其子集。\n增广性：若 X→Y，则 XZ→YZ。即如果 X 决定 Y，那么 X 与 Z 的组合也决定 Y 与 Z 的组合。\n传递性：若 X→Y 且 Y→Z，则 X→Z。即如果 X 决定 Y，且 Y 决定 Z，那么 X 也决定 Z。\n合并性：若 X→Y 且 X→Z，则 X→YZ。即如果 X 决定 Y，且 X 也决定 Z，那么 X 决定 YZ。\n分解性：若 X→Y 且 Y⊇Z，则存在 X→Z。即如果 X 决定 Y，而 Z 是 Y 的子集，那么 X 决定 Z。\n\n（四）关系分解  在数据库关系分解中，有两个重要概念：\n1. 无损连接  无损链接指的是将一个关系分解成多个子关系后，通过对这些子关系进行自然连接操作，可以无损地恢复原始关系。换句话说，在连接后得到的结果应该与原始关系完全相同，没有任何信息增加或丢失。\n无损连接分解的  判定方法  为：\n设ρ&#x3D;{R1, R2}是 R 的一个分解，F 是 R 上的函数依赖集。那么分解ρ相对于 F 是无损级联分解的充要条件为 (R1∩R2)→(R1−R2) 或 (R1∩R2)→(R2−R1) 。 注意两个条件只要有任意一个条件成立即可。\n2. 保持依赖  保持依赖指的是在关系分解后，仍然能够通过子关系中的函数依赖来推导出原始关系中的所有函数依赖。换句话说，分解后的子关系应该能够保持原始关系中的所有重要的依赖关系。\n举例来说，假设有一个关系 R(A, B, C)，并且它有函数依赖：A→B 和 B→C。\n\n如果将关系 R 分解为 R1(A, B)和 R2(B, C):\n通过属性 B 连接 R1 和 R2，可以恢复 R，因此是无损分解。\n关系 R1 保留了 A→B，关系 R2 保留了 B→C，因此是保持依赖。\n\n\n如果将关系 R 分解为 R1(A, B)和 R3(A, C):\n通过属性 A 连接 R1 和 R3，可以恢复 R，因此是无损分解。\n关系 R1 保留了 A→B，关系 R3 保留了 A→C，但是 B→C 丢失，因此不是保持依赖。\n\n\n\n（五）设计范式  数据库设计范式是指在设计数据库时遵循的一系列规范和原则，以确保数据的组织、存储和管理高效、合理。数据库主要范式包括：\n1. 第一范式（1NF）每个字段的值都是原子值，不能有重复的列或多值字段。\n不符合 1NF 的表：\n\n\n\n学生 ID\n学生姓名\n课程\n\n\n\n1\n张三\n数学, 物理\n\n\n在这个例子中，“课程”属性是个多值字段。需要重新设计成符合 1NF 的表：\n\n\n\n学生 ID\n学生姓名\n课程\n\n\n\n1\n张三\n数学\n\n\n1\n张三\n物理\n\n\n2. 第二范式（2NF）在满足 1NF 的基础上，要求消除部分依赖，即每个非主键字段必须完全依赖于主键，而不是主键的一部分。\n不符合 2NF 的表：\n\n\n\n学生 ID\n课程\n学生姓名\n\n\n\n1\n数学\n张三\n\n\n1\n物理\n张三\n\n\n2\n语文\n李四\n\n\n在这个例子中，“学生姓名”只依赖于“学生 ID”，而不依赖于“课程”。我们可以分成两个符合 2NF 的表：\n学生表：\n\n\n\n学生 ID\n学生姓名\n\n\n\n1\n张三\n\n\n2\n李四\n\n\n选课表：\n\n\n\n学生 ID\n课程\n\n\n\n1\n数学\n\n\n1\n物理\n\n\n2\n语文\n\n\n3. 第三范式（3NF）在满足 2NF 的基础上，要求消除传递依赖，即非主键字段不能依赖于其他非主键字段。\n不符合 3NF 的表：\n\n\n\n学生 ID\n学生姓名\n班级\n班主任\n\n\n\n1\n张三\n一班\n王老师\n\n\n2\n李四\n一班\n王老师\n\n\n在这个例子中，“班主任”依赖于“班级”，而不是“学生 ID”。可以进一步分成两个符合 3NF 的表：\n学生表：\n\n\n\n学生 ID\n学生姓名\n班级\n\n\n\n1\n张三\n一班\n\n\n2\n李四\n一班\n\n\n班级表：\n\n\n\n班级\n班主任\n\n\n\n一班\n王老师\n\n\n4. 博茨 - 科得范式（BCNF）3NF 的强化版本，要求每个决定因素（函数依赖的左侧）必须是超键，进一步消除所有依赖问题。\n不符合 BCNF 的表：\n\n\n\n学生 ID\n课程\n教师\n\n\n\n1\n数学\n李老师\n\n\n1\n物理\n李老师\n\n\n2\n数学\n张老师\n\n\n在这个例子中，“教师”依赖于“课程”，而“课程”不是超键。可以将其分为两个符合 BCNF 的表：\n课程表：\n\n\n\n课程\n教师\n\n\n\n数学\n李老师\n\n\n物理\n李老师\n\n\n语文\n张老师\n\n\n选课表：\n\n\n\n学生 ID\n课程\n\n\n\n1\n数学\n\n\n1\n物理\n\n\n2\n数学\n\n\n5. 第四范式（4NF）解决多值依赖的问题，要求每个表只能包含一个多值依赖。\n不符合 4NF 的表：\n\n\n\n学生 ID\n课程\n兴趣\n\n\n\n1\n数学\n足球\n\n\n1\n物理\n篮球\n\n\n在这个例子中，“课程”和“兴趣”之间存在多值依赖。可以将其分为两个符合 4NF 的表：\n选课表：\n\n\n\n学生 ID\n课程\n\n\n\n1\n数学\n\n\n1\n物理\n\n\n兴趣表：\n\n\n\n学生 ID\n兴趣\n\n\n\n1\n足球\n\n\n1\n篮球\n\n\n三、数据库设计  数据库设计主要包含如下阶段：\n\n需求分析阶段：通过结构化分析，得到数据流图和数据字典。\n概念设计阶段：根据功能模型，创建局部 ER 图，并合并为全局 ER 图（建立外模式）。\n逻辑设计阶段：将 ER 图转换为数据库的关系模型（建立逻辑模式）。\n物理设计阶段：根据数据逻辑模式，选择高效的存储结构和存储方法（建立内模式）。\n\n\n\n（一）概念设计  在结构化分析阶段，我们通过自顶向下的方式建立的系统的功能模型，以数据流图和数据字典表示。数据库的概念设计阶段，实际上就是建立系统的数据模型。\n数据库的概念设计采用  自底向上  的方式，其任务是建立系统的数据模型（通常以 ER 图表示），主要步骤为：\n\n选择局部应用\n设计局部 ER 图\n合并得到全局 ER 图\n优化全局 ER 图\n\n1. ER 图元素ER 图用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：\n\n实体：系统中的对象或概念，用矩形框表示。\n属性：实体具有的特性，用椭圆形表示。\n联系：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系。\n1:1 表示一对一关系\n1:n 表示一对多关系\nm:n 表示多对多关系\n\n\n\n\n\n2. ER 图合并  在合并 ER 图时，需要解决局部 ER 图之间的冲突问题，与合并之后全局 ER 图的冗余问题。\n冲突有三种类型：\n\n属性冲突：属性名和属性含义相同，但属性的取值类型或取值范围不同。\n命名冲突 ： 异名同义 （不同属性名表示同一种属性含义），或是 同名异义（同一属性名表示不同的属性含义）。\n结构冲突：\n同一对象在不同 ER 图中具有不同的抽象。例如某个对象在一个 ER 图中是实体，在另一个 ER 图中是属性。\n同一实体在不同 ER 图中所包含的属性个数和属性排列次序不完全相同。\n实体之间的关系在不同 ER 图中呈现为不同的联系。\n\n\n\n冗余有两种类型：\n\n冗余属性：可由基本数据导出的属性。\n冗余联系：可由其他联系导出的联系。\n\n消除冲突通常是结合业务需求，通过讨论与协商来处理。消除冗余通常是以数据流图和数据字典为依据，通过分析数据项之间的逻辑关系来处理。\n（二）逻辑设计  数据库的逻辑设计是指将 ER 图中的实体、属性、联系转换为 DBMS 数据库的关系模式，并进行范式规约。\n1. ER 图转换ER 图中的实体和属性可以直接转换为数据库中的一个关系模式（一张表），主键为实体，其他字段为属性。\nER 图中的联系，根据不同的类型，有不同的转换方式：\n(1) 1:1 联系\n\n\n转换方式：\n\n转换为一个独立的关系模式：联系两端的实体主键作为属性。ER 图转换结果：\n员工(工号，姓名，性别)\n办公电脑(电脑编号，电脑配置)\n使用(工号，电脑编号)\n\n\n与任意一端实体的关系模式合并：将一个实体的主键作为另一个实体的外键。ER 图转换结果：\n员工(工号，姓名，性别，电脑编号)\n办公电脑(电脑编号，电脑配置)\n\n\n\n(2) 1:n 联系\n\n\n转换方式：\n\n转换为一个独立的关系模式：联系两端的实体主键作为属性。ER 图转换结果：\n班级(编号，年级，人数)\n学生(学号，姓名，性别)\n隶属(学号，编号)\n\n\n与多端的实体的关系模式合并：在多端实体关系模式中，添加一端实体主键作为外键。ER 图转换结果：\n班级(编号，年级，人数)\n学生(学号，姓名，性别，编号)\n\n\n\n(3) m:n 联系\n\n\n转换方式：\n\n转换为一个独立的关系模式：联系两端的实体主键作为属性。ER 图转换结果：\n员工(工号，姓名，性别)\n角色(角色编号，角色名称，角色权限)\n使用(工号，角色编号)\n\n\n\n2. 范式规约  在转换为数据库的关系模式后，还要对关系模式进行规范化。不规范的关系模式会出现以下问题：\n\n数据冗余：重复存储相同的数据，浪费存储空间，并增加维护的复杂性。\n修改异常：数据在多个地方被重复存储时，若更新某一处而未同步其他地方，可能导致信息不一致。\n插入异常：需要插入新数据时，可能由于缺乏某些信息而无法完成插入。\n删除异常：删除某条记录可能会意外删除有用的信息。\n\n数据库规范化，通常是从 1NF 开始，逐步推进到更高级的设计范式。主要步骤包括：\n\n分析现有数据结构：查看当前的数据模型，识别实体、属性及其关系。\n识别主键：为每个表选择适当的主键。\n应用每一范式的规则：逐步应用上述每一范式的规则，检查和修改表结构。\n拆分和重组表：根据依赖关系，将数据拆分到多个表中，确保每个表遵循相关的范式。\n设置外键：为建立表之间的关系，添加外键约束，确保数据的完整性。\n验证和测试：在设计完成后，进行测试，确保数据完整性、查询效率和操作便利性。\n","dateCreated":"2024-10-23T09:27:29+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-10-23T09:27:29+08:00","description":"数据库的概念设计和逻辑设计","headline":"数据库设计与建模","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/","keywords":"软件工程, 数据库"}</script>
-    <meta name="description" content="数据库的概念设计和逻辑设计">
-<meta property="og:type" content="blog">
+<!DOCTYPE html><html lang="zh-cn" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>数据库设计与建模 | 千里之行，始于足下</title><meta name="author" content="一瓢清浅"><meta name="copyright" content="一瓢清浅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="数据库设计涵盖概念设计（ER建模）与逻辑设计（关系模式转换及范式规约），通过多级范式优化结构，消除数据冗余与操作异常。">
+<meta property="og:type" content="article">
 <meta property="og:title" content="数据库设计与建模">
-<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/index.html">
+<meta property="og:url" content="https://jiliguluss.github.io/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
-<meta property="og:description" content="数据库的概念设计和逻辑设计">
+<meta property="og:description" content="数据库设计涵盖概念设计（ER建模）与逻辑设计（关系模式转换及范式规约），通过多级范式优化结构，消除数据冗余与操作异常。">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1.jpg">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/ERD.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E4%B8%80.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E5%A4%9A.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E5%A4%9A%E5%AF%B9%E5%A4%9A.png">
+<meta property="og:image" content="https://jiliguluss.github.io/img/photo.jpg">
 <meta property="article:published_time" content="2024-10-23T01:27:29.000Z">
-<meta property="article:modified_time" content="2024-12-11T01:12:23.688Z">
+<meta property="article:modified_time" content="2025-05-30T05:02:50.421Z">
 <meta property="article:author" content="一瓢清浅">
 <meta property="article:tag" content="软件工程">
 <meta property="article:tag" content="数据库">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg">
-    
-    
-        
-    
-    
-        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
-    
-    
-    
-    
-    <!--STYLES-->
-    
-<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
-
-    <!--STYLES END-->
-    
-
-    
-
-    
-        
-            
-<link rel="stylesheet" href="/assets/css/gitalk.css">
-
-        
-    
-</head>
-
-    <body>
-        <div id="blog">
-            <!-- Define author's picture -->
-
-
-<header id="header" data-behavior="5">
-    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
-    <div class="header-title">
-        <a class="header-title-link" href="/" aria-label>
-            千里之行，始于足下
-        </a>
-    </div>
-    
-        
-            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
-        
-        
-            <i class="fa fa-question fa-lg"></i>
-        
-        </a>
-    
-</header>
-
-            <!-- Define author's picture -->
-
-
-
-        
-    
-
-<nav id="sidebar" data-behavior="5">
-    <div class="sidebar-container">
-        
-            <div class="sidebar-profile">
-                <a href="/#about" aria-label="阅读有关作者的更多信息">
-                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
-                </a>
-                <h4 class="sidebar-profile-name">一瓢清浅</h4>
-                
-                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
-</h5>
-                
-            </div>
-        
-        
-            <ul class="sidebar-buttons">
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
-                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">首页</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
-                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">分类</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
-                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">标签</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
-                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">归档</span>
-                    </a>
-            </li>
-            
-        </ul>
-        
-            <ul class="sidebar-buttons">
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
-                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">关于</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
-                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">GitHub</span>
-                    </a>
-            </li>
-            
-        </ul>
-        
-    </div>
-</nav>
-
-            
-            <div id="main" data-behavior="5" class="
-                        hasCoverMetaIn
-                        ">
-                
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
-    <style>
-        #post-toc {
-            position: fixed !important;
-            top: 80px;
-            padding: 10px;
-            z-index: 100;
-            background-color: rgba(255,255,255,0);
-            transform: translateX(0);
-            right: 3%;
-            width: 220px;
-            height: auto;
-            padding-top: 10px;
-            padding-bottom: 10px;
+<meta name="twitter:image" content="https://jiliguluss.github.io/img/photo.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "数据库设计与建模",
+  "url": "https://jiliguluss.github.io/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/",
+  "image": "https://jiliguluss.github.io/img/photo.jpg",
+  "datePublished": "2024-10-23T01:27:29.000Z",
+  "dateModified": "2025-05-30T05:02:50.421Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "一瓢清浅",
+      "url": "https://jiliguluss.github.io/"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/photo.jpg"><link rel="canonical" href="https://jiliguluss.github.io/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"><link rel="preconnect" href="//busuanzi.ibruce.info"><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
         }
-    </style>
-    <script>
-        var tocWidth = 220; // TOC的固定宽度
-        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
-        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+        return value
+      }
+    }
 
-        // 检查窗口宽度并调整TOC显示
-        function adjustToc() {
-            var toc = document.getElementById('post-toc');
-            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
-            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
-
-            if (contentWrap) {
-                var contentWidth = contentWrap.offsetWidth;
-                // 计算contentWrap的宽度加上TOC的宽度和内边距
-                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
-
-                if (totalWidth >= screenWidth) {
-                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
-                } else {
-                    toc.style.display = 'block'; // 否则，显示TOC
-                }
-            } else {
-                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
-            }
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
         }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
 
-        // 监听窗口大小变化事件
-        window.addEventListener('resize', adjustToc);
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
 
-        // 页面加载完毕时调用adjustToc
-        document.addEventListener('DOMContentLoaded', adjustToc);
-    </script>
-    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
-
-                
-<article class="post">
+      const theme = saveToLocal.get('theme')
     
-    
-        <div class="post-header main-content-wrap text-left">
-    
-        <h1 class="post-title">
-            数据库设计与建模
-        </h1>
-    
-    
-        <div class="post-meta">
-    <time datetime="2024-10-23T09:27:29+08:00">
-	
-		    2024 年 10 月 23 日
-    	
-    </time>
-    
-        <span>发布在 </span>
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
         
-    <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/">软考</a>, <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a>
-
-
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
     
-</div>
-
-    
-</div>
-
-    
-    <div class="post-content markdown">
-        <div class="main-content-wrap">
-            <!--excerpt-->
-
-<h2 id="一、数据库结构"><a href="# 一、数据库结构" class="headerlink" title="一、数据库结构"></a>一、数据库结构 </h2><p> 典型的数据库结构可归纳为“<strong>三级模式，两级映射</strong>”：</p>
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: 'Copy Successful',
+    error: 'Copy Failed',
+    noSupport: 'Browser Not Supported'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: 'Just now',
+    min: 'minutes ago',
+    hour: 'hours ago',
+    day: 'days ago',
+    month: 'months ago'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: 'Load More'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '数据库设计与建模',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="web_bg" style="background-image: url(/img/cover.png);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="site-data text-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">31</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="not-top-img" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">千里之行，始于足下</span></a><a class="nav-page-title" href="/"><span class="site-name">数据库设计与建模</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav></header><main class="layout" id="content-inner"><div id="post"><div id="post-info"><h1 class="post-title">数据库设计与建模</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2024-10-23T01:27:29.000Z" title="Created 2024-10-23 09:27:29">2024-10-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2025-05-30T05:02:50.421Z" title="Updated 2025-05-30 13:02:50">2025-05-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E8%BD%AF%E8%80%83/">软考</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id data-flag-title><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post Views:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div><article class="container post-content" id="article-container"><h2 id="一、数据库结构"><a href="# 一、数据库结构" class="headerlink" title="一、数据库结构"></a>一、数据库结构 </h2><p> 典型的数据库结构可归纳为“<strong>三级模式，两级映射</strong>”：</p>
 <img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg" class title=" 数据库结构 ">
-
 <h3 id="（一）三级模式"><a href="#（一）三级模式" class="headerlink" title="（一）三级模式"></a>（一）三级模式</h3><ol>
 <li><strong>外模式</strong>：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。</li>
 <li><strong>概念（逻辑）模式</strong>：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。</li>
@@ -304,7 +207,7 @@
 <h3 id="（四）关系分解"><a href="#（四）关系分解" class="headerlink" title="（四）关系分解"></a>（四）关系分解 </h3><p> 在数据库关系分解中，有两个重要概念：</p>
 <h4 id="1- 无损连接"><a href="#1- 无损连接" class="headerlink" title="1. 无损连接"></a>1. 无损连接 </h4><p> 无损链接指的是将一个关系分解成多个子关系后，通过对这些子关系进行自然连接操作，可以无损地恢复原始关系。换句话说，在连接后得到的结果应该与原始关系完全相同，没有任何信息增加或丢失。</p>
 <p>无损连接分解的 <strong> 判定方法 </strong> 为：</p>
-<p>设ρ&#x3D;{R1, R2}是 R 的一个分解，F 是 R 上的函数依赖集。那么分解ρ相对于 F 是无损级联分解的充要条件为 <strong>(R1∩R2)→(R1−R2)</strong> 或 <strong>(R1∩R2)→(R2−R1)</strong> 。 注意两个条件只要有任意一个条件成立即可。</p>
+<p>设ρ={R1, R2}是 R 的一个分解，F 是 R 上的函数依赖集。那么分解ρ相对于 F 是无损级联分解的充要条件为 <strong>(R1∩R2)→(R1−R2)</strong> 或 <strong>(R1∩R2)→(R2−R1)</strong> 。 注意两个条件只要有任意一个条件成立即可。</p>
 <h4 id="2- 保持依赖"><a href="#2- 保持依赖" class="headerlink" title="2. 保持依赖"></a>2. 保持依赖 </h4><p> 保持依赖指的是在关系分解后，仍然能够通过子关系中的函数依赖来推导出原始关系中的所有函数依赖。换句话说，分解后的子关系应该能够保持原始关系中的所有重要的依赖关系。</p>
 <p>举例来说，假设有一个关系 R(A, B, C)，并且它有函数依赖：A→B 和 B→C。</p>
 <ul>
@@ -322,6 +225,7 @@
 <h3 id="（五）设计范式"><a href="#（五）设计范式" class="headerlink" title="（五）设计范式"></a>（五）设计范式 </h3><p> 数据库设计范式是指在设计数据库时遵循的一系列规范和原则，以确保数据的组织、存储和管理高效、合理。数据库主要范式包括：</p>
 <h4 id="1- 第一范式（1NF）"><a href="#1- 第一范式（1NF）" class="headerlink" title="1. 第一范式（1NF）"></a>1. 第一范式（1NF）</h4><p><strong>每个字段的值都是原子值，不能有重复的列或多值字段。</strong></p>
 <p>不符合 1NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -330,13 +234,17 @@
 <th>课程</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>张三</td>
 <td>数学, 物理</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>在这个例子中，“课程”属性是个多值字段。需要重新设计成符合 1NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -345,7 +253,8 @@
 <th>课程</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>张三</td>
 <td>数学</td>
@@ -355,9 +264,12 @@
 <td>张三</td>
 <td>物理</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h4 id="2- 第二范式（2NF）"><a href="#2- 第二范式（2NF）" class="headerlink" title="2. 第二范式（2NF）"></a>2. 第二范式（2NF）</h4><p><strong>在满足 1NF 的基础上，要求消除部分依赖，即每个非主键字段必须完全依赖于主键，而不是主键的一部分。</strong></p>
 <p>不符合 2NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -366,7 +278,8 @@
 <th>学生姓名</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>数学</td>
 <td>张三</td>
@@ -381,9 +294,12 @@
 <td>语文</td>
 <td>李四</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>在这个例子中，“学生姓名”只依赖于“学生 ID”，而不依赖于“课程”。我们可以分成两个符合 2NF 的表：</p>
 <p>学生表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -391,7 +307,8 @@
 <th>学生姓名</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>张三</td>
 </tr>
@@ -399,8 +316,11 @@
 <td>2</td>
 <td>李四</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>选课表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -408,7 +328,8 @@
 <th>课程</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>数学</td>
 </tr>
@@ -420,9 +341,12 @@
 <td>2</td>
 <td>语文</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h4 id="3- 第三范式（3NF）"><a href="#3- 第三范式（3NF）" class="headerlink" title="3. 第三范式（3NF）"></a>3. 第三范式（3NF）</h4><p><strong>在满足 2NF 的基础上，要求消除传递依赖，即非主键字段不能依赖于其他非主键字段。</strong></p>
 <p>不符合 3NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -432,7 +356,8 @@
 <th>班主任</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>张三</td>
 <td>一班</td>
@@ -444,9 +369,12 @@
 <td>一班</td>
 <td>王老师</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>在这个例子中，“班主任”依赖于“班级”，而不是“学生 ID”。可以进一步分成两个符合 3NF 的表：</p>
 <p>学生表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -455,7 +383,8 @@
 <th>班级</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>张三</td>
 <td>一班</td>
@@ -465,8 +394,11 @@
 <td>李四</td>
 <td>一班</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>班级表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -474,13 +406,17 @@
 <th>班主任</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>一班</td>
 <td>王老师</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h4 id="4- 博茨 - 科得范式（BCNF）"><a href="#4- 博茨 - 科得范式（BCNF）" class="headerlink" title="4. 博茨 - 科得范式（BCNF）"></a>4. 博茨 - 科得范式（BCNF）</h4><p><strong>3NF 的强化版本，要求每个决定因素（函数依赖的左侧）必须是超键，进一步消除所有依赖问题。</strong></p>
 <p>不符合 BCNF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -489,7 +425,8 @@
 <th>教师</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>数学</td>
 <td>李老师</td>
@@ -504,9 +441,12 @@
 <td>数学</td>
 <td>张老师</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>在这个例子中，“教师”依赖于“课程”，而“课程”不是超键。可以将其分为两个符合 BCNF 的表：</p>
 <p>课程表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -514,7 +454,8 @@
 <th>教师</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>数学</td>
 <td>李老师</td>
 </tr>
@@ -526,8 +467,11 @@
 <td>语文</td>
 <td>张老师</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>选课表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -535,7 +479,8 @@
 <th>课程</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>数学</td>
 </tr>
@@ -547,9 +492,12 @@
 <td>2</td>
 <td>数学</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h4 id="5- 第四范式（4NF）"><a href="#5- 第四范式（4NF）" class="headerlink" title="5. 第四范式（4NF）"></a>5. 第四范式（4NF）</h4><p><strong>解决多值依赖的问题，要求每个表只能包含一个多值依赖。</strong></p>
 <p>不符合 4NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -558,7 +506,8 @@
 <th>兴趣</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>数学</td>
 <td>足球</td>
@@ -568,9 +517,12 @@
 <td>物理</td>
 <td>篮球</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>在这个例子中，“课程”和“兴趣”之间存在多值依赖。可以将其分为两个符合 4NF 的表：</p>
 <p>选课表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -578,7 +530,8 @@
 <th>课程</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>数学</td>
 </tr>
@@ -586,8 +539,11 @@
 <td>1</td>
 <td>物理</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>兴趣表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -595,7 +551,8 @@
 <th>兴趣</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>1</td>
 <td>足球</td>
 </tr>
@@ -603,7 +560,9 @@
 <td>1</td>
 <td>篮球</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h2 id="三、数据库设计"><a href="# 三、数据库设计" class="headerlink" title="三、数据库设计"></a>三、数据库设计 </h2><p> 数据库设计主要包含如下阶段：</p>
 <ol>
 <li><strong>需求分析阶段</strong>：通过结构化分析，得到数据流图和数据字典。</li>
@@ -612,7 +571,6 @@
 <li><strong>物理设计阶段</strong>：根据数据逻辑模式，选择高效的存储结构和存储方法（建立内模式）。</li>
 </ol>
 <img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1.jpg" class title=" 数据库设计 ">
-
 <h3 id="（一）概念设计"><a href="#（一）概念设计" class="headerlink" title="（一）概念设计"></a>（一）概念设计 </h3><p> 在结构化分析阶段，我们通过自顶向下的方式建立的系统的功能模型，以数据流图和数据字典表示。数据库的概念设计阶段，实际上就是建立系统的数据模型。</p>
 <p>数据库的概念设计采用 <strong> 自底向上 </strong> 的方式，其任务是建立系统的数据模型（通常以 ER 图表示），主要步骤为：</p>
 <ol>
@@ -633,7 +591,6 @@
 </li>
 </ul>
 <img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/ERD.png" class title="ER 图 ">
-
 <h4 id="2-ER 图合并"><a href="#2-ER 图合并" class="headerlink" title="2. ER 图合并"></a>2. ER 图合并 </h4><p> 在合并 ER 图时，需要解决局部 ER 图之间的冲突问题，与合并之后全局 ER 图的冗余问题。</p>
 <p>冲突有三种类型：</p>
 <ol>
@@ -655,9 +612,7 @@
 <h3 id="（二）逻辑设计"><a href="#（二）逻辑设计" class="headerlink" title="（二）逻辑设计"></a>（二）逻辑设计 </h3><p> 数据库的逻辑设计是指将 ER 图中的实体、属性、联系转换为 DBMS 数据库的关系模式，并进行范式规约。</p>
 <h4 id="1-ER 图转换"><a href="#1-ER 图转换" class="headerlink" title="1. ER 图转换"></a>1. ER 图转换</h4><p>ER 图中的实体和属性可以直接转换为数据库中的一个关系模式（一张表），主键为实体，其他字段为属性。</p>
 <p>ER 图中的联系，根据不同的类型，有不同的转换方式：</p>
-<p>(1) 1:1 联系</p>
-<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E4%B8%80.png" class title=" 一对一 ">
-
+<p>(1) 1:1 联系<br><img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E4%B8%80.png" class title=" 一对一 "></p>
 <p>转换方式：</p>
 <ul>
 <li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
@@ -672,9 +627,7 @@
 </ul>
 </li>
 </ul>
-<p>(2) 1:n 联系</p>
-<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E5%A4%9A.png" class title=" 一对多 ">
-
+<p>(2) 1:n 联系<br><img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E5%A4%9A.png" class title=" 一对多 "></p>
 <p>转换方式：</p>
 <ul>
 <li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
@@ -689,9 +642,7 @@
 </ul>
 </li>
 </ul>
-<p>(3) m:n 联系</p>
-<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E5%A4%9A%E5%AF%B9%E5%A4%9A.png" class title=" 多对多 ">
-
+<p>(3) m:n 联系<br><img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E5%A4%9A%E5%AF%B9%E5%A4%9A.png" class title=" 多对多 "></p>
 <p>转换方式：</p>
 <ul>
 <li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
@@ -717,229 +668,153 @@
 <li>设置外键：为建立表之间的关系，添加外键约束，确保数据的完整性。</li>
 <li>验证和测试：在设计完成后，进行测试，确保数据完整性、查询效率和操作便利性。</li>
 </ol>
-            
-
-
-            
-        </div>
-    </div>
-    <div id="post-footer" class="post-footer main-content-wrap">
-        
-            <div class="post-footer-tags">
-                <span class="text-color-light text-small">标签</span><br>
-                
-    <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/" rel="tag">数据库</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/" rel="tag">软件工程</a>
-
-            </div>
-        
-        
-            <div class="post-actions-wrap">
-    <nav>
-        <ul class="post-actions post-action-nav">
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" data-tooltip="数据库的控制功能" aria-label="上一篇: 数据库的控制功能">
-                    
-                        <i class="fa fa-angle-left" aria-hidden="true"></i>
-                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
-                    </a>
-            </li>
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" data-tooltip="系统分析与设计：结构化与面向对象" aria-label="下一篇: 系统分析与设计：结构化与面向对象">
-                    
-                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
-                        <i class="fa fa-angle-right" aria-hidden="true"></i>
-                    </a>
-            </li>
-        </ul>
-    </nav>
-    <ul class="post-actions post-action-share">
-        <li class="post-action hide-lg hide-md hide-sm">
-            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
-                <i class="fa fa-share-alt" aria-hidden="true"></i>
-            </a>
-        </li>
-        
-	
-        <li class="post-action">
-            
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
-            
-                <i class="fa fa-list" aria-hidden="true"></i>
-            </a>
-        </li>
-    </ul>
-</div>
-
-
-        
-        
-            
-                <div id="gitalk"></div>
-
-            
-        
-    </div>
-</article>
-
-
-
-                <footer id="footer" class="main-content-wrap">
-    <span class="copyrights">
-        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
-    </span>
-</footer>
-
-            </div>
-            
-                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
-                    <div class="post-actions-wrap">
-    <nav>
-        <ul class="post-actions post-action-nav">
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" data-tooltip="数据库的控制功能" aria-label="上一篇: 数据库的控制功能">
-                    
-                        <i class="fa fa-angle-left" aria-hidden="true"></i>
-                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
-                    </a>
-            </li>
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" data-tooltip="系统分析与设计：结构化与面向对象" aria-label="下一篇: 系统分析与设计：结构化与面向对象">
-                    
-                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
-                        <i class="fa fa-angle-right" aria-hidden="true"></i>
-                    </a>
-            </li>
-        </ul>
-    </nav>
-    <ul class="post-actions post-action-share">
-        <li class="post-action hide-lg hide-md hide-sm">
-            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
-                <i class="fa fa-share-alt" aria-hidden="true"></i>
-            </a>
-        </li>
-        
-	
-        <li class="post-action">
-            
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
-            
-                <i class="fa fa-list" aria-hidden="true"></i>
-            </a>
-        </li>
-    </ul>
-</div>
-
-
-                </div>
-                
-
-            
-        </div>
-        
-
-
-    
-        
-    
-
-<div id="about">
-    <div id="about-card">
-        <div id="about-btn-close">
-            <i class="fa fa-times"></i>
-        </div>
-        
-            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
-        
-            <h4 id="about-card-name">一瓢清浅</h4>
-        
-            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
-</div>
-        
-        
-            <div id="about-card-job">
-                <i class="fa fa-briefcase"></i>
-                <br>
-                <p>IT工程师</p>
-
-            </div>
-        
-        
-            <div id="about-card-location">
-                <i class="fa fa-map-marker-alt"></i>
-                <br>
-                中国
-            </div>
-        
-    </div>
-</div>
-
-        
-        
-<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
-        <!--SCRIPTS-->
-
-<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
-
-<!--SCRIPTS END-->
-
-
-    
-        
-<script src="/assets/js/gitalk.js"></script>
-
-        <script type="text/javascript">
-          (function() {
-            new Gitalk({
-              clientID: 'Ov23li8lUWNadcQIsjjS',
-              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
-              repo: 'comment',
-              owner: 'jiliguluss',
-              admin: ['jiliguluss'],
-              id: '2024/数据库设计与建模/',
-              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
-            }).render('gitalk')
-          })()
-        </script>
-    
-
-
-
-
-
-  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
-  <script type="text/javascript">
-      tocbot.init({
-        tocSelector: '#post-toc', // 目录容器的 ID 或 class
-        contentSelector: '.post-content', // 内容容器的 ID 或 class
-        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
-        collapseDepth: '3',
-        scrollSmooth: true, 
-        activeClass: 'active', 
-        orderedList: false
-    });
-  </script> 
-
-
-
-  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
-  <script type="text/javascript">
-      $(document).ready(function() {
-          var mermaid_config = {
-              startOnLoad: true,
-              theme: 'default',
+</article><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/">软件工程</a><a class="post-meta__tags" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" title="系统分析与设计：结构化与面向对象"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">Previous</div><div class="info-item-2">系统分析与设计：结构化与面向对象</div></div><div class="info-2"><div class="info-item-1">系统分析与设计包含结构化方法（如数据流图、实体关系图）和面向对象方法（如UML建模），前者强调功能分解与模块化，后者聚焦对象封装、继承和多态，适应不同系统复杂度需求。</div></div></div></a><a class="pagination-related" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" title="数据库的控制功能"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">Next</div><div class="info-item-2">数据库的控制功能</div></div><div class="info-2"><div class="info-item-1">数据库控制功能涵盖事务管理（ACID特性）、并发控制（锁机制与隔离级别）、性能优化（索引/读写分离/分区分片）及备份恢复机制，保障数据一致性与系统可靠性。</div></div></div></a></nav><hr class="custom-hr"><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> Comments</span></div></div><div class="comment-wrap"><div><div id="gitalk-container"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="author-info-name">一瓢清浅</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">31</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/jiliguluss"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">个人技术博客，涉及软件开发、安全测试、AI算法等领域。不求精深，但当涉猎，有所闻耳。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Contents</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84"><span class="toc-text">一、数据库结构 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E4%B8%89%E7%BA%A7%E6%A8%A1%E5%BC%8F"><span class="toc-text">（一）三级模式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E4%B8%A4%E7%BA%A7%E6%98%A0%E5%B0%84"><span class="toc-text">（二）两级映射</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E7%90%86%E8%AE%BA"><span class="toc-text">二、数据库理论 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E5%85%B3%E7%B3%BB%E8%BF%90%E7%AE%97"><span class="toc-text">（一）关系运算 </span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E5%87%BD%E6%95%B0%E4%BE%9D%E8%B5%96"><span class="toc-text">（二）函数依赖 </span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%89%EF%BC%89Armstrong%20%E5%85%AC%E7%90%86"><span class="toc-text">（三）Armstrong 公理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E5%9B%9B%EF%BC%89%E5%85%B3%E7%B3%BB%E5%88%86%E8%A7%A3"><span class="toc-text">（四）关系分解 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-%20%E6%97%A0%E6%8D%9F%E8%BF%9E%E6%8E%A5"><span class="toc-text">1. 无损连接 </span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E4%BF%9D%E6%8C%81%E4%BE%9D%E8%B5%96"><span class="toc-text">2. 保持依赖 </span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%94%EF%BC%89%E8%AE%BE%E8%AE%A1%E8%8C%83%E5%BC%8F"><span class="toc-text">（五）设计范式 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-%20%E7%AC%AC%E4%B8%80%E8%8C%83%E5%BC%8F%EF%BC%881NF%EF%BC%89"><span class="toc-text">1. 第一范式（1NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E7%AC%AC%E4%BA%8C%E8%8C%83%E5%BC%8F%EF%BC%882NF%EF%BC%89"><span class="toc-text">2. 第二范式（2NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-%20%E7%AC%AC%E4%B8%89%E8%8C%83%E5%BC%8F%EF%BC%883NF%EF%BC%89"><span class="toc-text">3. 第三范式（3NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-%20%E5%8D%9A%E8%8C%A8%20-%20%E7%A7%91%E5%BE%97%E8%8C%83%E5%BC%8F%EF%BC%88BCNF%EF%BC%89"><span class="toc-text">4. 博茨 - 科得范式（BCNF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-%20%E7%AC%AC%E5%9B%9B%E8%8C%83%E5%BC%8F%EF%BC%884NF%EF%BC%89"><span class="toc-text">5. 第四范式（4NF）</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1"><span class="toc-text">三、数据库设计 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E6%A6%82%E5%BF%B5%E8%AE%BE%E8%AE%A1"><span class="toc-text">（一）概念设计 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-ER%20%E5%9B%BE%E5%85%83%E7%B4%A0"><span class="toc-text">1. ER 图元素</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-ER%20%E5%9B%BE%E5%90%88%E5%B9%B6"><span class="toc-text">2. ER 图合并 </span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E9%80%BB%E8%BE%91%E8%AE%BE%E8%AE%A1"><span class="toc-text">（二）逻辑设计 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-ER%20%E5%9B%BE%E8%BD%AC%E6%8D%A2"><span class="toc-text">1. ER 图转换</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E8%8C%83%E5%BC%8F%E8%A7%84%E7%BA%A6"><span class="toc-text">2. 范式规约 </span></a></li></ol></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Posts</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E5%A4%9A%E8%87%82%E8%80%81%E8%99%8E%E6%9C%BA/" title="多臂老虎机">多臂老虎机</a><time datetime="2025-05-28T00:57:38.000Z" title="Created 2025-05-28 08:57:38">2025-05-28</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/" title="进程间通信机制">进程间通信机制</a><time datetime="2025-05-26T06:24:56.000Z" title="Created 2025-05-26 14:24:56">2025-05-26</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/" title="Web 应用架构">Web 应用架构</a><time datetime="2025-05-21T06:52:47.000Z" title="Created 2025-05-21 14:52:47">2025-05-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E8%82%A1%E7%A5%A8%E6%8A%95%E8%B5%84%E5%85%A5%E9%97%A8%E3%80%81%E8%BF%9B%E9%98%B6%E4%B8%8E%E5%AE%9E%E6%88%98%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《股票投资入门、进阶与实战》笔记">《股票投资入门、进阶与实战》笔记</a><time datetime="2025-02-24T04:50:18.000Z" title="Created 2025-02-24 12:50:18">2025-02-24</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E6%8A%95%E8%B5%84%E4%B8%AD%E6%9C%80%E7%AE%80%E5%8D%95%E7%9A%84%E4%BA%8B%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《投资中最简单的事》笔记">《投资中最简单的事》笔记</a><time datetime="2025-01-20T01:05:49.000Z" title="Created 2025-01-20 09:05:49">2025-01-20</time></div></div></div></div></div></div></main><footer id="footer" style="background: transparent;"><div id="footer-wrap"><div class="copyright">&copy;2023 - 2025 By 一瓢清浅</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Reading Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light and Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle Between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Settings"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table of Contents"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="Scroll to Comments"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="Back to Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"><script>(() => {
+  const loadMathjax = () => {
+    if (!window.MathJax) {
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          tags: 'none',
+        },
+        chtml: {
+          scale: 1.1
+        },
+        options: {
+          enableMenu: true,
+          renderActions: {
+            findScript: [10, doc => {
+              for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+                const display = !!node.type.match(/; *mode=display/)
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+                const text = document.createTextNode('')
+                node.parentNode.replaceChild(text, node)
+                math.start = {node: text, delim: '', n: 0}
+                math.end = {node: text, delim: '', n: 0}
+                doc.math.push(math)
+              }
+            }, '']
           }
-          mermaid.initialize(mermaid_config);
-      });
-  </script>
+        }
+      }
 
+      const script = document.createElement('script')
+      script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+      script.id = 'MathJax-script'
+      script.async = true
+      document.head.appendChild(script)
+    } else {
+      MathJax.startup.document.state(0)
+      MathJax.texReset()
+      MathJax.typesetPromise()
+    }
+  }
 
-    </body>
-</html>
+  btf.addGlobalFn('encrypt', loadMathjax, 'mathjax')
+  window.pjax ? loadMathjax() : window.addEventListener('load', loadMathjax)
+})()</script><script>(() => {
+  const runMermaid = ele => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    ele.forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = `%%{init:{ 'theme':'${theme}'}}%%\n`
+      const mermaidID = `mermaid-${index}`
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+      const renderMermaid = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      // mermaid v9 and v10 compatibility
+      typeof renderFn === 'string' ? renderMermaid(renderFn) : renderFn.then(({ svg }) => renderMermaid(svg))
+    })
+  }
+
+  const codeToMermaid = () => {
+    const codeMermaidEle = document.querySelectorAll('pre > code.mermaid')
+    if (codeMermaidEle.length === 0) return
+
+    codeMermaidEle.forEach(ele => {
+      const preEle = document.createElement('pre')
+      preEle.className = 'mermaid-src'
+      preEle.hidden = true
+      preEle.textContent = ele.textContent
+      const newEle = document.createElement('div')
+      newEle.className = 'mermaid-wrap'
+      newEle.appendChild(preEle)
+      ele.parentNode.replaceWith(newEle)
+    })
+  }
+
+  const loadMermaid = () => {
+    if (true) codeToMermaid()
+    const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+    if ($mermaid.length === 0) return
+
+    const runMermaidFn = () => runMermaid($mermaid)
+    btf.addGlobalFn('themeChange', runMermaidFn, 'mermaid')
+    window.loadMermaid ? runMermaidFn() : btf.getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaidFn)
+  }
+
+  btf.addGlobalFn('encrypt', loadMermaid, 'mermaid')
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const isShuoshuo = GLOBAL_CONFIG_SITE.pageType === 'shuoshuo'
+  const option = null
+
+  const commentCount = n => {
+    const isCommentCount = document.querySelector('#post-meta .gitalk-comment-count')
+    if (isCommentCount) {
+      isCommentCount.textContent= n
+    }
+  }
+
+  const initGitalk = (el, path) => {
+    if (isShuoshuo) {
+      window.shuoshuoComment.destroyGitalk = () => {
+        if (el.children.length) {
+          el.innerHTML = ''
+          el.classList.add('no-comment')
+        }
+      }
+    }
+
+    const gitalk = new Gitalk({
+      clientID: 'Ov23li8lUWNadcQIsjjS',
+      clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+      repo: 'comment',
+      owner: 'jiliguluss',
+      admin: ['jiliguluss'],
+      updateCountCallback: commentCount,
+      ...option,
+      id: isShuoshuo ? path : (option && option.id) || '6ca45eece7ce7d63c2116317377d0823'
+    })
+
+    gitalk.render('gitalk-container')
+  }
+
+  const loadGitalk = async(el, path) => {
+    if (typeof Gitalk === 'function') initGitalk(el, path)
+    else {
+      await btf.getCSS('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.css')
+      await btf.getScript('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.js')
+      initGitalk(el, path)
+    }
+  }
+
+  if (isShuoshuo) {
+    'Gitalk' === 'Gitalk'
+      ? window.shuoshuoComment = { loadComment: loadGitalk }
+      : window.loadOtherComment = loadGitalk
+    return
+  }
+
+  if ('Gitalk' === 'Gitalk' || !false) {
+    if (false) btf.loadComment(document.getElementById('gitalk-container'), loadGitalk)
+    else loadGitalk()
+  } else {
+    window.loadOtherComment = loadGitalk
+  }
+})()</script></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

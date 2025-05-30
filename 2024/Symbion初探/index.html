@@ -1,263 +1,166 @@
-
-<!DOCTYPE html>
-<html lang="zh-cn">
-    
-<head>
-    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="generator" content="千里之行，始于足下">
-    <title>交替符号执行工具——Symbion 初探 - 千里之行，始于足下</title>
-    <meta name="author" content="一瓢清浅">
-    
-        <meta name="keywords" content="python,AI,安全,算法,编程,">
-    
-    
-    
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、原理介绍  原始论文：SYMBION: Interleaving Symbolic with Concrete Execution\n官方博客：symbion: fusing concrete and symbolic execution\n1. 背景  符号执行可以用来获取走到指定程序区块的可行输入，但是符号执行在实际应用中面临很多挑战：\n\n路径爆炸问题：符号执行从程序入口开始探索，当程序中出现分支和循环时，会导致路径状态呈指数增长。\n\n环境交互问题：当程序与系统或三方库进行交互时，由于缺失源码或交互复杂等原因，会阻碍符号执行的状态更新。\n\n\n2. 方案Symbion 通过具体执行环境与符号执行环境的同步与切换，实现具体值和符号值交替执行。通过这种交替执行机制，减少符号执行探索的路径状态，并解决程序对外部环境的依赖问题。\n图中演示了具体执行环境与符号执行环境相互切换的过程：\n\n\n目标是对从 PoI 到TP的路径进行符号推理，CSP节点是程序入口。从 CSP 到PoI要经过复杂的运算和交互，这导致直接从 CSP 开始符号推理，将无法向后演进到PoI。\n使用 Symbion 时，首先将具体值输入给 CSP，在具体执行后到达PoI。然后在PoI 切换到符号执行环境，算出到达 TP 所需的变量取值。再将算出来的结果同步给具体执行环境，在 PoI 恢复具体执行，即可到达TP。\n3. 实现Symbion 的架构设计如下：\n\n\nSymbion 在 Angr 的基础上，增加了如下组件：\n\nConcrete Target：定义了与具体执行环境交互的方法，通过实现这些方法可以让 Symbion 支持特定的交互环境。例如 Symbion 实现的GDBConcreteTarget，它通过 gdbsever 控制远程目标程序的交互。\n\nread_memory(address, nbytes)：从具体进程内存中 address 开始读取 nbytes 字节。\nwrite_memory(address, value)：在具体进程内存中 address 处写入value。\nread_register(register)：返回具体进程中指定 register 的内容。\nwrite_register(register, value)：在具体进程的 register 中写入value。\nset_breakpoint(address)：在具体进程中的 address 处设置断点。\nremove_breakpoint(address)：移除之前在 address 处设置的断点。\nrun()：恢复具体进程的执行。\n\n\nSimEngineConcrete：利用 Concrete Target 的方法执行以下步骤，实现 Symbolic 环境到 Concrete 环境的切换。\n\n用用户提供的值修改具体进程的内存。\n用用户提供的值修改具体进程的寄存器。\n通过断点来设置新的PoI。\n恢复程序的具体执行，直到到达新的PoI，并将控制权交还给 Angr。\n\n\nConcrete SimPlugin：当具体执行到达 PoI，这个插件实现Concrete 环境到 Symbolic 环境的切换，它将具体状态导入 Angr 来创建SimState。\n\n将 SimState 的内存后端重定向到具体进程的内存，即在符号执行过程中，SimState的内存读取都是从具体进程中来操作。\n\n将具体进程中的寄存器值复制到 SimState 中。\n\n将具体进程的内存映射与 Angr 在启动期间加载的内存映射同步。\n\n\n\nSYMBION Exploration Technique：提供用户使用 Symbion 的 API ，通过这些 API ，用户指定 PoI 的地址，在具体执行到达 PoI 后，Symbion 切换为符号执行。\n\n\n简而言之，在 Symbion 的工作流程中，各组件的作用为：\n\n用户通过 SYMBION Exploration Technique 指定PoI。\n\n程序经过具体执行到达到 PoI 后暂停， Concrete SimPlugin 根据具体执行环境来创建一个SimState。\n\nAngr 通过符号执行，计算到达下一个 PoI 的可行解。\n\nSimEngineConcrete 用 Angr 算出来的结果修改具体进程中的变量，恢复具体执行直到下一个PoI。\n\n\n二、示例分析Symbion 官方示例：test_concrete_not_packed_elf64\n示例使用的二进制：not_packed_elf64\n二进制没有给源码，通过 IDA 逆向源码，并用 AI 改写，得到 C 源码如下，源码中取 dest 变量中的一串数值做判断，不同的分支触发不同的print。\n\n\n在 Symbion 的示例代码中，首先通过具体执行到达 BINARY_DECISION_ADDRESS，然后用符号执行探索从BINARY_DECISION_ADDRESS 到DROP_STAGE2_V2的路径。\n\n\n在符号执行求解成功后，再将求解结果传递给具体执行环境，并启动具体执行，即可到达DROP_STAGE2_V2：\n\n\n结合 CFG 和源码可以看到，符号执行的起点 BINARY_DECISION_ADDRESS 对应源码图右侧 55 行，符号执行的终点 DROP_STAGE2_V2 对应源码图右侧 77 行。通过 Symbion，实现了对二进制按指定路径的进行分析的目的。\n\n\nSymbion 的示例代码中，涉及到很多内存地址操作，需要结合 IDA 的反编译源码来看：\n\n\n\nline 2：启动具体执行，到 BINARY_DECISION_ADDRESS 停下，即 IDA 反编译源码第 67 行代码\n\nline 3：从具体执行环境的获取寄存器中的栈指针sp，指向栈顶（即栈开始的位置）\n\nline 4：从栈顶 sp 开始读取 20 个字节的内存，这块内存包括反编译源码中的变量 i 和v5\n\nline 5：判断是否为符号变量，此时为具体执行环境，所以不是符号变量\n\nline 7：定义符号变量，变量名为arg0，大小为 32 字节\n\nline 8：用 symbolic_buffer_memory 指向具体执行环境中 rbp-0xc0 的内存地址，它对应 IDA 反编译源码中的数组 s 的起始地址。\n\nline 10：从 symbolic_buffer_memory 开始加载 36 个字节的内存\n\nline 11：判断是否为符号变量，此时为具体执行环境，所以不是符号变量\n\nline 12：将 angr0 存储到symbolic_buffer_memory，将符号变量与具体执行环境的内存地址关联起来\n\nline 15：从 symbolic_buffer_memory 开始加载 36 个字节的内存\n\nline 16：判断是否为符号变量，因为 把 angr0 保存到这块内存，所以是符号变量\n\nline 19：符号执行状态初始化\n\nline 37：启动符号执行\n\n\n可以看到，Symbion 在切换具体执行环境和符号执行环境时，是通过内存地址把变量的具体值和符号值对应起来。需要结合 IDA 反编译的源码中给出的变量地址和内存大小，人工设置符号执行中所需要的符号变量，难以实现自动化。","dateCreated":"2024-02-27T16:33:24+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-02-27T16:33:24+08:00","description":"Symbion 是 Angr 的一款插件，可以实现具体执行与符号执行交替运行","headline":"交替符号执行工具——Symbion 初探","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/","keywords":"符号执行, Angr"}</script>
-    <meta name="description" content="Symbion 是 Angr 的一款插件，可以实现具体执行与符号执行交替运行">
-<meta property="og:type" content="blog">
+<!DOCTYPE html><html lang="zh-cn" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>交替符号执行工具——Symbion 初探 | 千里之行，始于足下</title><meta name="author" content="一瓢清浅"><meta name="copyright" content="一瓢清浅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="Symbion作为Angr插件，通过动态切换具体执行与符号执行环境，利用内存地址映射同步变量状态，有效解决路径爆炸和环境依赖问题，实现对二进制程序指定路径的精准分析。">
+<meta property="og:type" content="article">
 <meta property="og:title" content="交替符号执行工具——Symbion 初探">
-<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/index.html">
+<meta property="og:url" content="https://jiliguluss.github.io/2024/Symbion%E5%88%9D%E6%8E%A2/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
-<meta property="og:description" content="Symbion 是 Angr 的一款插件，可以实现具体执行与符号执行交替运行">
+<meta property="og:description" content="Symbion作为Angr插件，通过动态切换具体执行与符号执行环境，利用内存地址映射同步变量状态，有效解决路径爆炸和环境依赖问题，实现对二进制程序指定路径的精准分析。">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%87%E6%8D%A2.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E6%9E%B6%E6%9E%84.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BA%8C%E8%BF%9B%E5%88%B6%E9%80%86%E5%90%91%E6%BA%90%E7%A0%81.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BB%A3%E7%A0%81%E6%AE%B51.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BB%A3%E7%A0%81%E6%AE%B52.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/not_packed_elf64%E6%8C%87%E5%AE%9A%E8%B7%AF%E5%BE%84.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/not_packed_elf64%E7%A4%BA%E4%BE%8B%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90.png">
+<meta property="og:image" content="https://jiliguluss.github.io/img/photo.jpg">
 <meta property="article:published_time" content="2024-02-27T08:33:24.000Z">
-<meta property="article:modified_time" content="2024-12-11T01:12:23.578Z">
+<meta property="article:modified_time" content="2025-05-30T05:07:32.641Z">
 <meta property="article:author" content="一瓢清浅">
 <meta property="article:tag" content="符号执行">
 <meta property="article:tag" content="Angr">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%87%E6%8D%A2.png">
-    
-    
-        
-    
-    
-        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
-    
-    
-    
-    
-    <!--STYLES-->
-    
-<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
-
-    <!--STYLES END-->
-    
-
-    
-
-    
-        
-            
-<link rel="stylesheet" href="/assets/css/gitalk.css">
-
-        
-    
-</head>
-
-    <body>
-        <div id="blog">
-            <!-- Define author's picture -->
-
-
-<header id="header" data-behavior="5">
-    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
-    <div class="header-title">
-        <a class="header-title-link" href="/" aria-label>
-            千里之行，始于足下
-        </a>
-    </div>
-    
-        
-            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
-        
-        
-            <i class="fa fa-question fa-lg"></i>
-        
-        </a>
-    
-</header>
-
-            <!-- Define author's picture -->
-
-
-
-        
-    
-
-<nav id="sidebar" data-behavior="5">
-    <div class="sidebar-container">
-        
-            <div class="sidebar-profile">
-                <a href="/#about" aria-label="阅读有关作者的更多信息">
-                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
-                </a>
-                <h4 class="sidebar-profile-name">一瓢清浅</h4>
-                
-                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
-</h5>
-                
-            </div>
-        
-        
-            <ul class="sidebar-buttons">
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
-                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">首页</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
-                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">分类</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
-                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">标签</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
-                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">归档</span>
-                    </a>
-            </li>
-            
-        </ul>
-        
-            <ul class="sidebar-buttons">
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
-                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">关于</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
-                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">GitHub</span>
-                    </a>
-            </li>
-            
-        </ul>
-        
-    </div>
-</nav>
-
-            
-            <div id="main" data-behavior="5" class="
-                        hasCoverMetaIn
-                        ">
-                
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
-    <style>
-        #post-toc {
-            position: fixed !important;
-            top: 80px;
-            padding: 10px;
-            z-index: 100;
-            background-color: rgba(255,255,255,0);
-            transform: translateX(0);
-            right: 3%;
-            width: 220px;
-            height: auto;
-            padding-top: 10px;
-            padding-bottom: 10px;
+<meta name="twitter:image" content="https://jiliguluss.github.io/img/photo.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "交替符号执行工具——Symbion 初探",
+  "url": "https://jiliguluss.github.io/2024/Symbion%E5%88%9D%E6%8E%A2/",
+  "image": "https://jiliguluss.github.io/img/photo.jpg",
+  "datePublished": "2024-02-27T08:33:24.000Z",
+  "dateModified": "2025-05-30T05:07:32.641Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "一瓢清浅",
+      "url": "https://jiliguluss.github.io/"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/photo.jpg"><link rel="canonical" href="https://jiliguluss.github.io/2024/Symbion%E5%88%9D%E6%8E%A2/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"><link rel="preconnect" href="//busuanzi.ibruce.info"><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
         }
-    </style>
-    <script>
-        var tocWidth = 220; // TOC的固定宽度
-        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
-        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+        return value
+      }
+    }
 
-        // 检查窗口宽度并调整TOC显示
-        function adjustToc() {
-            var toc = document.getElementById('post-toc');
-            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
-            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
-
-            if (contentWrap) {
-                var contentWidth = contentWrap.offsetWidth;
-                // 计算contentWrap的宽度加上TOC的宽度和内边距
-                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
-
-                if (totalWidth >= screenWidth) {
-                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
-                } else {
-                    toc.style.display = 'block'; // 否则，显示TOC
-                }
-            } else {
-                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
-            }
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
         }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
 
-        // 监听窗口大小变化事件
-        window.addEventListener('resize', adjustToc);
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
 
-        // 页面加载完毕时调用adjustToc
-        document.addEventListener('DOMContentLoaded', adjustToc);
-    </script>
-    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
-
-                
-<article class="post">
+      const theme = saveToLocal.get('theme')
     
-    
-        <div class="post-header main-content-wrap text-left">
-    
-        <h1 class="post-title">
-            交替符号执行工具——Symbion 初探
-        </h1>
-    
-    
-        <div class="post-meta">
-    <time datetime="2024-02-27T16:33:24+08:00">
-	
-		    2024 年 2 月 27 日
-    	
-    </time>
-    
-        <span>发布在 </span>
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
         
-    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C/">符号执行</a>
-
-
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
     
-</div>
-
-    
-</div>
-
-    
-    <div class="post-content markdown">
-        <div class="main-content-wrap">
-            <!--excerpt-->
-
-<h2 id="一、原理介绍"><a href="# 一、原理介绍" class="headerlink" title="一、原理介绍"></a>一、原理介绍 </h2><p> 原始论文：<a target="_blank" rel="external nofollow noopener noreferrer" href="https://seclab.cs.ucsb.edu/files/publications/gritti2020_symbion.pdf">SYMBION: Interleaving Symbolic with Concrete Execution</a></p>
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: 'Copy Successful',
+    error: 'Copy Failed',
+    noSupport: 'Browser Not Supported'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: 'Just now',
+    min: 'minutes ago',
+    hour: 'hours ago',
+    day: 'days ago',
+    month: 'months ago'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: 'Load More'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '交替符号执行工具——Symbion 初探',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="web_bg" style="background-image: url(/img/cover.png);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="site-data text-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">31</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="not-top-img" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">千里之行，始于足下</span></a><a class="nav-page-title" href="/"><span class="site-name">交替符号执行工具——Symbion 初探</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav></header><main class="layout" id="content-inner"><div id="post"><div id="post-info"><h1 class="post-title">交替符号执行工具——Symbion 初探</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2024-02-27T08:33:24.000Z" title="Created 2024-02-27 16:33:24">2024-02-27</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2025-05-30T05:07:32.641Z" title="Updated 2025-05-30 13:07:32">2025-05-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E5%AE%89%E5%85%A8/">安全</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E5%AE%89%E5%85%A8/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C/">符号执行</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id data-flag-title><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post Views:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div><article class="container post-content" id="article-container"><h2 id="一、原理介绍"><a href="# 一、原理介绍" class="headerlink" title="一、原理介绍"></a>一、原理介绍 </h2><p> 原始论文：<a target="_blank" rel="external nofollow noopener noreferrer" href="https://seclab.cs.ucsb.edu/files/publications/gritti2020_symbion.pdf">SYMBION: Interleaving Symbolic with Concrete Execution</a></p>
 <p>官方博客：<a target="_blank" rel="external nofollow noopener noreferrer" href="https://angr.io/blog/angr_symbion/">symbion: fusing concrete and symbolic execution</a></p>
 <h3 id="1- 背景"><a href="#1- 背景" class="headerlink" title="1. 背景"></a>1. 背景 </h3><p> 符号执行可以用来获取走到指定程序区块的可行输入，但是符号执行在实际应用中面临很多挑战：</p>
 <ol>
@@ -269,12 +172,10 @@
 <h3 id="2- 方案"><a href="#2- 方案" class="headerlink" title="2. 方案"></a>2. 方案</h3><p>Symbion 通过具体执行环境与符号执行环境的同步与切换，实现具体值和符号值交替执行。通过这种交替执行机制，减少符号执行探索的路径状态，并解决程序对外部环境的依赖问题。</p>
 <p>图中演示了具体执行环境与符号执行环境相互切换的过程：</p>
 <img src="/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E4%B8%8A%E4%B8%8B%E6%96%87%E5%88%87%E6%8D%A2.png" class title="symbion 上下文切换 ">
-
 <p>目标是对从 <code>PoI</code> 到<code>TP</code>的路径进行符号推理，<code>CSP</code>节点是程序入口。从 <code>CSP</code> 到<code>PoI</code>要经过复杂的运算和交互，这导致直接从 <code>CSP</code> 开始符号推理，将无法向后演进到<code>PoI</code>。</p>
 <p>使用 <code>Symbion</code> 时，首先将具体值输入给 <code>CSP</code>，在具体执行后到达<code>PoI</code>。然后在<code>PoI</code> 切换到符号执行环境，算出到达 <code>TP</code> 所需的变量取值。再将算出来的结果同步给具体执行环境，在 <code>PoI</code> 恢复具体执行，即可到达<code>TP</code>。</p>
 <h3 id="3- 实现"><a href="#3- 实现" class="headerlink" title="3. 实现"></a>3. 实现</h3><p>Symbion 的架构设计如下：</p>
 <img src="/2024/Symbion%E5%88%9D%E6%8E%A2/symbion%E6%9E%B6%E6%9E%84.png" class title="symbion 架构 ">
-
 <p>Symbion 在 Angr 的基础上，增加了如下组件：</p>
 <ul>
 <li><p>Concrete Target：定义了与具体执行环境交互的方法，通过实现这些方法可以让 Symbion 支持特定的交互环境。例如 Symbion 实现的<code>GDBConcreteTarget</code>，它通过 gdbsever 控制远程目标程序的交互。</p>
@@ -324,19 +225,14 @@
 <p>示例使用的二进制：<a target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/angr/binaries/blob/master/tests/x86_64/not_packed_elf64">not_packed_elf64</a></p>
 <p>二进制没有给源码，通过 IDA 逆向源码，并用 AI 改写，得到 C 源码如下，源码中取 <code>dest</code> 变量中的一串数值做判断，不同的分支触发不同的<code>print</code>。</p>
 <img src="/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BA%8C%E8%BF%9B%E5%88%B6%E9%80%86%E5%90%91%E6%BA%90%E7%A0%81.png" class>
-
 <p>在 Symbion 的示例代码中，首先通过具体执行到达 <code>BINARY_DECISION_ADDRESS</code>，然后用符号执行探索从<code>BINARY_DECISION_ADDRESS</code> 到<code>DROP_STAGE2_V2</code>的路径。</p>
 <img src="/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BB%A3%E7%A0%81%E6%AE%B51.png" class>
-
 <p>在符号执行求解成功后，再将求解结果传递给具体执行环境，并启动具体执行，即可到达<code>DROP_STAGE2_V2</code>：</p>
 <img src="/2024/Symbion%E5%88%9D%E6%8E%A2/%E4%BB%A3%E7%A0%81%E6%AE%B52.png" class>
-
 <p>结合 CFG 和源码可以看到，符号执行的起点 <code>BINARY_DECISION_ADDRESS</code> 对应源码图右侧 55 行，符号执行的终点 <code>DROP_STAGE2_V2</code> 对应源码图右侧 77 行。通过 Symbion，实现了对二进制按指定路径的进行分析的目的。</p>
 <img src="/2024/Symbion%E5%88%9D%E6%8E%A2/not_packed_elf64%E6%8C%87%E5%AE%9A%E8%B7%AF%E5%BE%84.png" class>
-
 <p>Symbion 的示例代码中，涉及到很多内存地址操作，需要结合 IDA 的反编译源码来看：</p>
 <img src="/2024/Symbion%E5%88%9D%E6%8E%A2/not_packed_elf64%E7%A4%BA%E4%BE%8B%E4%BB%A3%E7%A0%81%E5%88%86%E6%9E%90.png" class title="not_packed_elf64 代码 ">
-
 <ul>
 <li><p>line 2：启动具体执行，到 <code>BINARY_DECISION_ADDRESS</code> 停下，即 IDA 反编译源码第 67 行代码</p>
 </li>
@@ -366,229 +262,153 @@
 </li>
 </ul>
 <p>可以看到，Symbion 在切换具体执行环境和符号执行环境时，是通过内存地址把变量的具体值和符号值对应起来。需要结合 IDA 反编译的源码中给出的变量地址和内存大小，人工设置符号执行中所需要的符号变量，难以实现自动化。</p>
-            
-
-
-            
-        </div>
-    </div>
-    <div id="post-footer" class="post-footer main-content-wrap">
-        
-            <div class="post-footer-tags">
-                <span class="text-color-light text-small">标签</span><br>
-                
-    <a class="tag tag--primary tag--small t-none-link" href="/tags/Angr/" rel="tag">Angr</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C/" rel="tag">符号执行</a>
-
-            </div>
-        
-        
-            <div class="post-actions-wrap">
-    <nav>
-        <ul class="post-actions post-action-nav">
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/" data-tooltip="Hexo 捣鼓札记" aria-label="上一篇: Hexo 捣鼓札记">
-                    
-                        <i class="fa fa-angle-left" aria-hidden="true"></i>
-                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
-                    </a>
-            </li>
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/" data-tooltip="符号执行工具——Angr 零基础入门" aria-label="下一篇: 符号执行工具——Angr 零基础入门">
-                    
-                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
-                        <i class="fa fa-angle-right" aria-hidden="true"></i>
-                    </a>
-            </li>
-        </ul>
-    </nav>
-    <ul class="post-actions post-action-share">
-        <li class="post-action hide-lg hide-md hide-sm">
-            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
-                <i class="fa fa-share-alt" aria-hidden="true"></i>
-            </a>
-        </li>
-        
-	
-        <li class="post-action">
-            
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
-            
-                <i class="fa fa-list" aria-hidden="true"></i>
-            </a>
-        </li>
-    </ul>
-</div>
-
-
-        
-        
-            
-                <div id="gitalk"></div>
-
-            
-        
-    </div>
-</article>
-
-
-
-                <footer id="footer" class="main-content-wrap">
-    <span class="copyrights">
-        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
-    </span>
-</footer>
-
-            </div>
-            
-                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
-                    <div class="post-actions-wrap">
-    <nav>
-        <ul class="post-actions post-action-nav">
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Hexo%E6%8D%A3%E9%BC%93%E6%9C%AD%E8%AE%B0/" data-tooltip="Hexo 捣鼓札记" aria-label="上一篇: Hexo 捣鼓札记">
-                    
-                        <i class="fa fa-angle-left" aria-hidden="true"></i>
-                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
-                    </a>
-            </li>
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/" data-tooltip="符号执行工具——Angr 零基础入门" aria-label="下一篇: 符号执行工具——Angr 零基础入门">
-                    
-                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
-                        <i class="fa fa-angle-right" aria-hidden="true"></i>
-                    </a>
-            </li>
-        </ul>
-    </nav>
-    <ul class="post-actions post-action-share">
-        <li class="post-action hide-lg hide-md hide-sm">
-            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
-                <i class="fa fa-share-alt" aria-hidden="true"></i>
-            </a>
-        </li>
-        
-	
-        <li class="post-action">
-            
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
-            
-                <i class="fa fa-list" aria-hidden="true"></i>
-            </a>
-        </li>
-    </ul>
-</div>
-
-
-                </div>
-                
-
-            
-        </div>
-        
-
-
-    
-        
-    
-
-<div id="about">
-    <div id="about-card">
-        <div id="about-btn-close">
-            <i class="fa fa-times"></i>
-        </div>
-        
-            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
-        
-            <h4 id="about-card-name">一瓢清浅</h4>
-        
-            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
-</div>
-        
-        
-            <div id="about-card-job">
-                <i class="fa fa-briefcase"></i>
-                <br>
-                <p>IT工程师</p>
-
-            </div>
-        
-        
-            <div id="about-card-location">
-                <i class="fa fa-map-marker-alt"></i>
-                <br>
-                中国
-            </div>
-        
-    </div>
-</div>
-
-        
-        
-<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
-        <!--SCRIPTS-->
-
-<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
-
-<!--SCRIPTS END-->
-
-
-    
-        
-<script src="/assets/js/gitalk.js"></script>
-
-        <script type="text/javascript">
-          (function() {
-            new Gitalk({
-              clientID: 'Ov23li8lUWNadcQIsjjS',
-              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
-              repo: 'comment',
-              owner: 'jiliguluss',
-              admin: ['jiliguluss'],
-              id: '2024/Symbion初探/',
-              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
-            }).render('gitalk')
-          })()
-        </script>
-    
-
-
-
-
-
-  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
-  <script type="text/javascript">
-      tocbot.init({
-        tocSelector: '#post-toc', // 目录容器的 ID 或 class
-        contentSelector: '.post-content', // 内容容器的 ID 或 class
-        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
-        collapseDepth: '3',
-        scrollSmooth: true, 
-        activeClass: 'active', 
-        orderedList: false
-    });
-  </script> 
-
-
-
-  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
-  <script type="text/javascript">
-      $(document).ready(function() {
-          var mermaid_config = {
-              startOnLoad: true,
-              theme: 'default',
+</article><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E7%AC%A6%E5%8F%B7%E6%89%A7%E8%A1%8C/">符号执行</a><a class="post-meta__tags" href="/tags/Angr/">Angr</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2024/Angr%E9%9B%B6%E5%9F%BA%E7%A1%80%E5%85%A5%E9%97%A8/" title="符号执行工具——Angr 零基础入门"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">Previous</div><div class="info-item-2">符号执行工具——Angr 零基础入门</div></div><div class="info-2"><div class="info-item-1">Angr是基于Python的开源二进制分析框架，通过CLE加载程序、PyVEX转换中间语言、Claripy约束求解实现跨平台符号执行，支持自动化漏洞挖掘和逆向工程分析。</div></div></div></a><a class="pagination-related" href="/2024/%E6%B1%A1%E7%82%B9%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E2%80%94%E2%80%94libdft64/" title="污点分析工具——libdft64"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">Next</div><div class="info-item-2">污点分析工具——libdft64</div></div><div class="info-2"><div class="info-item-1">libdft64是一种数据流追踪工具，可以实现高效并且透明的动态污点分析（DTA），通常用来检测二进制中的安全漏洞</div></div></div></a></nav><hr class="custom-hr"><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> Comments</span></div></div><div class="comment-wrap"><div><div id="gitalk-container"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="author-info-name">一瓢清浅</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">31</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/jiliguluss"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">个人技术博客，涉及软件开发、安全测试、AI算法等领域。不求精深，但当涉猎，有所闻耳。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Contents</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E5%8E%9F%E7%90%86%E4%BB%8B%E7%BB%8D"><span class="toc-text">一、原理介绍 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-%20%E8%83%8C%E6%99%AF"><span class="toc-text">1. 背景 </span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-%20%E6%96%B9%E6%A1%88"><span class="toc-text">2. 方案</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-%20%E5%AE%9E%E7%8E%B0"><span class="toc-text">3. 实现</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E7%A4%BA%E4%BE%8B%E5%88%86%E6%9E%90"><span class="toc-text">二、示例分析</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Posts</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E5%A4%9A%E8%87%82%E8%80%81%E8%99%8E%E6%9C%BA/" title="多臂老虎机">多臂老虎机</a><time datetime="2025-05-28T00:57:38.000Z" title="Created 2025-05-28 08:57:38">2025-05-28</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/" title="进程间通信机制">进程间通信机制</a><time datetime="2025-05-26T06:24:56.000Z" title="Created 2025-05-26 14:24:56">2025-05-26</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/" title="Web 应用架构">Web 应用架构</a><time datetime="2025-05-21T06:52:47.000Z" title="Created 2025-05-21 14:52:47">2025-05-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E8%82%A1%E7%A5%A8%E6%8A%95%E8%B5%84%E5%85%A5%E9%97%A8%E3%80%81%E8%BF%9B%E9%98%B6%E4%B8%8E%E5%AE%9E%E6%88%98%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《股票投资入门、进阶与实战》笔记">《股票投资入门、进阶与实战》笔记</a><time datetime="2025-02-24T04:50:18.000Z" title="Created 2025-02-24 12:50:18">2025-02-24</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E6%8A%95%E8%B5%84%E4%B8%AD%E6%9C%80%E7%AE%80%E5%8D%95%E7%9A%84%E4%BA%8B%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《投资中最简单的事》笔记">《投资中最简单的事》笔记</a><time datetime="2025-01-20T01:05:49.000Z" title="Created 2025-01-20 09:05:49">2025-01-20</time></div></div></div></div></div></div></main><footer id="footer" style="background: transparent;"><div id="footer-wrap"><div class="copyright">&copy;2023 - 2025 By 一瓢清浅</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Reading Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light and Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle Between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Settings"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table of Contents"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="Scroll to Comments"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="Back to Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"><script>(() => {
+  const loadMathjax = () => {
+    if (!window.MathJax) {
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          tags: 'none',
+        },
+        chtml: {
+          scale: 1.1
+        },
+        options: {
+          enableMenu: true,
+          renderActions: {
+            findScript: [10, doc => {
+              for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+                const display = !!node.type.match(/; *mode=display/)
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+                const text = document.createTextNode('')
+                node.parentNode.replaceChild(text, node)
+                math.start = {node: text, delim: '', n: 0}
+                math.end = {node: text, delim: '', n: 0}
+                doc.math.push(math)
+              }
+            }, '']
           }
-          mermaid.initialize(mermaid_config);
-      });
-  </script>
+        }
+      }
 
+      const script = document.createElement('script')
+      script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+      script.id = 'MathJax-script'
+      script.async = true
+      document.head.appendChild(script)
+    } else {
+      MathJax.startup.document.state(0)
+      MathJax.texReset()
+      MathJax.typesetPromise()
+    }
+  }
 
-    </body>
-</html>
+  btf.addGlobalFn('encrypt', loadMathjax, 'mathjax')
+  window.pjax ? loadMathjax() : window.addEventListener('load', loadMathjax)
+})()</script><script>(() => {
+  const runMermaid = ele => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    ele.forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = `%%{init:{ 'theme':'${theme}'}}%%\n`
+      const mermaidID = `mermaid-${index}`
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+      const renderMermaid = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      // mermaid v9 and v10 compatibility
+      typeof renderFn === 'string' ? renderMermaid(renderFn) : renderFn.then(({ svg }) => renderMermaid(svg))
+    })
+  }
+
+  const codeToMermaid = () => {
+    const codeMermaidEle = document.querySelectorAll('pre > code.mermaid')
+    if (codeMermaidEle.length === 0) return
+
+    codeMermaidEle.forEach(ele => {
+      const preEle = document.createElement('pre')
+      preEle.className = 'mermaid-src'
+      preEle.hidden = true
+      preEle.textContent = ele.textContent
+      const newEle = document.createElement('div')
+      newEle.className = 'mermaid-wrap'
+      newEle.appendChild(preEle)
+      ele.parentNode.replaceWith(newEle)
+    })
+  }
+
+  const loadMermaid = () => {
+    if (true) codeToMermaid()
+    const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+    if ($mermaid.length === 0) return
+
+    const runMermaidFn = () => runMermaid($mermaid)
+    btf.addGlobalFn('themeChange', runMermaidFn, 'mermaid')
+    window.loadMermaid ? runMermaidFn() : btf.getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaidFn)
+  }
+
+  btf.addGlobalFn('encrypt', loadMermaid, 'mermaid')
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const isShuoshuo = GLOBAL_CONFIG_SITE.pageType === 'shuoshuo'
+  const option = null
+
+  const commentCount = n => {
+    const isCommentCount = document.querySelector('#post-meta .gitalk-comment-count')
+    if (isCommentCount) {
+      isCommentCount.textContent= n
+    }
+  }
+
+  const initGitalk = (el, path) => {
+    if (isShuoshuo) {
+      window.shuoshuoComment.destroyGitalk = () => {
+        if (el.children.length) {
+          el.innerHTML = ''
+          el.classList.add('no-comment')
+        }
+      }
+    }
+
+    const gitalk = new Gitalk({
+      clientID: 'Ov23li8lUWNadcQIsjjS',
+      clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+      repo: 'comment',
+      owner: 'jiliguluss',
+      admin: ['jiliguluss'],
+      updateCountCallback: commentCount,
+      ...option,
+      id: isShuoshuo ? path : (option && option.id) || 'fd36ed5af2065d30b0def647524c74e1'
+    })
+
+    gitalk.render('gitalk-container')
+  }
+
+  const loadGitalk = async(el, path) => {
+    if (typeof Gitalk === 'function') initGitalk(el, path)
+    else {
+      await btf.getCSS('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.css')
+      await btf.getScript('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.js')
+      initGitalk(el, path)
+    }
+  }
+
+  if (isShuoshuo) {
+    'Gitalk' === 'Gitalk'
+      ? window.shuoshuoComment = { loadComment: loadGitalk }
+      : window.loadOtherComment = loadGitalk
+    return
+  }
+
+  if ('Gitalk' === 'Gitalk' || !false) {
+    if (false) btf.loadComment(document.getElementById('gitalk-container'), loadGitalk)
+    else loadGitalk()
+  } else {
+    window.loadOtherComment = loadGitalk
+  }
+})()</script></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

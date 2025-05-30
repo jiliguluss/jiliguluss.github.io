@@ -1,271 +1,165 @@
-
-<!DOCTYPE html>
-<html lang="zh-cn">
-    
-<head>
-    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="generator" content="千里之行，始于足下">
-    <title>系统分析与设计：结构化与面向对象 - 千里之行，始于足下</title>
-    <meta name="author" content="一瓢清浅">
-    
-        <meta name="keywords" content="python,AI,安全,算法,编程,">
-    
-    
-    
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、系统分析与系统设计  系统分析  阶段是应用系统思想和方法，把复杂的对象分解为简单的组成部分，找出这些部分的基本属性和彼此之间的关系的过程，其基本任务是系统分析师和用户在充分了解用户需求的基础上，把双方对新系统的理解表达为  系统需求规格说明书。\n系统设计  的目标是根据系统分析的结果，完成系统的构建过程。其主要目的是绘制系统的蓝图，权衡和比较各种技术和实施方法的利弊，合理分配各种资源，构建新系统的详细设计方案和相关模型，指导系统实施工作的顺利开展。系统设计的主要内容包括  概要设计  和详细设计。\n通俗点说，系统分析解决“做什么 ”的问题，主要由系统分析师完成；系统设计解决“ 怎么做”的问题，主要由系统架构师完成。\n结构化和面向对象这两种方法，在系统分析和设计中都有应用，以下分别展开介绍。\n二、结构化方法  结构化方法 ，也称为 面向功能的软件开发方法  或面向数据流的软件开发方法 ，提出了一组提高软件结构合理性的准则，如分解与抽象、模块独立性、信息隐蔽等。针对软件生存周期各个不同的阶段，它有结构化分析(SA)、结构化设计(SD) 和结构化编程 (SP) 等方法。\n（一）结构化分析  结构化分析(Structured Analysis，SA) 的基本思想是自顶向下，逐层分解，把一个大问题分解成若干个小问题，每个小问题再分解成若干个更小的问题。经过逐层分解，每个最底层的问题都是足够简单、容易解决的，于是复杂的问题也就迎刃而解了。\nSA 建立的模型的核心是  数据字典。围绕这个核心，有三个层次的模型：\n\n数据模型 ：描述系统的实体对象以及实体之间的联系，通常以  实体关系图（ER 图） 表示。\n功能模型 ：描述系统各功能模块对数据的处理，通常以  数据流图（DFD） 表示。\n行为模型 ：描述系统的状态以及影响状态的事件，通常以  状态转换图（STD） 表示。\n\n\n\n1. 数据流图  数据流图（Data Flow Diagram，DFD）的核心是数据流。DFD 从应用系统的数据流着手，以图形方式刻画和表示一个具体业务系统中的数据处理和流动。\nDFD 由 4 种基本元素 (模型对象) 组成：\n\n数据流(Data Flow)：用一个箭头描述数据的流向，箭头上标注的内容可以是信息说明或数据项。\n处理 &#x2F; 加工(Process)：表示对数据进行的加工和转换，在图中用矩形框表示，指向处理的数据流为该处理的输入数据，离开处理的数据流为该处理的输出数据。\n数据存储 ：表示系统内部用数据库形式(或者文件形式) 存储的数据，在图中用上下各一条线段来表示，对其进行的存取操作分别以指向或离开数据存储的箭头表示。\n外部实体：也称为数据源或者数据终点，描述系统数据的提供者或者数据的使用者，在图中用圆角框或者平行四边形框表示。\n\n\n\n使用 DFD 建立功能模型，主要通过 DFD 自顶向下的  逐层分解  来实现：\n\n首先创建顶层 DFD 图。顶层 DFD 是描述系统最高层结构的 DFD，它的特点是将整个待开发的系统表示为一个加工，将所有的外部实体和进出系统的数据流都画在一张图中。\n\n然后自顶向下逐层分解，得到最终的 DFD 层次结构图。层次结构图中的上一层是下一层的抽象，下一层是上一层的细化，而最后一层中的每个处理都是一个具体可实现的描述，即一个处理模块仅描述和解决一个问题。\n\n\n\n\n在 DFD 分解过程中，要遵循数据流图的  平衡原则： \n\n父图与子图的平衡，即上下级数据流图之间数据流的完整性和一致性\n父图中的数据流必须在子图中有所对应：每一个在父图中出现的数据流，在子图中也必须出现。\n子图的输入和输出数据流必须与父图中该过程的输入和输出数据流相匹配：这意味着子图的总输入和总输出必须与父图中对应过程的输入和输出完全一致。\n\n\n子图内部平衡\n一个处理至少有一个输入流和一个输出流。只有输入没有输出的处理称为  黑洞 ；只有输出没有输入的处理称为 奇迹 ；输入不足以产生输出的处理称为 灰洞。\n一个存储必须有流入的数据流和流出的数据流。\n一个数据流至少有一端是处理端。\n\n\n\n2. 状态转换图  状态转换图（简称状态图，State Transform Diagram，STD）通过描绘系统的状态及引起系统状态的事件来表示系统的行为。\nSTD 中定义的状态主要有 3 种：\n\n初态（初始状态）：用黑圆点表示，一个 STD 只有一个初态。\n终态（最终状态）：用黑圆点外加一个圆表示，一个 STD 可以没有终态，也可以有一个或多个终态。\n中间状态：用圆角矩形表示，状态之间的转换用箭头表示。\n\n\n\n3. 实体关系图  实体关系图（Entity Relation Diagram，ERD）用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：\n\n实体：系统中的对象或概念，用矩形框表示。\n属性：实体具有的特性，用椭圆形表示。\n联系：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系（1:1，1:n，m:n）。\n\n\n\n使用 ER 图建立数据模型，主要采用自底向上的策略，首先设计局部 ER 图，然后将各个局部 ER 图合并起来形成全局 ER 图，最后对全局 ER 图进行优化。\n4. 数据字典  数据字典是描述数据信息的集合，是对系统中使用的所有数据元素的定义的集合，主要目的是对系统中出现的条目给出严密一致的解释。在结构化分析中，数据流图上所有元素的定义和解释的文字集合就是数据字典。\n数据字典包含 6 类元素：\n\n数据项：数据流图中数据块的数据结构中的数据项说明，数据项是不可再分的数据单位。\n数据结构：数据流图中数据块的数据结构说明，一个数据结构可以由若干个数据项和若干个数据结构组成。\n数据流：数据流图中流线的说明，数据流是数据结构在系统内传输的路径。\n数据存储：数据流图中数据块的存储特性说明，是数据结构停留或保存的地方。\n加工逻辑：数据流图中功能块的说明，数据字典中只需要描述处理过程的说明性信息。\n外部实体：数据流图中位于系统外部的实体，通常是数据流的源点或终点。\n\n（二）结构化设计  结构化设计(Structured Design，SD) 是一种面向数据流的设计方法，它以 SRS 和 SA 阶段所产生的数据流图和数据字典等文档为基础，是一个自顶向下、逐步求精和模块化的过程。\nSD 方法的基本思想是  将软件设计成由相对独立且具有单一功能的模块组成的结构，分为概要设计和详细设计两个阶段：\n\n概要设计：确定软件系统的结构，对系统进行模块划分，确定每个模块的功能、接口和模块之间的调用关系。\n详细设计：为每个模块设计实现的细节。\n\nSD 包括四项设计活动：数据设计、软件结构设计、接口设计（人机界面设计）、过程设计。SD 以 SA 为基础，它们的关系如图所示：\n\n\nSD 将系统划分为可自由组合、分解、和变换的功能模块，模块划分应遵循如下原则：\n\n模块大小适中。\n\n模块扇入和扇出合理。设计良好的软件结构通常顶层扇出比较大，中间扇出较少，底层模块则有较大扇入。\n\n扇出是指该模块直接调用的下级模块个数。扇出大表示模块复杂度高，需要添加中间层的控制模块。\n扇入是指直接调用该模块的上级模块个数。扇入大表示模块复用程度高。\n\n\n深度和宽度适当。深度表示模块层数，宽度表示同一层模块总数的最大值。\n\n信息隐蔽。采用封装技术隐藏程序模块实现细节，使模块接口尽可能简单。\n\n高内聚，低耦合。\n\n耦合度从低到高\n\n\n\n\n耦合度\n描述\n\n\n\n非直接耦合（低）\n两个模块之间没有直接关系，它们之间的联系完全是通过主模块的控制和调用来实现的\n\n\n数据耦合\n模块借助参数表传递简单数据\n\n\n标记耦合\n模块通过参数表传递记录信息（数据结构）\n\n\n控制耦合\n模块之间传递的信息中包含用于控制模块内部逻辑的信息\n\n\n通信耦合\n一组模块共用了一组输入信息，或者它们的输出需要整合以形成完整数据，即共享了输入或输出\n\n\n公共耦合\n多个模块都访问同一个公共数据环境，公共数据环境可以是全局数据结构、共享的通信区、内存的公共覆盖区等\n\n\n内容耦合（高）\n一个模块直接访问另一个模块的内部数据；一个模块不通过正常入口转到另一个模块的内部；两个模块有一部分程序代码重叠；一个模块有多个入口等\n\n\n\n内聚度从高到底\n\n\n\n\n内聚类型\n描述\n\n\n\n功能内聚（高）\n完成一个单一功能，各个部分协同工作，缺一不可\n\n\n顺序内聚\n处理元素相关，而且必须顺序执行\n\n\n通信内聚\n所有处理元素集中在一个数据结构的区域上\n\n\n过程内聚\n处理元素相关，而且必须按特定的次序执行\n\n\n时间内聚\n所包含的任务必须在同一时间间隔内执行\n\n\n逻辑内聚\n完成逻辑上相关的一组任务\n\n\n偶然内聚（低）\n完成一组没有关系或松散关系的任务\n\n\n\n\n三、面向对象方法  面向对象 (Object-Oriented，OO) 开发方法 将面向对象的思想应用于软件开发过程中，主张参照人们认识一个现实系统的方法，完成分析、设计与实现一个软件系统，强调最终建立的系统能映射问题域，使得系统中的对象、以及对象之间的关系能够如实地反映问题域中固有的事物及其关系。\n面向对象开发方法是  以用例驱动的、以体系结构为中心的、迭代的和渐增式的开发过程，主要包括需求分析、系统分析、系统设计和系统实现 4 个阶段。但是，各个阶段的划分不像结构化开发方法那样清晰，而是在各个阶段之间迭代进行的。\n（一）面向对象分析  面向对象的分析方法 (Object-Oriented Analysis，OOA) 运用面向对象方法分析问题域，正确认识问题域中的事物及它们之间的关系，找出描述问题域和系统功能所需的类和对象，定义它们的属性和职责，以及它们之间所形成的各种联系。\n使用 OOA 时，包含建立用例模型与分析模型两大步骤：\n\n\n1. UML 统一建模语言UML（Unified Modeling Language，统一建模语言）是面向对象的标准化建模语言，其总体结构如图所示：\n\n\n在 UML 中，有两种类型的图：\n\n结构图 ：也称 静态图，用来描述事物之间的关系，包括类图、对象图、组件图和部署图等。\n行为图 ：也称 动态图，用来描述参与者和用例之间的交互，或者描述参与者如何使用系统，包括用例图、顺序图、活动图、状态图和通信图等。\n\n(1) 类图  类图描述类、接口、协作及它们之间的关系。在系统分析阶段，通过类图来表述问题域的对象和对象之间的联系。\n一个类包含三个部分：类名、属性、方法。类与类之间有 6 种，分别的含义与表达方式如下：\n\n\n这六种关系由强到弱依次为：继承 &#x3D; 实现 &gt; 组合 &gt; 聚合 &gt; 关联 &gt; 依赖。\n组合与聚合的区别在于生命周期的差别：组合关系具有相同的生命周期 ，“部分”会随着“整体”的创建而创建，也随着“整体”的消亡而消亡； 聚合关系意味着好聚好散，“部分”与“整体”生命周期可以不同。\n在如下示例中，Heart 和 People 是组合关系，People 和 PeopleGroup 是聚合关系：\n\n\n(2) 用例图  用例模型通常以用例图表示，用例图由 4 个元素组成：\n\n参与者(Actor)：系统交互的所有事物，该角色不仅可以由人承担，还可以是其他系统和硬件设备，甚至是系统时钟。在图中用一个小人表示。\n用例(Use Case)：外部可见的系统功能单元，对系统提供的服务进行描述。在图中用椭圆表示。\n系统边界(System Boundary)：系统与系统之间的界限。在图中用方形容器 + 系统名称表示。\n用例之间的关系：分为  包含、扩展、泛化  三种。\n包含与扩展的区别：包含用例是无条件执行，即不论如何都会执行；扩展用例是有条件执行，即满足某种条件才会执行。\n扩展与泛化的区别：泛化强调的是继承和重用，执行父用例，实际上是执行某一个子用例；扩展强调的是条件和可选性，在基础用例执行后，满足某个条件再执行扩展用例。\n\n\n\n\n\n(3) 顺序图（时序图）顺序图代表了一个相互作用、以时间为次序的对象之间的通信集合。顺序图的主要用途之一是为用例进行逻辑建模，任何用例模型都可以使用顺序图进一步阐明和实现。\n顺序图的主要元素包括：\n\n对象：系统中参与交互的实例。每个对象通常对应于类的一个具体实例，并在图中以矩形框加上对象名称和类名的形式表示。\n生命线：表示对象在交互过程中的存在时间。它以从对象框向下延伸的虚线表示。\n激活：表示对象在特定时间段内执行某个操作或方法。它通常以一个细长的矩形条覆盖在生命线上，显示该对象在此期间处于活动状态。\n消息：表示对象之间传递的信息或调用的方法，可分为同步消息、异步消息、返回消息三种类型。消息用带箭头的实线或虚线表示，箭头指向接收消息的对象在，不同消息类型用不同箭头样式表示。\n交互片段：用于封装交互图中的片段，并可对片段施加一定的操作（如分支、循环、可选等），从而支持复杂的交互建模。\n\n\n\n(4) 通信图（协作图）通信图显示了对象间的联系以及对象间发送和接收的消息。通信图与顺序图在语义上是等价的，可以相互转换，二者的区别在于：\n\n顺序图展示了对象之间如何相互协作来完成某一项功能，强调各个对象按照  时间顺序  进行交互的过程。\n通信图也描述了对象之间如何相互协作来完成某一项功能，但侧重于强调参与交互的对象的  组织关系。\n\n通信图的主要元素包括：\n\n类角色：在特定交互中对象所扮演的角色。每个类角色对应于类图中的一个类，但在通信图中，类角色强调对象在交互过程中的功能和责任。\n关联角色：在通信图中对象之间的关系角色。每个关联角色通常对应于类图中定义的一个关联，并指定了对象在该关联中的具体角色或职责。\n对象：系统中参与交互的实例。每个对象通常对应于类的一个具体实例，并在图中以矩形框加上对象名称和类名的形式表示。\n链：对象间发送消息的路径，用来在通信图中关联对象。在图中由一个或多个相连的线（直线或弧线）形成，链的两端是消息发送者和消息接收者。\n消息：表示对象之间传递的信息或调用的方法。在图上通过沿着链的箭头，以及箭头上添加消息名和消息编号来表示。消息编号用来表示消息的先后次序。\n\n\n\n(5) 活动图  活动图将业务流程或其他计算的结构展示为内部一步步的控制流和数据流，主要用于描述某一方法、机制或用例的内部行为。\n活动图的主要元素包括：\n\n起点：活动起始点，用实心圆表示，有且只有一个。\n终点：活动结束点，用同心圆表示，可能有多个。\n活动：对象执行的具体操作，用圆角矩形表示，活动名用动宾短语描述。\n判断（决策点）：流程产生分支的地方，用菱形表示。\n泳道：表示参与活动的不同对象，每个泳道表示一个参与者的职责范围。用矩形划分区域，每个对象的活动只能画在对应的泳道。\n控制流：将不同的活动按顺序连接起来，用带箭头的连线表示。\n分叉 &#x2F; 合并：分叉将控制流分为两个或多个并发运行的分支；合并用于同步并发分支，以达到共同完成一项事务的目的。在活动图中，用一条水平或者垂直的小黑棒表示。\n\n\n\n活动图与流程图的区别：\n\n活动图支持复杂流程，包括并发行为；流程图不支持并发活动。\n活动图面向对象，可以表示对象之间的交互；流程图面向过程，强调步骤之间的顺序和关系。\n活动图多用于软件工程和系统建模，适用于需求分析和系统设计；流程图多用于业务管理，适合描述工作流程。\n\n2. 4+1 视图RUP 中的 4+1 架构视图是 UML 在软件工程中的优秀实践。4+1 架构模型从不同的视角为系统架构建模，形成不同的视图：\n\n用例视图：从用户角度，描述系统的功能，通常以用例图、场景图表示。\n逻辑视图：从系统分析和设计人员角度，描述系统的组件和模块之间的关系，通常以类图、对象图表示。\n实现视图：从开发人员角度，描述系统代码结构，通常以组件图、包图表示。\n进程视图：从系统集成人员角度，描述系统运行时各对象的行为与交互，通常以状态图、活动图、时序图表示。\n部署视图：从系统工程师角度，描述系统的软件到硬件的映射和分布关系，通常以部署图表示。\n\n\n\n（二）面向对象设计  面向对象设计（Object-Oriented Design，OOD）是将 OOA 所创建的分析模型转化为设计模型，其目标是定义系统构造蓝图。OOD 的基本思想包括抽象、封装、继承和多态。在 OOD 中，数据结构和在数据结构上定义的操作算法封装在一个类中。\n1. 类的分类OOD 中设计的类分为三种：\n\n边界类（Boundary class）：负责系统与外部世界的交互，通常是用户界面、API 接口或外部系统的通信接口。\n控制类（Control class）：负责处理系统的逻辑流程和业务规则，充当协调者，控制系统的运作。\n实体类（Entity class）：代表系统中的数据对象或业务对象，通常对应数据库中的表，是系统中需要长期保存的信息。\n\n\n\n通俗来说：\n\n边界类负责输入和输出，与用户或外部系统交互。\n控制类负责逻辑控制，管理操作流程和业务规则。\n实体类负责数据存储，代表系统中的业务对象和数据。\n\n通过这种分类，我们可以更加清晰地分离系统中的不同职责，使系统设计更加模块化和可维护。\n2. 设计原则  在 OOD 中，合理运用设计原则可以带来可维护性的提升。常用的 OOD 原则为：\n\n\n\n原则\n描述\n\n\n\n单一职责原则（S）\n每个类应该只有一个引起变化的原因，类的职责要单一\n\n\n开闭原则（O）\n软件实体（类、模块、函数等）应该可以扩展，但不可修改\n\n\n里氏替换原则（L）\n子类对象必须能够替换其基类对象，且保证程序的正确性，反之不一定成立\n\n\n接口隔离原则（I）\n使用多个专门的接口，而不使用单一的总接口\n\n\n依赖倒置原则（D）\n高层模块不应该依赖低层模块，二者都应该依赖抽象。抽象不应该依赖细节，细节应该依赖抽象。要针对接口编程，而不是针对实现编程\n\n\n最少知识原则（迪米特法则）\n一个软件实体应当尽可能少地与其他实体发生相互作用\n\n\n组合 &#x2F; 聚合复用原则\n多用组合或聚合关系来复用已有对象，少用继承关系\n\n\n3. 设计模式  设计模式是前人经验的总结，它使人们可以方便地复用成功的设计和架构。当在特定的环境下遇到特定类型的问题，采用他人已使用过的一些成功的解决方案，一方面可以降低分析、设计和实现的难度，另一方面可以使系统具有更好的可复用性和灵活性。\n常见的设计模式包含如下 3 大类共 23 种：\n","dateCreated":"2024-10-11T16:37:02+08:00","dateModified":"2025-05-19T08:48:24+08:00","datePublished":"2024-10-11T16:37:02+08:00","description":"结构化方法和面向对象方法，是系统分析与设计的两种主要方法","headline":"系统分析与设计：结构化与面向对象","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/","keywords":"软件工程"}</script>
-    <meta name="description" content="结构化方法和面向对象方法，是系统分析与设计的两种主要方法">
-<meta property="og:type" content="blog">
+<!DOCTYPE html><html lang="zh-cn" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>系统分析与设计：结构化与面向对象 | 千里之行，始于足下</title><meta name="author" content="一瓢清浅"><meta name="copyright" content="一瓢清浅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="系统分析与设计包含结构化方法（如数据流图、实体关系图）和面向对象方法（如UML建模），前者强调功能分解与模块化，后者聚焦对象封装、继承和多态，适应不同系统复杂度需求。">
+<meta property="og:type" content="article">
 <meta property="og:title" content="系统分析与设计：结构化与面向对象">
-<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/index.html">
+<meta property="og:url" content="https://jiliguluss.github.io/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
-<meta property="og:description" content="结构化方法和面向对象方法，是系统分析与设计的两种主要方法">
+<meta property="og:description" content="系统分析与设计包含结构化方法（如数据流图、实体关系图）和面向对象方法（如UML建模），前者强调功能分解与模块化，后者聚焦对象封装、继承和多态，适应不同系统复杂度需求。">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/SA%E6%A8%A1%E5%9E%8B.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/DFD%E5%85%83%E7%B4%A0.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/DFD%E5%88%86%E8%A7%A3.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/STD.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/ERD.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/SD.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/OOA.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/UML%E6%A6%82%E5%BF%B5%E6%A8%A1%E5%9E%8B.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E7%B1%BB%E7%9A%84%E5%85%AD%E7%A7%8D%E5%85%B3%E7%B3%BB.jfif">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E7%B1%BB%E7%9A%84%E5%85%B3%E7%B3%BB%E4%B8%BE%E4%BE%8B.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E7%94%A8%E4%BE%8B%E7%9A%84%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E9%A1%BA%E5%BA%8F%E5%9B%BE%E7%A4%BA%E4%BE%8B.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E9%80%9A%E4%BF%A1%E5%9B%BE%E7%A4%BA%E4%BE%8B.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E6%B4%BB%E5%8A%A8%E5%9B%BE%E7%A4%BA%E4%BE%8B.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/RUP%E6%9E%B6%E6%9E%84%E8%A7%86%E5%9B%BE.png">
-<meta property="og:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F.png">
+<meta property="og:image" content="https://jiliguluss.github.io/img/photo.jpg">
 <meta property="article:published_time" content="2024-10-11T08:37:02.000Z">
-<meta property="article:modified_time" content="2025-05-19T00:48:24.899Z">
+<meta property="article:modified_time" content="2025-05-30T04:57:50.012Z">
 <meta property="article:author" content="一瓢清浅">
 <meta property="article:tag" content="软件工程">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://jiliguluss-github-io.vercel.app/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/SA%E6%A8%A1%E5%9E%8B.png">
-    
-    
-        
-    
-    
-        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
-    
-    
-    
-    
-    <!--STYLES-->
-    
-<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
-
-    <!--STYLES END-->
-    
-
-    
-
-    
-        
-            
-<link rel="stylesheet" href="/assets/css/gitalk.css">
-
-        
-    
-</head>
-
-    <body>
-        <div id="blog">
-            <!-- Define author's picture -->
-
-
-<header id="header" data-behavior="5">
-    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
-    <div class="header-title">
-        <a class="header-title-link" href="/" aria-label>
-            千里之行，始于足下
-        </a>
-    </div>
-    
-        
-            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
-        
-        
-            <i class="fa fa-question fa-lg"></i>
-        
-        </a>
-    
-</header>
-
-            <!-- Define author's picture -->
-
-
-
-        
-    
-
-<nav id="sidebar" data-behavior="5">
-    <div class="sidebar-container">
-        
-            <div class="sidebar-profile">
-                <a href="/#about" aria-label="阅读有关作者的更多信息">
-                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
-                </a>
-                <h4 class="sidebar-profile-name">一瓢清浅</h4>
-                
-                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
-</h5>
-                
-            </div>
-        
-        
-            <ul class="sidebar-buttons">
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
-                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">首页</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
-                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">分类</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
-                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">标签</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
-                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">归档</span>
-                    </a>
-            </li>
-            
-        </ul>
-        
-            <ul class="sidebar-buttons">
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
-                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">关于</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
-                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">GitHub</span>
-                    </a>
-            </li>
-            
-        </ul>
-        
-    </div>
-</nav>
-
-            
-            <div id="main" data-behavior="5" class="
-                        hasCoverMetaIn
-                        ">
-                
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
-    <style>
-        #post-toc {
-            position: fixed !important;
-            top: 80px;
-            padding: 10px;
-            z-index: 100;
-            background-color: rgba(255,255,255,0);
-            transform: translateX(0);
-            right: 3%;
-            width: 220px;
-            height: auto;
-            padding-top: 10px;
-            padding-bottom: 10px;
+<meta name="twitter:image" content="https://jiliguluss.github.io/img/photo.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "系统分析与设计：结构化与面向对象",
+  "url": "https://jiliguluss.github.io/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/",
+  "image": "https://jiliguluss.github.io/img/photo.jpg",
+  "datePublished": "2024-10-11T08:37:02.000Z",
+  "dateModified": "2025-05-30T04:57:50.012Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "一瓢清浅",
+      "url": "https://jiliguluss.github.io/"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/photo.jpg"><link rel="canonical" href="https://jiliguluss.github.io/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"><link rel="preconnect" href="//busuanzi.ibruce.info"><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
         }
-    </style>
-    <script>
-        var tocWidth = 220; // TOC的固定宽度
-        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
-        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+        return value
+      }
+    }
 
-        // 检查窗口宽度并调整TOC显示
-        function adjustToc() {
-            var toc = document.getElementById('post-toc');
-            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
-            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
-
-            if (contentWrap) {
-                var contentWidth = contentWrap.offsetWidth;
-                // 计算contentWrap的宽度加上TOC的宽度和内边距
-                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
-
-                if (totalWidth >= screenWidth) {
-                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
-                } else {
-                    toc.style.display = 'block'; // 否则，显示TOC
-                }
-            } else {
-                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
-            }
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
         }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
 
-        // 监听窗口大小变化事件
-        window.addEventListener('resize', adjustToc);
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
 
-        // 页面加载完毕时调用adjustToc
-        document.addEventListener('DOMContentLoaded', adjustToc);
-    </script>
-    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
-
-                
-<article class="post">
+      const theme = saveToLocal.get('theme')
     
-    
-        <div class="post-header main-content-wrap text-left">
-    
-        <h1 class="post-title">
-            系统分析与设计：结构化与面向对象
-        </h1>
-    
-    
-        <div class="post-meta">
-    <time datetime="2024-10-11T16:37:02+08:00">
-	
-		    2024 年 10 月 11 日
-    	
-    </time>
-    
-        <span>发布在 </span>
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
         
-    <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/">软考</a>, <a class="category-link" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a>
-
-
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
     
-</div>
-
-    
-</div>
-
-    
-    <div class="post-content markdown">
-        <div class="main-content-wrap">
-            <!--excerpt-->
-
-<h2 id="一、系统分析与系统设计"><a href="# 一、系统分析与系统设计" class="headerlink" title="一、系统分析与系统设计"></a>一、系统分析与系统设计 </h2><p><strong> 系统分析 </strong> 阶段是应用系统思想和方法，把复杂的对象分解为简单的组成部分，找出这些部分的基本属性和彼此之间的关系的过程，其基本任务是系统分析师和用户在充分了解用户需求的基础上，把双方对新系统的理解表达为 <strong> 系统需求规格说明书</strong>。</p>
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: 'Copy Successful',
+    error: 'Copy Failed',
+    noSupport: 'Browser Not Supported'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: 'Just now',
+    min: 'minutes ago',
+    hour: 'hours ago',
+    day: 'days ago',
+    month: 'months ago'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: 'Load More'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '系统分析与设计：结构化与面向对象',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="web_bg" style="background-image: url(/img/cover.png);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="site-data text-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">31</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="not-top-img" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">千里之行，始于足下</span></a><a class="nav-page-title" href="/"><span class="site-name">系统分析与设计：结构化与面向对象</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav></header><main class="layout" id="content-inner"><div id="post"><div id="post-info"><h1 class="post-title">系统分析与设计：结构化与面向对象</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2024-10-11T08:37:02.000Z" title="Created 2024-10-11 16:37:02">2024-10-11</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2025-05-30T04:57:50.012Z" title="Updated 2025-05-30 12:57:50">2025-05-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E8%BD%AF%E8%80%83/">软考</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id data-flag-title><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post Views:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div><article class="container post-content" id="article-container"><h2 id="一、系统分析与系统设计"><a href="# 一、系统分析与系统设计" class="headerlink" title="一、系统分析与系统设计"></a>一、系统分析与系统设计 </h2><p><strong> 系统分析 </strong> 阶段是应用系统思想和方法，把复杂的对象分解为简单的组成部分，找出这些部分的基本属性和彼此之间的关系的过程，其基本任务是系统分析师和用户在充分了解用户需求的基础上，把双方对新系统的理解表达为 <strong> 系统需求规格说明书</strong>。</p>
 <p><strong>系统设计 </strong> 的目标是根据系统分析的结果，完成系统的构建过程。其主要目的是绘制系统的蓝图，权衡和比较各种技术和实施方法的利弊，合理分配各种资源，构建新系统的详细设计方案和相关模型，指导系统实施工作的顺利开展。系统设计的主要内容包括 <strong> 概要设计 </strong> 和<strong>详细设计</strong>。</p>
 <p>通俗点说，系统分析解决“<strong>做什么 </strong>”的问题，主要由系统分析师完成；系统设计解决“<strong> 怎么做</strong>”的问题，主要由系统架构师完成。</p>
 <p>结构化和面向对象这两种方法，在系统分析和设计中都有应用，以下分别展开介绍。</p>
@@ -278,17 +172,15 @@
 <li><strong>行为模型 </strong>：描述系统的状态以及影响状态的事件，通常以 <strong> 状态转换图（STD）</strong> 表示。</li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/SA%E6%A8%A1%E5%9E%8B.png" class title=" 结构化分析模型 ">
-
 <h4 id="1- 数据流图"><a href="#1- 数据流图" class="headerlink" title="1. 数据流图"></a>1. 数据流图 </h4><p> 数据流图（Data Flow Diagram，DFD）的核心是数据流。DFD 从应用系统的数据流着手，以图形方式刻画和表示一个具体业务系统中的数据处理和流动。</p>
 <p>DFD 由 4 种基本元素 (模型对象) 组成：</p>
 <ul>
 <li><strong>数据流</strong>(Data Flow)：用一个箭头描述数据的流向，箭头上标注的内容可以是信息说明或数据项。</li>
-<li><strong>处理 &#x2F; 加工</strong>(Process)：表示对数据进行的加工和转换，在图中用矩形框表示，指向处理的数据流为该处理的输入数据，离开处理的数据流为该处理的输出数据。</li>
+<li><strong>处理 / 加工</strong>(Process)：表示对数据进行的加工和转换，在图中用矩形框表示，指向处理的数据流为该处理的输入数据，离开处理的数据流为该处理的输出数据。</li>
 <li><strong>数据存储 </strong>：表示系统内部用数据库形式(或者文件形式) 存储的数据，在图中用上下各一条线段来表示，对其进行的存取操作分别以指向或离开数据存储的箭头表示。</li>
 <li><strong>外部实体</strong>：也称为数据源或者数据终点，描述系统数据的提供者或者数据的使用者，在图中用圆角框或者平行四边形框表示。</li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/DFD%E5%85%83%E7%B4%A0.png" class title="DFD 元素 ">
-
 <p>使用 DFD 建立功能模型，主要通过 DFD 自顶向下的 <strong> 逐层分解 </strong> 来实现：</p>
 <ol>
 <li><p>首先创建顶层 DFD 图。顶层 DFD 是描述系统最高层结构的 DFD，它的特点是将整个待开发的系统表示为一个加工，将所有的外部实体和进出系统的数据流都画在一张图中。</p>
@@ -297,7 +189,6 @@
 </li>
 </ol>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/DFD%E5%88%86%E8%A7%A3.png" class title="DFD">
-
 <p>在 DFD 分解过程中，要遵循数据流图的 <strong> 平衡原则</strong>： </p>
 <ul>
 <li><strong>父图与子图的平衡</strong>，即上下级数据流图之间数据流的完整性和一致性<ol>
@@ -320,7 +211,6 @@
 <li>中间状态：用圆角矩形表示，状态之间的转换用箭头表示。</li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/STD.png" class title="STD">
-
 <h4 id="3- 实体关系图"><a href="#3- 实体关系图" class="headerlink" title="3. 实体关系图"></a>3. 实体关系图 </h4><p> 实体关系图（Entity Relation Diagram，ERD）用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：</p>
 <ul>
 <li><strong>实体</strong>：系统中的对象或概念，用矩形框表示。</li>
@@ -328,7 +218,6 @@
 <li><strong>联系</strong>：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系（1:1，1:n，m:n）。</li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/ERD.png" class title="ERD">
-
 <p>使用 ER 图建立数据模型，主要采用自底向上的策略，首先设计局部 ER 图，然后将各个局部 ER 图合并起来形成全局 ER 图，最后对全局 ER 图进行优化。</p>
 <h4 id="4- 数据字典"><a href="#4- 数据字典" class="headerlink" title="4. 数据字典"></a>4. 数据字典 </h4><p> 数据字典是描述数据信息的集合，是对系统中使用的所有数据元素的定义的集合，主要目的是对系统中出现的条目给出严密一致的解释。在结构化分析中，数据流图上所有元素的定义和解释的文字集合就是数据字典。</p>
 <p>数据字典包含 6 类元素：</p>
@@ -348,100 +237,25 @@
 </ul>
 <p>SD 包括四项设计活动：数据设计、软件结构设计、接口设计（人机界面设计）、过程设计。SD 以 SA 为基础，它们的关系如图所示：</p>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/SD.png" class title=" 结构化设计 ">
-
 <p>SD 将系统划分为可自由组合、分解、和变换的功能模块，模块划分应遵循如下原则：</p>
 <ol>
-<li><p>模块大小适中。</p>
-</li>
-<li><p>模块扇入和扇出合理。设计良好的软件结构通常顶层扇出比较大，中间扇出较少，底层模块则有较大扇入。</p>
-<ul>
+<li>模块大小适中。</li>
+<li>模块扇入和扇出合理。设计良好的软件结构通常顶层扇出比较大，中间扇出较少，底层模块则有较大扇入。<ul>
 <li>扇出是指该模块直接调用的下级模块个数。扇出大表示模块复杂度高，需要添加中间层的控制模块。</li>
 <li>扇入是指直接调用该模块的上级模块个数。扇入大表示模块复用程度高。</li>
 </ul>
 </li>
-<li><p>深度和宽度适当。深度表示模块层数，宽度表示同一层模块总数的最大值。</p>
-</li>
-<li><p>信息隐蔽。采用封装技术隐藏程序模块实现细节，使模块接口尽可能简单。</p>
-</li>
+<li>深度和宽度适当。深度表示模块层数，宽度表示同一层模块总数的最大值。</li>
+<li>信息隐蔽。采用封装技术隐藏程序模块实现细节，使模块接口尽可能简单。</li>
 <li><p><strong>高内聚，低耦合</strong>。</p>
 <ul>
 <li><strong>耦合度从低到高</strong></li>
 </ul>
-<table>
-<thead>
-<tr>
-<th>耦合度</th>
-<th>描述</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>非直接耦合（低）</td>
-<td>两个模块之间没有直接关系，它们之间的联系完全是通过主模块的控制和调用来实现的</td>
-</tr>
-<tr>
-<td>数据耦合</td>
-<td>模块借助参数表传递简单数据</td>
-</tr>
-<tr>
-<td>标记耦合</td>
-<td>模块通过参数表传递记录信息（数据结构）</td>
-</tr>
-<tr>
-<td>控制耦合</td>
-<td>模块之间传递的信息中包含用于控制模块内部逻辑的信息</td>
-</tr>
-<tr>
-<td>通信耦合</td>
-<td>一组模块共用了一组输入信息，或者它们的输出需要整合以形成完整数据，即共享了输入或输出</td>
-</tr>
-<tr>
-<td>公共耦合</td>
-<td>多个模块都访问同一个公共数据环境，公共数据环境可以是全局数据结构、共享的通信区、内存的公共覆盖区等</td>
-</tr>
-<tr>
-<td>内容耦合（高）</td>
-<td>一个模块直接访问另一个模块的内部数据；一个模块不通过正常入口转到另一个模块的内部；两个模块有一部分程序代码重叠；一个模块有多个入口等</td>
-</tr>
-</tbody></table>
+<p>| 耦合度      | 描述                                               |<br>|—————|—————————————————————————|<br>| 非直接耦合（低） | 两个模块之间没有直接关系，它们之间的联系完全是通过主模块的控制和调用来实现的           |<br>| 数据耦合     | 模块借助参数表传递简单数据                                    |<br>| 标记耦合     | 模块通过参数表传递记录信息（数据结构）                              |<br>| 控制耦合     | 模块之间传递的信息中包含用于控制模块内部逻辑的信息                        |<br>| 通信耦合     | 一组模块共用了一组输入信息，或者它们的输出需要整合以形成完整数据，即共享了输入或输出      |<br>| 公共耦合     | 多个模块都访问同一个公共数据环境，公共数据环境可以是全局数据结构、共享的通信区、内存的公共覆盖区等 |<br>| 内容耦合（高）  | 一个模块直接访问另一个模块的内部数据；一个模块不通过正常入口转到另一个模块的内部；两个模块有一部分程序代码重叠；一个模块有多个入口等        | </p>
 <ul>
 <li><strong>内聚度从高到底</strong></li>
 </ul>
-<table>
-<thead>
-<tr>
-<th>内聚类型</th>
-<th>描述</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>功能内聚（高）</td>
-<td>完成一个单一功能，各个部分协同工作，缺一不可</td>
-</tr>
-<tr>
-<td>顺序内聚</td>
-<td>处理元素相关，而且必须顺序执行</td>
-</tr>
-<tr>
-<td>通信内聚</td>
-<td>所有处理元素集中在一个数据结构的区域上</td>
-</tr>
-<tr>
-<td>过程内聚</td>
-<td>处理元素相关，而且必须按特定的次序执行</td>
-</tr>
-<tr>
-<td>时间内聚</td>
-<td>所包含的任务必须在同一时间间隔内执行</td>
-</tr>
-<tr>
-<td>逻辑内聚</td>
-<td>完成逻辑上相关的一组任务</td>
-</tr>
-<tr>
-<td>偶然内聚（低）</td>
-<td>完成一组没有关系或松散关系的任务</td>
-</tr>
-</tbody></table>
+<p>| 内聚类型    | 描述                      |<br>|————-|————————————-|<br>| 功能内聚（高） | 完成一个单一功能，各个部分协同工作，缺一不可  |<br>| 顺序内聚    | 处理元素相关，而且必须顺序执行  |<br>| 通信内聚    | 所有处理元素集中在一个数据结构的区域上  |<br>| 过程内聚    | 处理元素相关，而且必须按特定的次序执行  |<br>| 时间内聚    | 所包含的任务必须在同一时间间隔内执行 |<br>| 逻辑内聚    | 完成逻辑上相关的一组任务  |<br>| 偶然内聚（低） | 完成一组没有关系或松散关系的任务  |</p>
 </li>
 </ol>
 <h2 id="三、面向对象方法"><a href="# 三、面向对象方法" class="headerlink" title="三、面向对象方法"></a>三、面向对象方法 </h2><p><strong> 面向对象 (Object-Oriented，OO) 开发方法</strong> 将面向对象的思想应用于软件开发过程中，主张参照人们认识一个现实系统的方法，完成分析、设计与实现一个软件系统，强调最终建立的系统能映射问题域，使得系统中的对象、以及对象之间的关系能够如实地反映问题域中固有的事物及其关系。</p>
@@ -449,10 +263,8 @@
 <h3 id="（一）面向对象分析"><a href="#（一）面向对象分析" class="headerlink" title="（一）面向对象分析"></a>（一）面向对象分析 </h3><p> 面向对象的分析方法 (Object-Oriented Analysis，OOA) 运用面向对象方法分析问题域，正确认识问题域中的事物及它们之间的关系，找出描述问题域和系统功能所需的类和对象，定义它们的属性和职责，以及它们之间所形成的各种联系。</p>
 <p>使用 OOA 时，包含建立用例模型与分析模型两大步骤：</p>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/OOA.png" class title="OOA">
-
 <h4 id="1-UML 统一建模语言"><a href="#1-UML 统一建模语言" class="headerlink" title="1. UML 统一建模语言"></a>1. UML 统一建模语言</h4><p>UML（Unified Modeling Language，统一建模语言）是面向对象的标准化建模语言，其总体结构如图所示：</p>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/UML%E6%A6%82%E5%BF%B5%E6%A8%A1%E5%9E%8B.png" class title="UML 概念模型 ">
-
 <p>在 UML 中，有两种类型的图：</p>
 <ul>
 <li><strong>结构图 </strong>：也称<strong> 静态图</strong>，用来描述事物之间的关系，包括类图、对象图、组件图和部署图等。</li>
@@ -461,12 +273,10 @@
 <h5 id="1- 类图"><a href="#1- 类图" class="headerlink" title="(1) 类图"></a>(1) 类图 </h5><p> 类图描述类、接口、协作及它们之间的关系。在系统分析阶段，通过类图来表述问题域的对象和对象之间的联系。</p>
 <p>一个类包含三个部分：类名、属性、方法。类与类之间有 6 种，分别的含义与表达方式如下：</p>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E7%B1%BB%E7%9A%84%E5%85%AD%E7%A7%8D%E5%85%B3%E7%B3%BB.jfif" class title=" 类的六种关系 ">
-
-<p>这六种关系由强到弱依次为：<strong>继承 &#x3D; 实现 &gt; 组合 &gt; 聚合 &gt; 关联 &gt; 依赖</strong>。</p>
+<p>这六种关系由强到弱依次为：<strong>继承 = 实现 &gt; 组合 &gt; 聚合 &gt; 关联 &gt; 依赖</strong>。</p>
 <p>组合与聚合的区别在于生命周期的差别：<strong>组合关系具有相同的生命周期 </strong>，“部分”会随着“整体”的创建而创建，也随着“整体”的消亡而消亡；<strong> 聚合关系意味着好聚好散</strong>，“部分”与“整体”生命周期可以不同。</p>
 <p>在如下示例中，Heart 和 People 是组合关系，People 和 PeopleGroup 是聚合关系：</p>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E7%B1%BB%E7%9A%84%E5%85%B3%E7%B3%BB%E4%B8%BE%E4%BE%8B.png" class title=" 类的关系示例 ">
-
 <h5 id="2- 用例图"><a href="#2- 用例图" class="headerlink" title="(2) 用例图"></a>(2) 用例图 </h5><p> 用例模型通常以用例图表示，用例图由 4 个元素组成：</p>
 <ul>
 <li>参与者(Actor)：系统交互的所有事物，该角色不仅可以由人承担，还可以是其他系统和硬件设备，甚至是系统时钟。在图中用一个小人表示。</li>
@@ -479,7 +289,6 @@
 </li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E7%94%A8%E4%BE%8B%E7%9A%84%E5%85%B3%E7%B3%BB.png" class title=" 用例之间的关系 ">
-
 <h5 id="3- 顺序图（时序图）"><a href="#3- 顺序图（时序图）" class="headerlink" title="(3) 顺序图（时序图）"></a>(3) 顺序图（时序图）</h5><p>顺序图代表了一个相互作用、以时间为次序的对象之间的通信集合。顺序图的主要用途之一是为用例进行逻辑建模，任何用例模型都可以使用顺序图进一步阐明和实现。</p>
 <p>顺序图的主要元素包括：</p>
 <ul>
@@ -490,7 +299,6 @@
 <li>交互片段：用于封装交互图中的片段，并可对片段施加一定的操作（如分支、循环、可选等），从而支持复杂的交互建模。</li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E9%A1%BA%E5%BA%8F%E5%9B%BE%E7%A4%BA%E4%BE%8B.png" class title=" 顺序图示例 ">
-
 <h5 id="4- 通信图（协作图）"><a href="#4- 通信图（协作图）" class="headerlink" title="(4) 通信图（协作图）"></a>(4) 通信图（协作图）</h5><p>通信图显示了对象间的联系以及对象间发送和接收的消息。通信图与顺序图在语义上是等价的，可以相互转换，二者的区别在于：</p>
 <ul>
 <li>顺序图展示了对象之间如何相互协作来完成某一项功能，强调各个对象按照 <strong> 时间顺序 </strong> 进行交互的过程。</li>
@@ -505,7 +313,6 @@
 <li>消息：表示对象之间传递的信息或调用的方法。在图上通过沿着链的箭头，以及箭头上添加消息名和消息编号来表示。消息编号用来表示消息的先后次序。</li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E9%80%9A%E4%BF%A1%E5%9B%BE%E7%A4%BA%E4%BE%8B.png" class title=" 通信图示例 ">
-
 <h5 id="5- 活动图"><a href="#5- 活动图" class="headerlink" title="(5) 活动图"></a>(5) 活动图 </h5><p> 活动图将业务流程或其他计算的结构展示为内部一步步的控制流和数据流，主要用于描述某一方法、机制或用例的内部行为。</p>
 <p>活动图的主要元素包括：</p>
 <ul>
@@ -515,10 +322,9 @@
 <li>判断（决策点）：流程产生分支的地方，用菱形表示。</li>
 <li>泳道：表示参与活动的不同对象，每个泳道表示一个参与者的职责范围。用矩形划分区域，每个对象的活动只能画在对应的泳道。</li>
 <li>控制流：将不同的活动按顺序连接起来，用带箭头的连线表示。</li>
-<li>分叉 &#x2F; 合并：分叉将控制流分为两个或多个并发运行的分支；合并用于同步并发分支，以达到共同完成一项事务的目的。在活动图中，用一条水平或者垂直的小黑棒表示。</li>
+<li>分叉 / 合并：分叉将控制流分为两个或多个并发运行的分支；合并用于同步并发分支，以达到共同完成一项事务的目的。在活动图中，用一条水平或者垂直的小黑棒表示。</li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E6%B4%BB%E5%8A%A8%E5%9B%BE%E7%A4%BA%E4%BE%8B.png" class title=" 活动图示例 ">
-
 <p>活动图与流程图的区别：</p>
 <ul>
 <li>活动图支持复杂流程，包括并发行为；流程图不支持并发活动。</li>
@@ -534,7 +340,6 @@
 <li><strong>部署视图</strong>：从系统工程师角度，描述系统的软件到硬件的映射和分布关系，通常以部署图表示。</li>
 </ul>
 <img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/RUP%E6%9E%B6%E6%9E%84%E8%A7%86%E5%9B%BE.png" class title="4+1 架构视图 ">
-
 <h3 id="（二）面向对象设计"><a href="#（二）面向对象设计" class="headerlink" title="（二）面向对象设计"></a>（二）面向对象设计 </h3><p> 面向对象设计（Object-Oriented Design，OOD）是将 OOA 所创建的分析模型转化为设计模型，其目标是定义系统构造蓝图。OOD 的基本思想包括抽象、封装、继承和多态。在 OOD 中，数据结构和在数据结构上定义的操作算法封装在一个类中。</p>
 <h4 id="1- 类的分类"><a href="#1- 类的分类" class="headerlink" title="1. 类的分类"></a>1. 类的分类</h4><p>OOD 中设计的类分为三种：</p>
 <ul>
@@ -542,7 +347,6 @@
 <li><strong>控制类</strong>（Control class）：负责处理系统的逻辑流程和业务规则，充当协调者，控制系统的运作。</li>
 <li><strong>实体类</strong>（Entity class）：代表系统中的数据对象或业务对象，通常对应数据库中的表，是系统中需要长期保存的信息。</li>
 </ul>
-
 
 <p>通俗来说：</p>
 <ul>
@@ -552,6 +356,7 @@
 </ul>
 <p>通过这种分类，我们可以更加清晰地分离系统中的不同职责，使系统设计更加模块化和可维护。</p>
 <h4 id="2- 设计原则"><a href="#2- 设计原则" class="headerlink" title="2. 设计原则"></a>2. 设计原则 </h4><p> 在 OOD 中，合理运用设计原则可以带来可维护性的提升。常用的 OOD 原则为：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -559,7 +364,8 @@
 <th>描述</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>单一职责原则（S）</td>
 <td>每个类应该只有一个引起变化的原因，类的职责要单一</td>
 </tr>
@@ -584,236 +390,161 @@
 <td>一个软件实体应当尽可能少地与其他实体发生相互作用</td>
 </tr>
 <tr>
-<td>组合 &#x2F; 聚合复用原则</td>
+<td>组合 / 聚合复用原则</td>
 <td>多用组合或聚合关系来复用已有对象，少用继承关系</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h4 id="3- 设计模式"><a href="#3- 设计模式" class="headerlink" title="3. 设计模式"></a>3. 设计模式 </h4><p> 设计模式是前人经验的总结，它使人们可以方便地复用成功的设计和架构。当在特定的环境下遇到特定类型的问题，采用他人已使用过的一些成功的解决方案，一方面可以降低分析、设计和实现的难度，另一方面可以使系统具有更好的可复用性和灵活性。</p>
 <p>常见的设计模式包含如下 3 大类共 23 种：</p>
-<img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F.png" class title=" 设计模式 ">
-            
-
-
-            
-        </div>
-    </div>
-    <div id="post-footer" class="post-footer main-content-wrap">
-        
-            <div class="post-footer-tags">
-                <span class="text-color-light text-small">标签</span><br>
-                
-    <a class="tag tag--primary tag--small t-none-link" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/" rel="tag">软件工程</a>
-
-            </div>
-        
-        
-            <div class="post-actions-wrap">
-    <nav>
-        <ul class="post-actions post-action-nav">
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" data-tooltip="数据库设计与建模" aria-label="上一篇: 数据库设计与建模">
-                    
-                        <i class="fa fa-angle-left" aria-hidden="true"></i>
-                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
-                    </a>
-            </li>
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/" data-tooltip="ClusterFuzz 源码分析（二）" aria-label="下一篇: ClusterFuzz 源码分析（二）">
-                    
-                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
-                        <i class="fa fa-angle-right" aria-hidden="true"></i>
-                    </a>
-            </li>
-        </ul>
-    </nav>
-    <ul class="post-actions post-action-share">
-        <li class="post-action hide-lg hide-md hide-sm">
-            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
-                <i class="fa fa-share-alt" aria-hidden="true"></i>
-            </a>
-        </li>
-        
-	
-        <li class="post-action">
-            
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
-            
-                <i class="fa fa-list" aria-hidden="true"></i>
-            </a>
-        </li>
-    </ul>
-</div>
-
-
-        
-        
-            
-                <div id="gitalk"></div>
-
-            
-        
-    </div>
-</article>
-
-
-
-                <footer id="footer" class="main-content-wrap">
-    <span class="copyrights">
-        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
-    </span>
-</footer>
-
-            </div>
-            
-                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
-                    <div class="post-actions-wrap">
-    <nav>
-        <ul class="post-actions post-action-nav">
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" data-tooltip="数据库设计与建模" aria-label="上一篇: 数据库设计与建模">
-                    
-                        <i class="fa fa-angle-left" aria-hidden="true"></i>
-                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
-                    </a>
-            </li>
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/" data-tooltip="ClusterFuzz 源码分析（二）" aria-label="下一篇: ClusterFuzz 源码分析（二）">
-                    
-                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
-                        <i class="fa fa-angle-right" aria-hidden="true"></i>
-                    </a>
-            </li>
-        </ul>
-    </nav>
-    <ul class="post-actions post-action-share">
-        <li class="post-action hide-lg hide-md hide-sm">
-            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
-                <i class="fa fa-share-alt" aria-hidden="true"></i>
-            </a>
-        </li>
-        
-	
-        <li class="post-action">
-            
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
-            
-                <i class="fa fa-list" aria-hidden="true"></i>
-            </a>
-        </li>
-    </ul>
-</div>
-
-
-                </div>
-                
-
-            
-        </div>
-        
-
-
-    
-        
-    
-
-<div id="about">
-    <div id="about-card">
-        <div id="about-btn-close">
-            <i class="fa fa-times"></i>
-        </div>
-        
-            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
-        
-            <h4 id="about-card-name">一瓢清浅</h4>
-        
-            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
-</div>
-        
-        
-            <div id="about-card-job">
-                <i class="fa fa-briefcase"></i>
-                <br>
-                <p>IT工程师</p>
-
-            </div>
-        
-        
-            <div id="about-card-location">
-                <i class="fa fa-map-marker-alt"></i>
-                <br>
-                中国
-            </div>
-        
-    </div>
-</div>
-
-        
-        
-<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
-        <!--SCRIPTS-->
-
-<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
-
-<!--SCRIPTS END-->
-
-
-    
-        
-<script src="/assets/js/gitalk.js"></script>
-
-        <script type="text/javascript">
-          (function() {
-            new Gitalk({
-              clientID: 'Ov23li8lUWNadcQIsjjS',
-              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
-              repo: 'comment',
-              owner: 'jiliguluss',
-              admin: ['jiliguluss'],
-              id: '2024/系统分析与设计：结构化与面向对象/',
-              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
-            }).render('gitalk')
-          })()
-        </script>
-    
-
-
-
-
-
-  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
-  <script type="text/javascript">
-      tocbot.init({
-        tocSelector: '#post-toc', // 目录容器的 ID 或 class
-        contentSelector: '.post-content', // 内容容器的 ID 或 class
-        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
-        collapseDepth: '3',
-        scrollSmooth: true, 
-        activeClass: 'active', 
-        orderedList: false
-    });
-  </script> 
-
-
-
-  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
-  <script type="text/javascript">
-      $(document).ready(function() {
-          var mermaid_config = {
-              startOnLoad: true,
-              theme: 'default',
+<img src="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F.png" class title=" 设计模式 "></article><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/">软件工程</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/" title="ClusterFuzz 源码分析（二）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">Previous</div><div class="info-item-2">ClusterFuzz 源码分析（二）</div></div><div class="info-2"><div class="info-item-1">ClusterFuzz启动server时初始化本地模拟器（GCS/PubSub/Datastore）及数据库，通过Gunicorn加载路由服务；bot启动后循环执行任务，依赖监控器和fuzzer引擎处理任务更新与命令调度。</div></div></div></a><a class="pagination-related" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/" title="数据库设计与建模"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">Next</div><div class="info-item-2">数据库设计与建模</div></div><div class="info-2"><div class="info-item-1">数据库设计涵盖概念设计（ER建模）与逻辑设计（关系模式转换及范式规约），通过多级范式优化结构，消除数据冗余与操作异常。</div></div></div></a></nav><hr class="custom-hr"><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> Comments</span></div></div><div class="comment-wrap"><div><div id="gitalk-container"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="author-info-name">一瓢清浅</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">31</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/jiliguluss"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">个人技术博客，涉及软件开发、安全测试、AI算法等领域。不求精深，但当涉猎，有所闻耳。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Contents</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1"><span class="toc-text">一、系统分析与系统设计 </span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E7%BB%93%E6%9E%84%E5%8C%96%E6%96%B9%E6%B3%95"><span class="toc-text">二、结构化方法 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E7%BB%93%E6%9E%84%E5%8C%96%E5%88%86%E6%9E%90"><span class="toc-text">（一）结构化分析 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-%20%E6%95%B0%E6%8D%AE%E6%B5%81%E5%9B%BE"><span class="toc-text">1. 数据流图 </span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2%E5%9B%BE"><span class="toc-text">2. 状态转换图 </span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-%20%E5%AE%9E%E4%BD%93%E5%85%B3%E7%B3%BB%E5%9B%BE"><span class="toc-text">3. 实体关系图 </span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-%20%E6%95%B0%E6%8D%AE%E5%AD%97%E5%85%B8"><span class="toc-text">4. 数据字典 </span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E7%BB%93%E6%9E%84%E5%8C%96%E8%AE%BE%E8%AE%A1"><span class="toc-text">（二）结构化设计 </span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1%E6%96%B9%E6%B3%95"><span class="toc-text">三、面向对象方法 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1%E5%88%86%E6%9E%90"><span class="toc-text">（一）面向对象分析 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-UML%20%E7%BB%9F%E4%B8%80%E5%BB%BA%E6%A8%A1%E8%AF%AD%E8%A8%80"><span class="toc-text">1. UML 统一建模语言</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#1-%20%E7%B1%BB%E5%9B%BE"><span class="toc-text">(1) 类图 </span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#2-%20%E7%94%A8%E4%BE%8B%E5%9B%BE"><span class="toc-text">(2) 用例图 </span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#3-%20%E9%A1%BA%E5%BA%8F%E5%9B%BE%EF%BC%88%E6%97%B6%E5%BA%8F%E5%9B%BE%EF%BC%89"><span class="toc-text">(3) 顺序图（时序图）</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#4-%20%E9%80%9A%E4%BF%A1%E5%9B%BE%EF%BC%88%E5%8D%8F%E4%BD%9C%E5%9B%BE%EF%BC%89"><span class="toc-text">(4) 通信图（协作图）</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#5-%20%E6%B4%BB%E5%8A%A8%E5%9B%BE"><span class="toc-text">(5) 活动图 </span></a></li></ol></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-1%20%E8%A7%86%E5%9B%BE"><span class="toc-text">2. 4+1 视图</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1%E8%AE%BE%E8%AE%A1"><span class="toc-text">（二）面向对象设计 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-%20%E7%B1%BB%E7%9A%84%E5%88%86%E7%B1%BB"><span class="toc-text">1. 类的分类</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E8%AE%BE%E8%AE%A1%E5%8E%9F%E5%88%99"><span class="toc-text">2. 设计原则 </span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-%20%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F"><span class="toc-text">3. 设计模式 </span></a></li></ol></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Posts</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E5%A4%9A%E8%87%82%E8%80%81%E8%99%8E%E6%9C%BA/" title="多臂老虎机">多臂老虎机</a><time datetime="2025-05-28T00:57:38.000Z" title="Created 2025-05-28 08:57:38">2025-05-28</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/" title="进程间通信机制">进程间通信机制</a><time datetime="2025-05-26T06:24:56.000Z" title="Created 2025-05-26 14:24:56">2025-05-26</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/" title="Web 应用架构">Web 应用架构</a><time datetime="2025-05-21T06:52:47.000Z" title="Created 2025-05-21 14:52:47">2025-05-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E8%82%A1%E7%A5%A8%E6%8A%95%E8%B5%84%E5%85%A5%E9%97%A8%E3%80%81%E8%BF%9B%E9%98%B6%E4%B8%8E%E5%AE%9E%E6%88%98%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《股票投资入门、进阶与实战》笔记">《股票投资入门、进阶与实战》笔记</a><time datetime="2025-02-24T04:50:18.000Z" title="Created 2025-02-24 12:50:18">2025-02-24</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E6%8A%95%E8%B5%84%E4%B8%AD%E6%9C%80%E7%AE%80%E5%8D%95%E7%9A%84%E4%BA%8B%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《投资中最简单的事》笔记">《投资中最简单的事》笔记</a><time datetime="2025-01-20T01:05:49.000Z" title="Created 2025-01-20 09:05:49">2025-01-20</time></div></div></div></div></div></div></main><footer id="footer" style="background: transparent;"><div id="footer-wrap"><div class="copyright">&copy;2023 - 2025 By 一瓢清浅</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Reading Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light and Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle Between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Settings"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table of Contents"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="Scroll to Comments"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="Back to Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"><script>(() => {
+  const loadMathjax = () => {
+    if (!window.MathJax) {
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          tags: 'none',
+        },
+        chtml: {
+          scale: 1.1
+        },
+        options: {
+          enableMenu: true,
+          renderActions: {
+            findScript: [10, doc => {
+              for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+                const display = !!node.type.match(/; *mode=display/)
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+                const text = document.createTextNode('')
+                node.parentNode.replaceChild(text, node)
+                math.start = {node: text, delim: '', n: 0}
+                math.end = {node: text, delim: '', n: 0}
+                doc.math.push(math)
+              }
+            }, '']
           }
-          mermaid.initialize(mermaid_config);
-      });
-  </script>
+        }
+      }
 
+      const script = document.createElement('script')
+      script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+      script.id = 'MathJax-script'
+      script.async = true
+      document.head.appendChild(script)
+    } else {
+      MathJax.startup.document.state(0)
+      MathJax.texReset()
+      MathJax.typesetPromise()
+    }
+  }
 
-    </body>
-</html>
+  btf.addGlobalFn('encrypt', loadMathjax, 'mathjax')
+  window.pjax ? loadMathjax() : window.addEventListener('load', loadMathjax)
+})()</script><script>(() => {
+  const runMermaid = ele => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    ele.forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = `%%{init:{ 'theme':'${theme}'}}%%\n`
+      const mermaidID = `mermaid-${index}`
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+      const renderMermaid = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      // mermaid v9 and v10 compatibility
+      typeof renderFn === 'string' ? renderMermaid(renderFn) : renderFn.then(({ svg }) => renderMermaid(svg))
+    })
+  }
+
+  const codeToMermaid = () => {
+    const codeMermaidEle = document.querySelectorAll('pre > code.mermaid')
+    if (codeMermaidEle.length === 0) return
+
+    codeMermaidEle.forEach(ele => {
+      const preEle = document.createElement('pre')
+      preEle.className = 'mermaid-src'
+      preEle.hidden = true
+      preEle.textContent = ele.textContent
+      const newEle = document.createElement('div')
+      newEle.className = 'mermaid-wrap'
+      newEle.appendChild(preEle)
+      ele.parentNode.replaceWith(newEle)
+    })
+  }
+
+  const loadMermaid = () => {
+    if (true) codeToMermaid()
+    const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+    if ($mermaid.length === 0) return
+
+    const runMermaidFn = () => runMermaid($mermaid)
+    btf.addGlobalFn('themeChange', runMermaidFn, 'mermaid')
+    window.loadMermaid ? runMermaidFn() : btf.getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaidFn)
+  }
+
+  btf.addGlobalFn('encrypt', loadMermaid, 'mermaid')
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const isShuoshuo = GLOBAL_CONFIG_SITE.pageType === 'shuoshuo'
+  const option = null
+
+  const commentCount = n => {
+    const isCommentCount = document.querySelector('#post-meta .gitalk-comment-count')
+    if (isCommentCount) {
+      isCommentCount.textContent= n
+    }
+  }
+
+  const initGitalk = (el, path) => {
+    if (isShuoshuo) {
+      window.shuoshuoComment.destroyGitalk = () => {
+        if (el.children.length) {
+          el.innerHTML = ''
+          el.classList.add('no-comment')
+        }
+      }
+    }
+
+    const gitalk = new Gitalk({
+      clientID: 'Ov23li8lUWNadcQIsjjS',
+      clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+      repo: 'comment',
+      owner: 'jiliguluss',
+      admin: ['jiliguluss'],
+      updateCountCallback: commentCount,
+      ...option,
+      id: isShuoshuo ? path : (option && option.id) || '747b2a37cc0839314eb93d42b35b8cf1'
+    })
+
+    gitalk.render('gitalk-container')
+  }
+
+  const loadGitalk = async(el, path) => {
+    if (typeof Gitalk === 'function') initGitalk(el, path)
+    else {
+      await btf.getCSS('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.css')
+      await btf.getScript('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.js')
+      initGitalk(el, path)
+    }
+  }
+
+  if (isShuoshuo) {
+    'Gitalk' === 'Gitalk'
+      ? window.shuoshuoComment = { loadComment: loadGitalk }
+      : window.loadOtherComment = loadGitalk
+    return
+  }
+
+  if ('Gitalk' === 'Gitalk' || !false) {
+    if (false) btf.loadComment(document.getElementById('gitalk-container'), loadGitalk)
+    else loadGitalk()
+  } else {
+    window.loadOtherComment = loadGitalk
+  }
+})()</script></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>

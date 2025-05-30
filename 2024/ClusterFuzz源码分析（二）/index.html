@@ -1,295 +1,188 @@
-
-<!DOCTYPE html>
-<html lang="zh-cn">
-    
-<head>
-    <meta name="google-site-verification" content="arHRrxbxU48vZwldQv5AtJp4xyTZxM7GIOnFRVRraM0">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="generator" content="千里之行，始于足下">
-    <title>ClusterFuzz 源码分析（二） - 千里之行，始于足下</title>
-    <meta name="author" content="一瓢清浅">
-    
-        <meta name="keywords" content="python,AI,安全,算法,编程,">
-    
-    
-    
-    <script type="application/ld+json">{"@context":"http://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg"},"articleBody":"\n\n一、ClusterFuzz 使用简介  根据 ClusterFuzz官方说明，可以在本地执行以下命令启动 ClusterFuzz 平台：\n12345# If you run the server for the first time or want to reset all data.python butler.py run_server --bootstrap# In all the other cases, do not use &quot;--bootstrap&quot; flag.python butler.py run_server\n启动 ClusterFuzz 后，通过访问http://localhost:9000，即可打开 web 页面。\n执行 fuzz 任务，需要启动 bot，命令如下：\n1python butler.py run_bot --name my-bot /path/to/my-bot  # rename my-bot to anything\n当 bot 启动后，ClusterFuzz 的各项任务才能执行。\n二、run_server 源码分析  当我们执行 python butler.py run_server --skip-install-deps --bootstrap 时，发生了什么？\nsequenceDiagram\n    participant A as bulter.py\n    box local/bulter\n        participant B as run_server.py\n        participant C as common.py\n    end\n    box appengine\n        participant D as main.py\n        participant E as server.py\n    end\n    box clusterfuzz/_internal\n        participant F as test_utils.py\n    end\n    participant G as gcs.go\n\n    A ->> A: call _setup\n    A ->> B: call execute\n    B ->> B: call bootstrap_gcs\n    B ->> F: call start_cloud_emulator\n    F -->> B: start pubsub emulator and datastore emulator\n    B ->> G: go run gcs.go\n    alt bootstrap\n        B ->> B: call bootstrap_db\n    end\n    B ->> B: call start_cron_threads\n    B ->> C: call execute_async\n    C ->> D: gunicorn start app for cron service\n    D ->> E: register_routes\n    E -->> D: return cron service app\n    B ->> C: call execute\n    C ->> D: gunicorn start app for dev service\n    D ->> E: register_routes\n    E -->> D: return dev service app\n\n_setup：设置工程的模块搜索路径\nrun_server.execute：依次启动各项服务\nbootstrap_gcs：创建 gcs 相关路径，默认保存在 local/storage/local_gcs 之下\ntest_utils.start_cloud_emulator：启动 pubsub emulator 和 datastore emulator\ncommon.execute_async(&#39;go run emulators/gcs.go&#39;)：启动 gcs emulator\nbootstrap_db：执行 src/local/butler/scripts/setup.py 中的execute，初始化数据库\nstart_cron_threads：启动定时任务，各项任务通过 route 转到相应 handler 执行\ncommon.execute_async(&#39;gunicorn -b :&#123;port&#125; main:app)：gunicorn 指定 port 启动 src/appengine/main.py 中的 app 应用\nsrc/appengine/main.py：调用 server.py 中的 app\nsrc/appengine/server.py：定义 web app，注册 web route 信息\n\n\n\n三、run_bot 源码分析  当我们执行 python butler.py run_bot --name fuzz-bot fuzz-bot/ 时，发生了什么？\nsequenceDiagram\n    participant A as bulter.py\n    box local/bulter\n        participant B as run_bot.py\n        participant C as common.py\n    end\n    box python/bot\n        participant D as startup/run_bot.py\n    end\n    box local/_internal\n        participant E as metrics/monitor.py\n        participant F as bot/fuzzers/init.py\n        participant G as bot/tasks/update_task.py\n        participant H as base/tasks.py\n        participant I as bot/tasks/commands.py\n    end\n    \n    A ->> A: call _setup\n    A ->> B: call execute\n    B ->> B: call _setup_bot_directory\n    B ->> B: call _setup_environment_and_configs\n    B ->> C: call execute_async\n    C ->> D: start bot\n    D ->> E: initialize monitor\n    E -->> D: \n    D ->> F: initialize fuzzer engine\n    F --> D: \n    loop task_loop\n        D ->> G: call run to update task\n        G --> D: \n        D ->> H: call get_task\n        H --> D: \n        D --> I: call process_commands to execute task\n    end\n\n_setup：设置工程的模块搜索路径\nrun_bot.execute：启动 bot\n_setup_bot_directory：创建 bot 相关路径\n_setup_environment_and_configs：设置运行环境，如环境变量等\nexecute_async(&#39;python src/python/bot/startup/run_bot.py&#39;)：启动 bot\nmonitor.initialize：初始化监控器\nfuzzers_init.run：初始化 fuzz 引擎，通过 import clusterfuzz._internal.bot.fuzzers.&#123;engine_name&#125;.engine 导入各 fuzzer 模块\ntask_loop：循环执行任务\nupdate_task.run：更新任务信息和 bot 心跳\ntasks.get_task：获取任务，有多种任务，fuzz 只是其中一种任务\ncommands.process_command：通过命令行执行任务\n\n\n\n\n\n\n","dateCreated":"2024-10-10T13:25:07+08:00","dateModified":"2024-12-11T09:12:23+08:00","datePublished":"2024-10-10T13:25:07+08:00","description":"ClusterFuzz 启动 server 和 bot 的源码分析","headline":"ClusterFuzz 源码分析（二）","image":[],"mainEntityOfPage":{"@type":"WebPage","@id":"https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/"},"publisher":{"@type":"Organization","name":"一瓢清浅","sameAs":["#about","https://github.com/jiliguluss"],"image":"photo.jpg","logo":{"@type":"ImageObject","url":"photo.jpg"}},"url":"https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/","keywords":"Fuzz, 源码"}</script>
-    <meta name="description" content="ClusterFuzz 启动 server 和 bot 的源码分析">
-<meta property="og:type" content="blog">
+<!DOCTYPE html><html lang="zh-cn" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>ClusterFuzz 源码分析（二） | 千里之行，始于足下</title><meta name="author" content="一瓢清浅"><meta name="copyright" content="一瓢清浅"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="ClusterFuzz启动server时初始化本地模拟器（GCS&#x2F;PubSub&#x2F;Datastore）及数据库，通过Gunicorn加载路由服务；bot启动后循环执行任务，依赖监控器和fuzzer引擎处理任务更新与命令调度。">
+<meta property="og:type" content="article">
 <meta property="og:title" content="ClusterFuzz 源码分析（二）">
-<meta property="og:url" content="https://jiliguluss-github-io.vercel.app/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/index.html">
+<meta property="og:url" content="https://jiliguluss.github.io/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/index.html">
 <meta property="og:site_name" content="千里之行，始于足下">
-<meta property="og:description" content="ClusterFuzz 启动 server 和 bot 的源码分析">
+<meta property="og:description" content="ClusterFuzz启动server时初始化本地模拟器（GCS&#x2F;PubSub&#x2F;Datastore）及数据库，通过Gunicorn加载路由服务；bot启动后循环执行任务，依赖监控器和fuzzer引擎处理任务更新与命令调度。">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://jiliguluss.github.io/img/photo.jpg">
 <meta property="article:published_time" content="2024-10-10T05:25:07.000Z">
-<meta property="article:modified_time" content="2024-12-11T01:12:23.393Z">
+<meta property="article:modified_time" content="2025-05-30T05:15:50.775Z">
 <meta property="article:author" content="一瓢清浅">
 <meta property="article:tag" content="Fuzz">
 <meta property="article:tag" content="源码">
 <meta name="twitter:card" content="summary">
-    
-    
-        
-    
-    
-        <meta property="og:image" content="https://jiliguluss-github-io.vercel.app/assets/images/photo.jpg">
-    
-    
-    
-    
-    <!--STYLES-->
-    
-<link rel="stylesheet" href="/assets/css/style-dpmt3mkus3hoxnninecz5slvvthzj1vjadj2nwlkm24rzvexvzthf2vrpqxe.min.css">
-
-    <!--STYLES END-->
-    
-
-    
-
-    
-        
-            
-<link rel="stylesheet" href="/assets/css/gitalk.css">
-
-        
-    
-</head>
-
-    <body>
-        <div id="blog">
-            <!-- Define author's picture -->
-
-
-<header id="header" data-behavior="5">
-    <i id="btn-open-sidebar" class="fa fa-lg fa-bars"></i>
-    <div class="header-title">
-        <a class="header-title-link" href="/" aria-label>
-            千里之行，始于足下
-        </a>
-    </div>
-    
-        
-            <a class="header-right-icon " href="#about" aria-label="打开链接: /#about">
-        
-        
-            <i class="fa fa-question fa-lg"></i>
-        
-        </a>
-    
-</header>
-
-            <!-- Define author's picture -->
-
-
-
-        
-    
-
-<nav id="sidebar" data-behavior="5">
-    <div class="sidebar-container">
-        
-            <div class="sidebar-profile">
-                <a href="/#about" aria-label="阅读有关作者的更多信息">
-                    <img class="sidebar-profile-picture" src="/assets/images/photo.jpg" alt="作者的图片">
-                </a>
-                <h4 class="sidebar-profile-name">一瓢清浅</h4>
-                
-                    <h5 class="sidebar-profile-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
-</h5>
-                
-            </div>
-        
-        
-            <ul class="sidebar-buttons">
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/" rel="noopener" title="首页">
-                        <i class="sidebar-button-icon fa fa-home" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">首页</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-categories" rel="noopener" title="分类">
-                        <i class="sidebar-button-icon fa fa-bookmark" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">分类</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-tags" rel="noopener" title="标签">
-                        <i class="sidebar-button-icon fa fa-tags" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">标签</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="/all-archives" rel="noopener" title="归档">
-                        <i class="sidebar-button-icon fa fa-archive" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">归档</span>
-                    </a>
-            </li>
-            
-        </ul>
-        
-            <ul class="sidebar-buttons">
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="#about" rel="noopener" title="关于">
-                        <i class="sidebar-button-icon fa fa-question" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">关于</span>
-                    </a>
-            </li>
-            
-                <li class="sidebar-button">
-                    
-                        <a class="sidebar-button-link " href="https://github.com/jiliguluss" target="_blank" rel="external nofollow noopener noreferrer" title="GitHub">
-                        <i class="sidebar-button-icon fab fa-github" aria-hidden="true"></i>
-                        <span class="sidebar-button-desc">GitHub</span>
-                    </a>
-            </li>
-            
-        </ul>
-        
-    </div>
-</nav>
-
-            
-            <div id="main" data-behavior="5" class="
-                        hasCoverMetaIn
-                        ">
-                
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.25.0/tocbot.css">
-    <style>
-        #post-toc {
-            position: fixed !important;
-            top: 80px;
-            padding: 10px;
-            z-index: 100;
-            background-color: rgba(255,255,255,0);
-            transform: translateX(0);
-            right: 3%;
-            width: 220px;
-            height: auto;
-            padding-top: 10px;
-            padding-bottom: 10px;
+<meta name="twitter:image" content="https://jiliguluss.github.io/img/photo.jpg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "ClusterFuzz 源码分析（二）",
+  "url": "https://jiliguluss.github.io/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/",
+  "image": "https://jiliguluss.github.io/img/photo.jpg",
+  "datePublished": "2024-10-10T05:25:07.000Z",
+  "dateModified": "2025-05-30T05:15:50.775Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "一瓢清浅",
+      "url": "https://jiliguluss.github.io/"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/photo.jpg"><link rel="canonical" href="https://jiliguluss.github.io/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%BA%8C%EF%BC%89/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"><link rel="preconnect" href="//busuanzi.ibruce.info"><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
         }
-    </style>
-    <script>
-        var tocWidth = 220; // TOC的固定宽度
-        var tocPadding = 10; // TOC的内边距，这里假设是两边各10px，总和为20px
-        var tocRight = 0.03; // TOC的右边框距离屏幕右边的距离相对屏幕宽度的占比
+        return value
+      }
+    }
 
-        // 检查窗口宽度并调整TOC显示
-        function adjustToc() {
-            var toc = document.getElementById('post-toc');
-            var screenWidth = window.innerWidth || document.documentElement.clientWidth;
-            var contentWrap = document.querySelector('div.post-content.markdown div.main-content-wrap');
-
-            if (contentWrap) {
-                var contentWidth = contentWrap.offsetWidth;
-                // 计算contentWrap的宽度加上TOC的宽度和内边距
-                var totalWidth = Math.round((contentWidth + tocWidth * 2 + tocPadding * 4) / (1 - tocRight * 2));
-
-                if (totalWidth >= screenWidth) {
-                    toc.style.display = 'none'; // 如果总宽度大于或等于屏幕宽度，不显示TOC
-                } else {
-                    toc.style.display = 'block'; // 否则，显示TOC
-                }
-            } else {
-                toc.style.display = 'none'; // 如果无法获取contentWrap的宽度，不显示TOC
-            }
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
         }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
 
-        // 监听窗口大小变化事件
-        window.addEventListener('resize', adjustToc);
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
 
-        // 页面加载完毕时调用adjustToc
-        document.addEventListener('DOMContentLoaded', adjustToc);
-    </script>
-    <div id="post-toc" class="toc" style="display: none;"></div> <!-- 初始化时隐藏 -->
-
-                
-<article class="post">
+      const theme = saveToLocal.get('theme')
     
-    
-        <div class="post-header main-content-wrap text-left">
-    
-        <h1 class="post-title">
-            ClusterFuzz 源码分析（二）
-        </h1>
-    
-    
-        <div class="post-meta">
-    <time datetime="2024-10-10T13:25:07+08:00">
-	
-		    2024 年 10 月 10 日
-    	
-    </time>
-    
-        <span>发布在 </span>
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
         
-    <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/">安全</a>, <a class="category-link" href="/categories/%E5%AE%89%E5%85%A8/%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/">模糊测试</a>
-
-
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
     
-</div>
-
-    
-</div>
-
-    
-    <div class="post-content markdown">
-        <div class="main-content-wrap">
-            <!--excerpt-->
-
-<h2 id="一、ClusterFuzz 使用简介"><a href="# 一、ClusterFuzz 使用简介" class="headerlink" title="一、ClusterFuzz 使用简介"></a>一、ClusterFuzz 使用简介 </h2><p> 根据 ClusterFuzz<a target="_blank" rel="external nofollow noopener noreferrer" href="https://google.github.io/clusterfuzz/getting-started/local-instance/">官方说明</a>，可以在本地执行以下命令启动 ClusterFuzz 平台：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># If you run the server for the first time or want to reset all data.</span></span><br><span class="line">python butler.py run_server --bootstrap</span><br><span class="line"></span><br><span class="line"><span class="comment"># In all the other cases, do not use &quot;--bootstrap&quot; flag.</span></span><br><span class="line">python butler.py run_server</span><br></pre></td></tr></table></figure>
-<p>启动 ClusterFuzz 后，通过访问<a href="http://localhost:9000，即可打开 web 页面。" rel="external nofollow noopener noreferrer" target="_blank">http://localhost:9000，即可打开 web 页面。</a></p>
-<p>执行 fuzz 任务，需要启动 bot，命令如下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python butler.py run_bot --name my-bot /path/to/my-bot  <span class="comment"># rename my-bot to anything</span></span><br></pre></td></tr></table></figure>
-<p>当 bot 启动后，ClusterFuzz 的各项任务才能执行。</p>
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: 'Copy Successful',
+    error: 'Copy Failed',
+    noSupport: 'Browser Not Supported'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: 'Just now',
+    min: 'minutes ago',
+    hour: 'hours ago',
+    day: 'days ago',
+    month: 'months ago'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: 'Load More'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'ClusterFuzz 源码分析（二）',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="web_bg" style="background-image: url(/img/cover.png);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="site-data text-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">31</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="not-top-img" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">千里之行，始于足下</span></a><a class="nav-page-title" href="/"><span class="site-name">ClusterFuzz 源码分析（二）</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav></header><main class="layout" id="content-inner"><div id="post"><div id="post-info"><h1 class="post-title">ClusterFuzz 源码分析（二）</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2024-10-10T05:25:07.000Z" title="Created 2024-10-10 13:25:07">2024-10-10</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2025-05-30T05:15:50.775Z" title="Updated 2025-05-30 13:15:50">2025-05-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E5%AE%89%E5%85%A8/">安全</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E5%AE%89%E5%85%A8/%E6%A8%A1%E7%B3%8A%E6%B5%8B%E8%AF%95/">模糊测试</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id data-flag-title><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post Views:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div><article class="container post-content" id="article-container"><h2 id="一、ClusterFuzz 使用简介"><a href="# 一、ClusterFuzz 使用简介" class="headerlink" title="一、ClusterFuzz 使用简介"></a>一、ClusterFuzz 使用简介 </h2><p> 根据 ClusterFuzz<a target="_blank" rel="external nofollow noopener noreferrer" href="https://google.github.io/clusterfuzz/getting-started/local-instance/">官方说明 </a>，可以在本地执行以下命令启动 ClusterFuzz 平台：<br><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># If you run the server for the first time or want to reset all data.</span></span><br><span class="line">python butler.py run_server --bootstrap</span><br><span class="line"></span><br><span class="line"><span class="comment"># In all the other cases, do not use &quot;--bootstrap&quot; flag.</span></span><br><span class="line">python butler.py run_server</span><br></pre></td></tr></table></figure><br> 启动 ClusterFuzz 后，通过访问<a href="http://localhost:9000，即可打开 web 页面。" rel="external nofollow noopener noreferrer" target="_blank">http://localhost:9000，即可打开 web 页面。</a></p>
+<p>执行 fuzz 任务，需要启动 bot，命令如下：<br><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python butler.py run_bot --name my-bot /path/to/my-bot  <span class="comment"># rename my-bot to anything</span></span><br></pre></td></tr></table></figure><br>当 bot 启动后，ClusterFuzz 的各项任务才能执行。</p>
 <h2 id="二、run-server 源码分析"><a href="# 二、run-server 源码分析" class="headerlink" title="二、run_server 源码分析"></a>二、run_server 源码分析 </h2><p> 当我们执行 <code>python butler.py run_server --skip-install-deps --bootstrap</code> 时，发生了什么？</p>
-<pre class="mermaid">sequenceDiagram
-    participant A as bulter.py
-    box local/bulter
-        participant B as run_server.py
-        participant C as common.py
-    end
-    box appengine
-        participant D as main.py
-        participant E as server.py
-    end
-    box clusterfuzz/_internal
-        participant F as test_utils.py
-    end
-    participant G as gcs.go
-
-    A ->> A: call _setup
-    A ->> B: call execute
-    B ->> B: call bootstrap_gcs
-    B ->> F: call start_cloud_emulator
-    F -->> B: start pubsub emulator and datastore emulator
-    B ->> G: go run gcs.go
-    alt bootstrap
-        B ->> B: call bootstrap_db
-    end
-    B ->> B: call start_cron_threads
-    B ->> C: call execute_async
-    C ->> D: gunicorn start app for cron service
-    D ->> E: register_routes
-    E -->> D: return cron service app
-    B ->> C: call execute
-    C ->> D: gunicorn start app for dev service
-    D ->> E: register_routes
-    E -->> D: return dev service app</pre>
-<ul>
+<p><pre class="mermaid">sequenceDiagram<br>    participant A as bulter.py<br>    box local/bulter<br>        participant B as run_server.py<br>        participant C as common.py<br>    end<br>    box appengine<br>        participant D as main.py<br>        participant E as server.py<br>    end<br>    box clusterfuzz/_internal<br>        participant F as test_utils.py<br>    end<br>    participant G as gcs.go</pre></p>
+<pre><code>A -&gt;&gt; A: call _setup
+A -&gt;&gt; B: call execute
+B -&gt;&gt; B: call bootstrap_gcs
+B -&gt;&gt; F: call start_cloud_emulator
+F --&gt;&gt; B: start pubsub emulator and datastore emulator
+B -&gt;&gt; G: go run gcs.go
+alt bootstrap
+    B -&gt;&gt; B: call bootstrap_db
+end
+B -&gt;&gt; B: call start_cron_threads
+B -&gt;&gt; C: call execute_async
+C -&gt;&gt; D: gunicorn start app for cron service
+D -&gt;&gt; E: register_routes
+E --&gt;&gt; D: return cron service app
+B -&gt;&gt; C: call execute
+C -&gt;&gt; D: gunicorn start app for dev service
+D -&gt;&gt; E: register_routes
+E --&gt;&gt; D: return dev service app&lt;/pre&gt;
+</code></pre><ul>
 <li><code>_setup</code>：设置工程的模块搜索路径</li>
 <li><code>run_server.execute</code>：依次启动各项服务<ul>
 <li><code>bootstrap_gcs</code>：创建 gcs 相关路径，默认保存在 <code>local/storage/local_gcs</code> 之下</li>
@@ -304,41 +197,25 @@
 </li>
 </ul>
 <h2 id="三、run-bot 源码分析"><a href="# 三、run-bot 源码分析" class="headerlink" title="三、run_bot 源码分析"></a>三、run_bot 源码分析 </h2><p> 当我们执行 <code>python butler.py run_bot --name fuzz-bot fuzz-bot/</code> 时，发生了什么？</p>
-<pre class="mermaid">sequenceDiagram
-    participant A as bulter.py
-    box local/bulter
-        participant B as run_bot.py
-        participant C as common.py
-    end
-    box python/bot
-        participant D as startup/run_bot.py
-    end
-    box local/_internal
-        participant E as metrics/monitor.py
-        participant F as bot/fuzzers/init.py
-        participant G as bot/tasks/update_task.py
-        participant H as base/tasks.py
-        participant I as bot/tasks/commands.py
-    end
-    
-    A ->> A: call _setup
-    A ->> B: call execute
-    B ->> B: call _setup_bot_directory
-    B ->> B: call _setup_environment_and_configs
-    B ->> C: call execute_async
-    C ->> D: start bot
-    D ->> E: initialize monitor
-    E -->> D: 
-    D ->> F: initialize fuzzer engine
-    F --> D: 
-    loop task_loop
-        D ->> G: call run to update task
-        G --> D: 
-        D ->> H: call get_task
-        H --> D: 
-        D --> I: call process_commands to execute task
-    end</pre>
-<ul>
+<p><pre class="mermaid">sequenceDiagram<br>    participant A as bulter.py<br>    box local/bulter<br>        participant B as run_bot.py<br>        participant C as common.py<br>    end<br>    box python/bot<br>        participant D as startup/run_bot.py<br>    end<br>    box local/_internal<br>        participant E as metrics/monitor.py<br>        participant F as bot/fuzzers/init.py<br>        participant G as bot/tasks/update_task.py<br>        participant H as base/tasks.py<br>        participant I as bot/tasks/commands.py<br>    end</pre></p>
+<pre><code>A -&gt;&gt; A: call _setup
+A -&gt;&gt; B: call execute
+B -&gt;&gt; B: call _setup_bot_directory
+B -&gt;&gt; B: call _setup_environment_and_configs
+B -&gt;&gt; C: call execute_async
+C -&gt;&gt; D: start bot
+D -&gt;&gt; E: initialize monitor
+E --&gt;&gt; D: 
+D -&gt;&gt; F: initialize fuzzer engine
+F --&gt; D: 
+loop task_loop
+    D -&gt;&gt; G: call run to update task
+    G --&gt; D: 
+    D -&gt;&gt; H: call get_task
+    H --&gt; D: 
+    D --&gt; I: call process_commands to execute task
+end&lt;/pre&gt;
+</code></pre><ul>
 <li><code>_setup</code>：设置工程的模块搜索路径</li>
 <li><code>run_bot.execute</code>：启动 bot<ul>
 <li><code>_setup_bot_directory</code>：创建 bot 相关路径</li>
@@ -357,229 +234,153 @@
 </ul>
 </li>
 </ul>
-            
-
-
-            
-        </div>
-    </div>
-    <div id="post-footer" class="post-footer main-content-wrap">
-        
-            <div class="post-footer-tags">
-                <span class="text-color-light text-small">标签</span><br>
-                
-    <a class="tag tag--primary tag--small t-none-link" href="/tags/Fuzz/" rel="tag">Fuzz</a> <a class="tag tag--primary tag--small t-none-link" href="/tags/%E6%BA%90%E7%A0%81/" rel="tag">源码</a>
-
-            </div>
-        
-        
-            <div class="post-actions-wrap">
-    <nav>
-        <ul class="post-actions post-action-nav">
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" data-tooltip="系统分析与设计：结构化与面向对象" aria-label="上一篇: 系统分析与设计：结构化与面向对象">
-                    
-                        <i class="fa fa-angle-left" aria-hidden="true"></i>
-                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
-                    </a>
-            </li>
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/" data-tooltip="ClusterFuzz 源码分析（一）" aria-label="下一篇: ClusterFuzz 源码分析（一）">
-                    
-                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
-                        <i class="fa fa-angle-right" aria-hidden="true"></i>
-                    </a>
-            </li>
-        </ul>
-    </nav>
-    <ul class="post-actions post-action-share">
-        <li class="post-action hide-lg hide-md hide-sm">
-            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
-                <i class="fa fa-share-alt" aria-hidden="true"></i>
-            </a>
-        </li>
-        
-	
-        <li class="post-action">
-            
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
-            
-                <i class="fa fa-list" aria-hidden="true"></i>
-            </a>
-        </li>
-    </ul>
-</div>
-
-
-        
-        
-            
-                <div id="gitalk"></div>
-
-            
-        
-    </div>
-</article>
-
-
-
-                <footer id="footer" class="main-content-wrap">
-    <span class="copyrights">
-        Copyrights &copy; 2025 一瓢清浅. All Rights Reserved.
-    </span>
-</footer>
-
-            </div>
-            
-                <div id="bottom-bar" class="post-bottom-bar" data-behavior="5">
-                    <div class="post-actions-wrap">
-    <nav>
-        <ul class="post-actions post-action-nav">
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" data-tooltip="系统分析与设计：结构化与面向对象" aria-label="上一篇: 系统分析与设计：结构化与面向对象">
-                    
-                        <i class="fa fa-angle-left" aria-hidden="true"></i>
-                        <span class="hide-xs hide-sm text-small icon-ml">上一篇</span>
-                    </a>
-            </li>
-            <li class="post-action">
-                
-                    
-                <a class="post-action-btn btn btn--default tooltip--top" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/" data-tooltip="ClusterFuzz 源码分析（一）" aria-label="下一篇: ClusterFuzz 源码分析（一）">
-                    
-                        <span class="hide-xs hide-sm text-small icon-mr">下一篇</span>
-                        <i class="fa fa-angle-right" aria-hidden="true"></i>
-                    </a>
-            </li>
-        </ul>
-    </nav>
-    <ul class="post-actions post-action-share">
-        <li class="post-action hide-lg hide-md hide-sm">
-            <a class="post-action-btn btn btn--default btn-open-shareoptions" href="#btn-open-shareoptions" aria-label="Share this post">
-                <i class="fa fa-share-alt" aria-hidden="true"></i>
-            </a>
-        </li>
-        
-	
-        <li class="post-action">
-            
-                <a class="post-action-btn btn btn--default" href="#" aria-label="Back to top">
-            
-                <i class="fa fa-list" aria-hidden="true"></i>
-            </a>
-        </li>
-    </ul>
-</div>
-
-
-                </div>
-                
-
-            
-        </div>
-        
-
-
-    
-        
-    
-
-<div id="about">
-    <div id="about-card">
-        <div id="about-btn-close">
-            <i class="fa fa-times"></i>
-        </div>
-        
-            <img id="about-card-picture" src="/assets/images/photo.jpg" alt="作者的图片">
-        
-            <h4 id="about-card-name">一瓢清浅</h4>
-        
-            <div id="about-card-bio"><p>个人技术博客<br>涉猎开发、测试、数据、算法、安全等领域</p>
-</div>
-        
-        
-            <div id="about-card-job">
-                <i class="fa fa-briefcase"></i>
-                <br>
-                <p>IT工程师</p>
-
-            </div>
-        
-        
-            <div id="about-card-location">
-                <i class="fa fa-map-marker-alt"></i>
-                <br>
-                中国
-            </div>
-        
-    </div>
-</div>
-
-        
-        
-<div id="cover" style="background-image:url('/assets/images/cover.png');"></div>
-        <!--SCRIPTS-->
-
-<script src="/assets/js/script-czwrmx5gkop1kbr9rlujoqfrmtwkkhyljlv2j2m5fjlzvilr3coc6lgtdmgb.min.js"></script>
-
-<!--SCRIPTS END-->
-
-
-    
-        
-<script src="/assets/js/gitalk.js"></script>
-
-        <script type="text/javascript">
-          (function() {
-            new Gitalk({
-              clientID: 'Ov23li8lUWNadcQIsjjS',
-              clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
-              repo: 'comment',
-              owner: 'jiliguluss',
-              admin: ['jiliguluss'],
-              id: '2024/ClusterFuzz源码分析（二）/',
-              ...{"language":"zh-CN","perPage":10,"distractionFreeMode":false,"enableHotKey":true,"pagerDirection":"first"}
-            }).render('gitalk')
-          })()
-        </script>
-    
-
-
-
-
-
-  <script src="https://cdn.jsdelivr.net/npm/tocbot@4.25.0/dist/tocbot.min.js"></script> 
-  <script type="text/javascript">
-      tocbot.init({
-        tocSelector: '#post-toc', // 目录容器的 ID 或 class
-        contentSelector: '.post-content', // 内容容器的 ID 或 class
-        headingSelector: 'h2,h3,h4', // 包含在目录中的标题级别
-        collapseDepth: '3',
-        scrollSmooth: true, 
-        activeClass: 'active', 
-        orderedList: false
-    });
-  </script> 
-
-
-
-  <script src="https://unpkg.com/mermaid@11.3.0/dist/mermaid.min.js"></script>
-  <script type="text/javascript">
-      $(document).ready(function() {
-          var mermaid_config = {
-              startOnLoad: true,
-              theme: 'default',
+</article><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Fuzz/">Fuzz</a><a class="post-meta__tags" href="/tags/%E6%BA%90%E7%A0%81/">源码</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2024/ClusterFuzz%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%EF%BC%88%E4%B8%80%EF%BC%89/" title="ClusterFuzz 源码分析（一）"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">Previous</div><div class="info-item-2">ClusterFuzz 源码分析（一）</div></div><div class="info-2"><div class="info-item-1">ClusterFuzz是Google开源的自动化模糊测试平台，核心由App Engine（任务调度与Web界面）和Fuzz Bot集群（执行Fuzz、崩溃复现、测试用例精简等任务）组成，支持LibFuzzer、AFL等多引擎，实现测试流程全自动化管理。</div></div></div></a><a class="pagination-related" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" title="系统分析与设计：结构化与面向对象"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">Next</div><div class="info-item-2">系统分析与设计：结构化与面向对象</div></div><div class="info-2"><div class="info-item-1">系统分析与设计包含结构化方法（如数据流图、实体关系图）和面向对象方法（如UML建模），前者强调功能分解与模块化，后者聚焦对象封装、继承和多态，适应不同系统复杂度需求。</div></div></div></a></nav><hr class="custom-hr"><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> Comments</span></div></div><div class="comment-wrap"><div><div id="gitalk-container"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="author-info-name">一瓢清浅</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">31</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/jiliguluss"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">个人技术博客，涉及软件开发、安全测试、AI算法等领域。不求精深，但当涉猎，有所闻耳。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Contents</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81ClusterFuzz%20%E4%BD%BF%E7%94%A8%E7%AE%80%E4%BB%8B"><span class="toc-text">一、ClusterFuzz 使用简介 </span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81run-server%20%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="toc-text">二、run_server 源码分析 </span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81run-bot%20%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="toc-text">三、run_bot 源码分析 </span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Posts</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E5%A4%9A%E8%87%82%E8%80%81%E8%99%8E%E6%9C%BA/" title="多臂老虎机">多臂老虎机</a><time datetime="2025-05-28T00:57:38.000Z" title="Created 2025-05-28 08:57:38">2025-05-28</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/" title="进程间通信机制">进程间通信机制</a><time datetime="2025-05-26T06:24:56.000Z" title="Created 2025-05-26 14:24:56">2025-05-26</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/" title="Web 应用架构">Web 应用架构</a><time datetime="2025-05-21T06:52:47.000Z" title="Created 2025-05-21 14:52:47">2025-05-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E8%82%A1%E7%A5%A8%E6%8A%95%E8%B5%84%E5%85%A5%E9%97%A8%E3%80%81%E8%BF%9B%E9%98%B6%E4%B8%8E%E5%AE%9E%E6%88%98%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《股票投资入门、进阶与实战》笔记">《股票投资入门、进阶与实战》笔记</a><time datetime="2025-02-24T04:50:18.000Z" title="Created 2025-02-24 12:50:18">2025-02-24</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E6%8A%95%E8%B5%84%E4%B8%AD%E6%9C%80%E7%AE%80%E5%8D%95%E7%9A%84%E4%BA%8B%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《投资中最简单的事》笔记">《投资中最简单的事》笔记</a><time datetime="2025-01-20T01:05:49.000Z" title="Created 2025-01-20 09:05:49">2025-01-20</time></div></div></div></div></div></div></main><footer id="footer" style="background: transparent;"><div id="footer-wrap"><div class="copyright">&copy;2023 - 2025 By 一瓢清浅</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Reading Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light and Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle Between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Settings"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table of Contents"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="Scroll to Comments"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="Back to Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"><script>(() => {
+  const loadMathjax = () => {
+    if (!window.MathJax) {
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          tags: 'none',
+        },
+        chtml: {
+          scale: 1.1
+        },
+        options: {
+          enableMenu: true,
+          renderActions: {
+            findScript: [10, doc => {
+              for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+                const display = !!node.type.match(/; *mode=display/)
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display)
+                const text = document.createTextNode('')
+                node.parentNode.replaceChild(text, node)
+                math.start = {node: text, delim: '', n: 0}
+                math.end = {node: text, delim: '', n: 0}
+                doc.math.push(math)
+              }
+            }, '']
           }
-          mermaid.initialize(mermaid_config);
-      });
-  </script>
+        }
+      }
 
+      const script = document.createElement('script')
+      script.src = 'https://cdn.jsdelivr.net/npm/mathjax/es5/tex-mml-chtml.min.js'
+      script.id = 'MathJax-script'
+      script.async = true
+      document.head.appendChild(script)
+    } else {
+      MathJax.startup.document.state(0)
+      MathJax.texReset()
+      MathJax.typesetPromise()
+    }
+  }
 
-    </body>
-</html>
+  btf.addGlobalFn('encrypt', loadMathjax, 'mathjax')
+  window.pjax ? loadMathjax() : window.addEventListener('load', loadMathjax)
+})()</script><script>(() => {
+  const runMermaid = ele => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    ele.forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+      const mermaidThemeConfig = `%%{init:{ 'theme':'${theme}'}}%%\n`
+      const mermaidID = `mermaid-${index}`
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+      const renderMermaid = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+      }
+
+      // mermaid v9 and v10 compatibility
+      typeof renderFn === 'string' ? renderMermaid(renderFn) : renderFn.then(({ svg }) => renderMermaid(svg))
+    })
+  }
+
+  const codeToMermaid = () => {
+    const codeMermaidEle = document.querySelectorAll('pre > code.mermaid')
+    if (codeMermaidEle.length === 0) return
+
+    codeMermaidEle.forEach(ele => {
+      const preEle = document.createElement('pre')
+      preEle.className = 'mermaid-src'
+      preEle.hidden = true
+      preEle.textContent = ele.textContent
+      const newEle = document.createElement('div')
+      newEle.className = 'mermaid-wrap'
+      newEle.appendChild(preEle)
+      ele.parentNode.replaceWith(newEle)
+    })
+  }
+
+  const loadMermaid = () => {
+    if (true) codeToMermaid()
+    const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+    if ($mermaid.length === 0) return
+
+    const runMermaidFn = () => runMermaid($mermaid)
+    btf.addGlobalFn('themeChange', runMermaidFn, 'mermaid')
+    window.loadMermaid ? runMermaidFn() : btf.getScript('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js').then(runMermaidFn)
+  }
+
+  btf.addGlobalFn('encrypt', loadMermaid, 'mermaid')
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script><script>(() => {
+  const isShuoshuo = GLOBAL_CONFIG_SITE.pageType === 'shuoshuo'
+  const option = null
+
+  const commentCount = n => {
+    const isCommentCount = document.querySelector('#post-meta .gitalk-comment-count')
+    if (isCommentCount) {
+      isCommentCount.textContent= n
+    }
+  }
+
+  const initGitalk = (el, path) => {
+    if (isShuoshuo) {
+      window.shuoshuoComment.destroyGitalk = () => {
+        if (el.children.length) {
+          el.innerHTML = ''
+          el.classList.add('no-comment')
+        }
+      }
+    }
+
+    const gitalk = new Gitalk({
+      clientID: 'Ov23li8lUWNadcQIsjjS',
+      clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+      repo: 'comment',
+      owner: 'jiliguluss',
+      admin: ['jiliguluss'],
+      updateCountCallback: commentCount,
+      ...option,
+      id: isShuoshuo ? path : (option && option.id) || 'c12e5fda5b2df82aa948eebc01364de8'
+    })
+
+    gitalk.render('gitalk-container')
+  }
+
+  const loadGitalk = async(el, path) => {
+    if (typeof Gitalk === 'function') initGitalk(el, path)
+    else {
+      await btf.getCSS('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.css')
+      await btf.getScript('https://cdn.jsdelivr.net/npm/gitalk/dist/gitalk.min.js')
+      initGitalk(el, path)
+    }
+  }
+
+  if (isShuoshuo) {
+    'Gitalk' === 'Gitalk'
+      ? window.shuoshuoComment = { loadComment: loadGitalk }
+      : window.loadOtherComment = loadGitalk
+    return
+  }
+
+  if ('Gitalk' === 'Gitalk' || !false) {
+    if (false) btf.loadComment(document.getElementById('gitalk-container'), loadGitalk)
+    else loadGitalk()
+  } else {
+    window.loadOtherComment = loadGitalk
+  }
+})()</script></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
