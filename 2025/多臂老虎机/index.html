@@ -175,7 +175,7 @@
 Rt(T) = T\mu^* - \mathbb{E} \left[\sum_{t=1}^T X_{A_t,t} \right] = \sum_{i=1}^T \Delta_i \cdot \mathbb{E}[N_i(T)] \quad \text{(越小越好)}</script><p>其中：</p>
 <ul>
 <li>$\Delta_i = \mu^* - \mu_i$ 是臂 $i$ 的“劣势”；</li>
-<li>$N_i(T) = \sum_{t=1}^T \mathbb{I}{A_t = i}$ 是臂 $i$ 被选择的次数；</li>
+<li>$N_i(T) = \sum_{t=1}^T \mathbb{I}\{A_t = i\}$ 是臂 $i$ 被选择的次数；</li>
 </ul>
 <p>这个遗憾函数反映了我们策略由于没有总是选择最优臂而损失的期望奖励。</p>
 <p>由于 $T\mu^{\ast}$ 是个固定值，最小化累计遗憾也等价于最大化 <strong> 累计奖励（Cumulative Reward）</strong>：</p>
@@ -186,7 +186,7 @@ Rd(T) = \mathbb{E}\left[\sum_{t=1}^T X_{A_t,t}\right] \quad \text{(越大越好)
 <ul>
 <li>$N_i(t)$：到第 $t$ 轮为止臂 $i$ 被选择的次数；</li>
 <li>$X_{i,s}$：第 $s$ 轮从臂 $i$ 获得的奖励；</li>
-<li>$\mathbb{I}{A_s = i}$ 是指示函数，表示第 $s$ 轮是否选择了臂 $i$。</li>
+<li>$\mathbb{I}\{A_s = i\}$ 是指示函数，表示第 $s$ 轮是否选择了臂 $i$。</li>
 </ul>
 <p>$\varepsilon$-Greedy 算法是求解 MAB 问题最简单的策略：</p>
 <ul>
@@ -271,11 +271,11 @@ p_i \bigg| \{X_{i,s}\}_{s=1}^{t-1} \sim \mathrm{Beta}(\,\alpha_i + S_i,\beta_i +
 <script type="math/tex; mode=display">
 \theta_i \sim \mathrm{Beta}\bigl(\alpha_i(t-1),\beta_i(t-1)\bigr)</script><p>这里 $\theta_i$ 可以看作“根据到目前为止的信息，臂 $i$ 的潜在真实成功率”的一个随机猜测。</p>
 </li>
-<li><p><strong>根据抽样值 ${\theta_i}_{i=1}^K$ 选臂</strong>：</p>
+<li><p><strong>根据抽样值 $\{\theta_i\}_{i=1}^K$ 选臂</strong>：</p>
 <script type="math/tex; mode=display">
 A_t = \arg\max_{1 \le i \le K} \bigl\{\theta_i\bigr\}</script><p>换句话说，实际选择那个“这次恰好随机抽得最大 $\theta_i$”的臂。</p>
 </li>
-<li><p><strong>拉动所选臂 $A_t$，观察到奖励</strong> $X_{A_t,t} \in {0,1}$。</p>
+<li><p><strong>拉动所选臂 $A_t$，观察到奖励</strong> $X_{A_t,t} \in \{0,1\}$。</p>
 <ul>
 <li>若 $X_{A_t,t} = 1$，说明成功一次，于是更新该臂的 “成功计数” $S_{A_t} \leftarrow S_{A_t} + 1$，对应后验参数 $\alpha_{A_t} \leftarrow \alpha_{A_t} + 1$。</li>
 <li>若 $X_{A_t,t} = 0$，说明失败一次，于是更新该臂的 “失败计数” $F_{A_t} \leftarrow F_{A_t} + 1$，对应后验参数 $\beta_{A_t} \leftarrow \beta_{A_t} + 1$。</li>
