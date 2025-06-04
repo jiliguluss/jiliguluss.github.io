@@ -160,25 +160,20 @@
   isHighlightShrink: false,
   isToc: true,
   pageType: 'post'
-}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="web_bg" style="background-image: url(/img/cover.png);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="site-data text-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">37</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="not-top-img" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">千里之行，始于足下</span></a><a class="nav-page-title" href="/"><span class="site-name">数据库设计与建模</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav></header><main class="layout" id="content-inner"><div id="post"><div id="post-info"><h1 class="post-title">数据库设计与建模</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2024-10-23T01:27:29.000Z" title="Created 2024-10-23 09:27:29">2024-10-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2025-05-30T05:02:50.421Z" title="Updated 2025-05-30 13:02:50">2025-05-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E8%BD%AF%E8%80%83/">软考</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id data-flag-title><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post Views:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div><article class="container post-content" id="article-container"><h2 id="一、数据库结构">一、数据库结构</h2>
-<p>典型的数据库结构可归纳为“<strong>三级模式，两级映射</strong>”：</p>
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div id="web_bg" style="background-image: url(/img/cover.png);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="site-data text-center"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">37</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="not-top-img" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">千里之行，始于足下</span></a><a class="nav-page-title" href="/"><span class="site-name">数据库设计与建模</span></a></span><div id="menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> Home</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav></header><main class="layout" id="content-inner"><div id="post"><div id="post-info"><h1 class="post-title">数据库设计与建模</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">Created</span><time class="post-meta-date-created" datetime="2024-10-23T01:27:29.000Z" title="Created 2024-10-23 09:27:29">2024-10-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">Updated</span><time class="post-meta-date-updated" datetime="2025-05-30T05:02:50.421Z" title="Updated 2025-05-30 13:02:50">2025-05-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E8%BD%AF%E8%80%83/">软考</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E8%BD%AF%E8%80%83/%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84/">系统架构</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">Word Count:</span><span class="word-count">3.8k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">Reading Time:</span><span>11mins</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id data-flag-title><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">Post Views:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div><article class="container post-content" id="article-container"><h2 id="一、数据库结构"><a href="# 一、数据库结构" class="headerlink" title="一、数据库结构"></a>一、数据库结构 </h2><p> 典型的数据库结构可归纳为“<strong>三级模式，两级映射</strong>”：</p>
 <img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.jpg" class title=" 数据库结构 ">
-<h3 id="（一）三级模式">（一）三级模式</h3>
-<ol>
+<h3 id="（一）三级模式"><a href="#（一）三级模式" class="headerlink" title="（一）三级模式"></a>（一）三级模式</h3><ol>
 <li><strong>外模式</strong>：是数据库用户能看见和使用的局部数据的逻辑结构，与某一应用有关的数据逻辑表示。对应用户视图，面向数据库用户。</li>
 <li><strong>概念（逻辑）模式</strong>：是数据库中全体数据的逻辑结构和特征的描述，所有用户的公共数据视图。对应数据库表，面向数据库管理员。</li>
 <li><strong>内模式</strong>：是数据物理结构和存储方式的描述，数据在数据库内部的表示方式。对应物理文件，面向系统程序员。</li>
 </ol>
-<h3 id="（二）两级映射">（二）两级映射</h3>
-<ol>
+<h3 id="（二）两级映射"><a href="#（二）两级映射" class="headerlink" title="（二）两级映射"></a>（二）两级映射</h3><ol>
 <li><strong>外模式 - 模式映射 </strong>：保证<strong> 逻辑独立性</strong>，即当逻辑模式发生改变时，应用程序不用修改。</li>
 <li><strong>模式 - 内模式映射 </strong>：保证<strong> 物理独立性</strong>，即当内模式发生改变时，应用程序不用修改。</li>
 </ol>
 <p>两级映射保证了逻辑独立性和物理独立性，逻辑独立比物理独立更难实现。</p>
-<h2 id="二、数据库理论">二、数据库理论</h2>
-<p>关系型数据库中的 <strong> 关系 </strong> 是指由行列组成的二维表文件，每行表示一条记录，每列表示一个属性。<strong>关系模型 </strong> 是关系的逻辑描述，可以表示为：关系名(属性 1, 属性 2, …, 属性 N)。</p>
-<h3 id="（一）关系运算">（一）关系运算</h3>
-<p>关系代数的基本运算主要有交、并、差、笛卡尔积、选择、投影、连接和除法运算。</p>
+<h2 id="二、数据库理论"><a href="# 二、数据库理论" class="headerlink" title="二、数据库理论"></a>二、数据库理论 </h2><p> 关系型数据库中的 <strong> 关系 </strong> 是指由行列组成的二维表文件，每行表示一条记录，每列表示一个属性。<strong>关系模型 </strong> 是关系的逻辑描述，可以表示为：关系名(属性 1, 属性 2, …, 属性 N)。</p>
+<h3 id="（一）关系运算"><a href="#（一）关系运算" class="headerlink" title="（一）关系运算"></a>（一）关系运算 </h3><p> 关系代数的基本运算主要有交、并、差、笛卡尔积、选择、投影、连接和除法运算。</p>
 <p><strong>交、并、差、笛卡尔积 </strong> 跟集合论中的运算是一个意思，就是把每张数据表视为行的集合，然后做运算。</p>
 <p><strong>选择 </strong> 是指从数据表中找出符合条件的行（记录）。</p>
 <p><strong>投影 </strong> 是指从数据表中抽取指定的列（属性）。</p>
@@ -187,15 +182,13 @@
 <li><strong>θ连接</strong>：从两个关系的笛卡尔积中选取属性满足一定条件的元组</li>
 <li><strong>自然连接（⊳⊲连接）</strong>：两个关系中进行比较的分量必须是相同的属性，并且在结果中将重复的属性去掉</li>
 </ol>
-<h3 id="（二）函数依赖">（二）函数依赖</h3>
-<p>函数依赖（Functional Dependency）是数据库理论中的一个重要概念，用于描述属性之间的关系。在关系数据库中，如果属性集 X 的值能够唯一地决定属性集 Y 的值，我们就说<strong>Y 函数依赖于 X</strong>，记作 X→Y。</p>
+<h3 id="（二）函数依赖"><a href="#（二）函数依赖" class="headerlink" title="（二）函数依赖"></a>（二）函数依赖 </h3><p> 函数依赖（Functional Dependency）是数据库理论中的一个重要概念，用于描述属性之间的关系。在关系数据库中，如果属性集 X 的值能够唯一地决定属性集 Y 的值，我们就说<strong>Y 函数依赖于 X</strong>，记作 X→Y。</p>
 <p>函数依赖的定义：</p>
 <p>给定一个关系 R，如果对于关系 R 中的任意两个元组 t1 和 t2，若 t1 和 t2 在属性集 X 上的值相同，则它们在属性集 Y 上的值也必须相同，那么我们就说 Y 函数依赖于 X。</p>
 <p>函数依赖的类型：</p>
 <ul>
 <li><strong>平凡函数依赖</strong>：如果属性集 Y 是属性集 X 的一个子集，则称 X 决定 Y 的依赖关系为平凡依赖。例如 X→X</li>
-<li><strong>非平凡函数依赖</strong>：属性 Y 不是属性 X 的子集，则称 X 决定 Y 的依赖关系为非平凡依赖。可以进一步分类：
-<ul>
+<li><strong>非平凡函数依赖</strong>：属性 Y 不是属性 X 的子集，则称 X 决定 Y 的依赖关系为非平凡依赖。可以进一步分类：<ul>
 <li><strong>完全函数依赖</strong>：如果在一个复合属性集 X 中，Y 仅依赖于 X 的全部属性，而不依赖于 X 的任何真子集。</li>
 <li><strong>部分函数依赖</strong>：如果 Y 依赖于 X 的某个真子集。</li>
 <li><strong>传递函数依赖</strong>：如果 X 函数依赖于 Y，而 Y 又函数依赖于 Z，那么可以说 X 传递函数依赖于 Z。</li>
@@ -203,8 +196,7 @@
 </li>
 </ul>
 <p>简单点说：<strong>左右包含是平凡，左右互斥非平凡，若无子集是完全，若有子集是部分，环环相连是传递</strong>。</p>
-<h3 id="（三）Armstrong 公理">（三）Armstrong 公理</h3>
-<p>Armstrong 公理是一组用于推导关系数据库中函数依赖的基本规则，通过这些规则，可以推导出任意一组函数依赖的所有隐含依赖。</p>
+<h3 id="（三）Armstrong 公理"><a href="#（三）Armstrong 公理" class="headerlink" title="（三）Armstrong 公理"></a>（三）Armstrong 公理</h3><p>Armstrong 公理是一组用于推导关系数据库中函数依赖的基本规则，通过这些规则，可以推导出任意一组函数依赖的所有隐含依赖。</p>
 <ul>
 <li><strong>自反性</strong>：若 X⊇Y，则 X→Y。即一个属性集必然决定其子集。</li>
 <li><strong>增广性</strong>：若 X→Y，则 XZ→YZ。即如果 X 决定 Y，那么 X 与 Z 的组合也决定 Y 与 Z 的组合。</li>
@@ -212,34 +204,28 @@
 <li><strong>合并性</strong>：若 X→Y 且 X→Z，则 X→YZ。即如果 X 决定 Y，且 X 也决定 Z，那么 X 决定 YZ。</li>
 <li><strong>分解性</strong>：若 X→Y 且 Y⊇Z，则存在 X→Z。即如果 X 决定 Y，而 Z 是 Y 的子集，那么 X 决定 Z。</li>
 </ul>
-<h3 id="（四）关系分解">（四）关系分解</h3>
-<p>在数据库关系分解中，有两个重要概念：</p>
-<h4 id="1- 无损连接">1. 无损连接</h4>
-<p>无损链接指的是将一个关系分解成多个子关系后，通过对这些子关系进行自然连接操作，可以无损地恢复原始关系。换句话说，在连接后得到的结果应该与原始关系完全相同，没有任何信息增加或丢失。</p>
+<h3 id="（四）关系分解"><a href="#（四）关系分解" class="headerlink" title="（四）关系分解"></a>（四）关系分解 </h3><p> 在数据库关系分解中，有两个重要概念：</p>
+<h4 id="1- 无损连接"><a href="#1- 无损连接" class="headerlink" title="1. 无损连接"></a>1. 无损连接 </h4><p> 无损链接指的是将一个关系分解成多个子关系后，通过对这些子关系进行自然连接操作，可以无损地恢复原始关系。换句话说，在连接后得到的结果应该与原始关系完全相同，没有任何信息增加或丢失。</p>
 <p>无损连接分解的 <strong> 判定方法 </strong> 为：</p>
 <p>设ρ={R1, R2}是 R 的一个分解，F 是 R 上的函数依赖集。那么分解ρ相对于 F 是无损级联分解的充要条件为 <strong>(R1∩R2)→(R1−R2)</strong> 或 <strong>(R1∩R2)→(R2−R1)</strong> 。 注意两个条件只要有任意一个条件成立即可。</p>
-<h4 id="2- 保持依赖">2. 保持依赖</h4>
-<p>保持依赖指的是在关系分解后，仍然能够通过子关系中的函数依赖来推导出原始关系中的所有函数依赖。换句话说，分解后的子关系应该能够保持原始关系中的所有重要的依赖关系。</p>
+<h4 id="2- 保持依赖"><a href="#2- 保持依赖" class="headerlink" title="2. 保持依赖"></a>2. 保持依赖 </h4><p> 保持依赖指的是在关系分解后，仍然能够通过子关系中的函数依赖来推导出原始关系中的所有函数依赖。换句话说，分解后的子关系应该能够保持原始关系中的所有重要的依赖关系。</p>
 <p>举例来说，假设有一个关系 R(A, B, C)，并且它有函数依赖：A→B 和 B→C。</p>
 <ul>
-<li>如果将关系 R 分解为 R1(A, B)和 R2(B, C):
-<ul>
+<li>如果将关系 R 分解为 R1(A, B)和 R2(B, C):<ul>
 <li>通过属性 B 连接 R1 和 R2，可以恢复 R，因此是无损分解。</li>
 <li>关系 R1 保留了 A→B，关系 R2 保留了 B→C，因此是保持依赖。</li>
 </ul>
 </li>
-<li>如果将关系 R 分解为 R1(A, B)和 R3(A, C):
-<ul>
+<li>如果将关系 R 分解为 R1(A, B)和 R3(A, C):<ul>
 <li>通过属性 A 连接 R1 和 R3，可以恢复 R，因此是无损分解。</li>
 <li>关系 R1 保留了 A→B，关系 R3 保留了 A→C，但是 B→C 丢失，因此不是保持依赖。</li>
 </ul>
 </li>
 </ul>
-<h3 id="（五）设计范式">（五）设计范式</h3>
-<p>数据库设计范式是指在设计数据库时遵循的一系列规范和原则，以确保数据的组织、存储和管理高效、合理。数据库主要范式包括：</p>
-<h4 id="1- 第一范式（1NF）">1. 第一范式（1NF）</h4>
-<p><strong>每个字段的值都是原子值，不能有重复的列或多值字段。</strong></p>
+<h3 id="（五）设计范式"><a href="#（五）设计范式" class="headerlink" title="（五）设计范式"></a>（五）设计范式 </h3><p> 数据库设计范式是指在设计数据库时遵循的一系列规范和原则，以确保数据的组织、存储和管理高效、合理。数据库主要范式包括：</p>
+<h4 id="1- 第一范式（1NF）"><a href="#1- 第一范式（1NF）" class="headerlink" title="1. 第一范式（1NF）"></a>1. 第一范式（1NF）</h4><p><strong>每个字段的值都是原子值，不能有重复的列或多值字段。</strong></p>
 <p>不符合 1NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -256,7 +242,9 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>在这个例子中，“课程”属性是个多值字段。需要重新设计成符合 1NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -278,9 +266,10 @@
 </tr>
 </tbody>
 </table>
-<h4 id="2- 第二范式（2NF）">2. 第二范式（2NF）</h4>
-<p><strong>在满足 1NF 的基础上，要求消除部分依赖，即每个非主键字段必须完全依赖于主键，而不是主键的一部分。</strong></p>
+</div>
+<h4 id="2- 第二范式（2NF）"><a href="#2- 第二范式（2NF）" class="headerlink" title="2. 第二范式（2NF）"></a>2. 第二范式（2NF）</h4><p><strong>在满足 1NF 的基础上，要求消除部分依赖，即每个非主键字段必须完全依赖于主键，而不是主键的一部分。</strong></p>
 <p>不符合 2NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -307,8 +296,10 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>在这个例子中，“学生姓名”只依赖于“学生 ID”，而不依赖于“课程”。我们可以分成两个符合 2NF 的表：</p>
 <p>学生表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -327,7 +318,9 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>选课表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -350,9 +343,10 @@
 </tr>
 </tbody>
 </table>
-<h4 id="3- 第三范式（3NF）">3. 第三范式（3NF）</h4>
-<p><strong>在满足 2NF 的基础上，要求消除传递依赖，即非主键字段不能依赖于其他非主键字段。</strong></p>
+</div>
+<h4 id="3- 第三范式（3NF）"><a href="#3- 第三范式（3NF）" class="headerlink" title="3. 第三范式（3NF）"></a>3. 第三范式（3NF）</h4><p><strong>在满足 2NF 的基础上，要求消除传递依赖，即非主键字段不能依赖于其他非主键字段。</strong></p>
 <p>不符合 3NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -377,8 +371,10 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>在这个例子中，“班主任”依赖于“班级”，而不是“学生 ID”。可以进一步分成两个符合 3NF 的表：</p>
 <p>学生表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -400,7 +396,9 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>班级表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -415,9 +413,10 @@
 </tr>
 </tbody>
 </table>
-<h4 id="4- 博茨 - 科得范式（BCNF）">4. 博茨 - 科得范式（BCNF）</h4>
-<p><strong>3NF 的强化版本，要求每个决定因素（函数依赖的左侧）必须是超键，进一步消除所有依赖问题。</strong></p>
+</div>
+<h4 id="4- 博茨 - 科得范式（BCNF）"><a href="#4- 博茨 - 科得范式（BCNF）" class="headerlink" title="4. 博茨 - 科得范式（BCNF）"></a>4. 博茨 - 科得范式（BCNF）</h4><p><strong>3NF 的强化版本，要求每个决定因素（函数依赖的左侧）必须是超键，进一步消除所有依赖问题。</strong></p>
 <p>不符合 BCNF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -444,8 +443,10 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>在这个例子中，“教师”依赖于“课程”，而“课程”不是超键。可以将其分为两个符合 BCNF 的表：</p>
 <p>课程表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -468,7 +469,9 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>选课表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -491,9 +494,10 @@
 </tr>
 </tbody>
 </table>
-<h4 id="5- 第四范式（4NF）">5. 第四范式（4NF）</h4>
-<p><strong>解决多值依赖的问题，要求每个表只能包含一个多值依赖。</strong></p>
+</div>
+<h4 id="5- 第四范式（4NF）"><a href="#5- 第四范式（4NF）" class="headerlink" title="5. 第四范式（4NF）"></a>5. 第四范式（4NF）</h4><p><strong>解决多值依赖的问题，要求每个表只能包含一个多值依赖。</strong></p>
 <p>不符合 4NF 的表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -515,8 +519,10 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>在这个例子中，“课程”和“兴趣”之间存在多值依赖。可以将其分为两个符合 4NF 的表：</p>
 <p>选课表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -535,7 +541,9 @@
 </tr>
 </tbody>
 </table>
+</div>
 <p>兴趣表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -554,8 +562,8 @@
 </tr>
 </tbody>
 </table>
-<h2 id="三、数据库设计">三、数据库设计</h2>
-<p>数据库设计主要包含如下阶段：</p>
+</div>
+<h2 id="三、数据库设计"><a href="# 三、数据库设计" class="headerlink" title="三、数据库设计"></a>三、数据库设计 </h2><p> 数据库设计主要包含如下阶段：</p>
 <ol>
 <li><strong>需求分析阶段</strong>：通过结构化分析，得到数据流图和数据字典。</li>
 <li><strong>概念设计阶段</strong>：根据功能模型，创建局部 ER 图，并合并为全局 ER 图（建立外模式）。</li>
@@ -563,8 +571,7 @@
 <li><strong>物理设计阶段</strong>：根据数据逻辑模式，选择高效的存储结构和存储方法（建立内模式）。</li>
 </ol>
 <img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1.jpg" class title=" 数据库设计 ">
-<h3 id="（一）概念设计">（一）概念设计</h3>
-<p>在结构化分析阶段，我们通过自顶向下的方式建立的系统的功能模型，以数据流图和数据字典表示。数据库的概念设计阶段，实际上就是建立系统的数据模型。</p>
+<h3 id="（一）概念设计"><a href="#（一）概念设计" class="headerlink" title="（一）概念设计"></a>（一）概念设计 </h3><p> 在结构化分析阶段，我们通过自顶向下的方式建立的系统的功能模型，以数据流图和数据字典表示。数据库的概念设计阶段，实际上就是建立系统的数据模型。</p>
 <p>数据库的概念设计采用 <strong> 自底向上 </strong> 的方式，其任务是建立系统的数据模型（通常以 ER 图表示），主要步骤为：</p>
 <ol>
 <li>选择局部应用</li>
@@ -572,13 +579,11 @@
 <li>合并得到全局 ER 图</li>
 <li>优化全局 ER 图</li>
 </ol>
-<h4 id="1-ER 图元素">1. ER 图元素</h4>
-<p>ER 图用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：</p>
+<h4 id="1-ER 图元素"><a href="#1-ER 图元素" class="headerlink" title="1. ER 图元素"></a>1. ER 图元素</h4><p>ER 图用于描述系统的各种实体及其之间的关系，主要包含三个基本元素：</p>
 <ul>
 <li><strong>实体</strong>：系统中的对象或概念，用矩形框表示。</li>
 <li><strong>属性</strong>：实体具有的特性，用椭圆形表示。</li>
-<li><strong>联系</strong>：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系。
-<ul>
+<li><strong>联系</strong>：用菱形框表示，通过连线与有关的实体相连，在连线上注明对应关系。<ul>
 <li><strong>1:1</strong> 表示一对一关系</li>
 <li><strong>1:n</strong> 表示一对多关系</li>
 <li><strong>m:n</strong> 表示多对多关系</li>
@@ -586,14 +591,12 @@
 </li>
 </ul>
 <img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/ERD.png" class title="ER 图 ">
-<h4 id="2-ER 图合并">2. ER 图合并</h4>
-<p>在合并 ER 图时，需要解决局部 ER 图之间的冲突问题，与合并之后全局 ER 图的冗余问题。</p>
+<h4 id="2-ER 图合并"><a href="#2-ER 图合并" class="headerlink" title="2. ER 图合并"></a>2. ER 图合并 </h4><p> 在合并 ER 图时，需要解决局部 ER 图之间的冲突问题，与合并之后全局 ER 图的冗余问题。</p>
 <p>冲突有三种类型：</p>
 <ol>
 <li><strong>属性冲突</strong>：属性名和属性含义相同，但属性的取值类型或取值范围不同。</li>
 <li><strong>命名冲突 </strong>：<strong> 异名同义 </strong>（不同属性名表示同一种属性含义），或是<strong> 同名异义</strong>（同一属性名表示不同的属性含义）。</li>
-<li><strong>结构冲突</strong>：
-<ol>
+<li><strong>结构冲突</strong>：<ol>
 <li>同一对象在不同 ER 图中具有不同的抽象。例如某个对象在一个 ER 图中是实体，在另一个 ER 图中是属性。</li>
 <li>同一实体在不同 ER 图中所包含的属性个数和属性排列次序不完全相同。</li>
 <li>实体之间的关系在不同 ER 图中呈现为不同的联系。</li>
@@ -605,63 +608,51 @@
 <li><strong>冗余属性</strong>：可由基本数据导出的属性。</li>
 <li><strong>冗余联系</strong>：可由其他联系导出的联系。</li>
 </ol>
-<p>消除冲突通常是结合业务需求，通过讨论与协商来处理。<br>
-消除冗余通常是以数据流图和数据字典为依据，通过分析数据项之间的逻辑关系来处理。</p>
-<h3 id="（二）逻辑设计">（二）逻辑设计</h3>
-<p>数据库的逻辑设计是指将 ER 图中的实体、属性、联系转换为 DBMS 数据库的关系模式，并进行范式规约。</p>
-<h4 id="1-ER 图转换">1. ER 图转换</h4>
-<p>ER 图中的实体和属性可以直接转换为数据库中的一个关系模式（一张表），主键为实体，其他字段为属性。</p>
+<p>消除冲突通常是结合业务需求，通过讨论与协商来处理。<br>消除冗余通常是以数据流图和数据字典为依据，通过分析数据项之间的逻辑关系来处理。</p>
+<h3 id="（二）逻辑设计"><a href="#（二）逻辑设计" class="headerlink" title="（二）逻辑设计"></a>（二）逻辑设计 </h3><p> 数据库的逻辑设计是指将 ER 图中的实体、属性、联系转换为 DBMS 数据库的关系模式，并进行范式规约。</p>
+<h4 id="1-ER 图转换"><a href="#1-ER 图转换" class="headerlink" title="1. ER 图转换"></a>1. ER 图转换</h4><p>ER 图中的实体和属性可以直接转换为数据库中的一个关系模式（一张表），主键为实体，其他字段为属性。</p>
 <p>ER 图中的联系，根据不同的类型，有不同的转换方式：</p>
-<p>(1) 1:1 联系</p>
-<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E4%B8%80.png" class title=" 一对一 ">
+<p>(1) 1:1 联系<br><img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E4%B8%80.png" class title=" 一对一 "></p>
 <p>转换方式：</p>
 <ul>
-<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：
-<ul>
+<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
 <li>员工(工号，姓名，性别)</li>
 <li>办公电脑(电脑编号，电脑配置)</li>
 <li>使用(工号，电脑编号)</li>
 </ul>
 </li>
-<li><strong>与任意一端实体的关系模式合并</strong>：将一个实体的主键作为另一个实体的外键。ER 图转换结果：
-<ul>
+<li><strong>与任意一端实体的关系模式合并</strong>：将一个实体的主键作为另一个实体的外键。ER 图转换结果：<ul>
 <li>员工(工号，姓名，性别，电脑编号)</li>
 <li>办公电脑(电脑编号，电脑配置)</li>
 </ul>
 </li>
 </ul>
-<p>(2) 1:n 联系</p>
-<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E5%A4%9A.png" class title=" 一对多 ">
+<p>(2) 1:n 联系<br><img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E4%B8%80%E5%AF%B9%E5%A4%9A.png" class title=" 一对多 "></p>
 <p>转换方式：</p>
 <ul>
-<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：
-<ul>
+<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
 <li>班级(编号，年级，人数)</li>
 <li>学生(学号，姓名，性别)</li>
 <li>隶属(学号，编号)</li>
 </ul>
 </li>
-<li><strong>与多端的实体的关系模式合并</strong>：在多端实体关系模式中，添加一端实体主键作为外键。ER 图转换结果：
-<ul>
+<li><strong>与多端的实体的关系模式合并</strong>：在多端实体关系模式中，添加一端实体主键作为外键。ER 图转换结果：<ul>
 <li>班级(编号，年级，人数)</li>
 <li>学生(学号，姓名，性别，编号)</li>
 </ul>
 </li>
 </ul>
-<p>(3) m:n 联系</p>
-<img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E5%A4%9A%E5%AF%B9%E5%A4%9A.png" class title=" 多对多 ">
+<p>(3) m:n 联系<br><img src="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1%E4%B8%8E%E5%BB%BA%E6%A8%A1/%E5%A4%9A%E5%AF%B9%E5%A4%9A.png" class title=" 多对多 "></p>
 <p>转换方式：</p>
 <ul>
-<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：
-<ul>
+<li><strong>转换为一个独立的关系模式</strong>：联系两端的实体主键作为属性。ER 图转换结果：<ul>
 <li>员工(工号，姓名，性别)</li>
 <li>角色(角色编号，角色名称，角色权限)</li>
 <li>使用(工号，角色编号)</li>
 </ul>
 </li>
 </ul>
-<h4 id="2- 范式规约">2. 范式规约</h4>
-<p>在转换为数据库的关系模式后，还要对关系模式进行规范化。不规范的关系模式会出现以下问题：</p>
+<h4 id="2- 范式规约"><a href="#2- 范式规约" class="headerlink" title="2. 范式规约"></a>2. 范式规约 </h4><p> 在转换为数据库的关系模式后，还要对关系模式进行规范化。不规范的关系模式会出现以下问题：</p>
 <ul>
 <li><strong>数据冗余</strong>：重复存储相同的数据，浪费存储空间，并增加维护的复杂性。</li>
 <li><strong>修改异常</strong>：数据在多个地方被重复存储时，若更新某一处而未同步其他地方，可能导致信息不一致。</li>
@@ -677,7 +668,7 @@
 <li>设置外键：为建立表之间的关系，添加外键约束，确保数据的完整性。</li>
 <li>验证和测试：在设计完成后，进行测试，确保数据完整性、查询效率和操作便利性。</li>
 </ol>
-</article><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/">软件工程</a><a class="post-meta__tags" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" title="系统分析与设计：结构化与面向对象"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">Previous</div><div class="info-item-2">系统分析与设计：结构化与面向对象</div></div><div class="info-2"><div class="info-item-1">系统分析与设计包含结构化方法（如数据流图、实体关系图）和面向对象方法（如UML建模），前者强调功能分解与模块化，后者聚焦对象封装、继承和多态，适应不同系统复杂度需求。</div></div></div></a><a class="pagination-related" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" title="数据库的控制功能"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">Next</div><div class="info-item-2">数据库的控制功能</div></div><div class="info-2"><div class="info-item-1">数据库控制功能涵盖事务管理（ACID特性）、并发控制（锁机制与隔离级别）、性能优化（索引/读写分离/分区分片）及备份恢复机制，保障数据一致性与系统可靠性。</div></div></div></a></nav><hr class="custom-hr"><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> Comments</span></div></div><div class="comment-wrap"><div><div id="gitalk-container"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="author-info-name">一瓢清浅</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">37</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/jiliguluss"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">个人技术博客，涉及软件开发、安全测试、AI算法等领域。不求精深，但当涉猎，有所闻耳。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Contents</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84"><span class="toc-text">一、数据库结构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E4%B8%89%E7%BA%A7%E6%A8%A1%E5%BC%8F"><span class="toc-text">（一）三级模式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E4%B8%A4%E7%BA%A7%E6%98%A0%E5%B0%84"><span class="toc-text">（二）两级映射</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E7%90%86%E8%AE%BA"><span class="toc-text">二、数据库理论</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E5%85%B3%E7%B3%BB%E8%BF%90%E7%AE%97"><span class="toc-text">（一）关系运算</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E5%87%BD%E6%95%B0%E4%BE%9D%E8%B5%96"><span class="toc-text">（二）函数依赖</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%89%EF%BC%89Armstrong%20%E5%85%AC%E7%90%86"><span class="toc-text">（三）Armstrong 公理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E5%9B%9B%EF%BC%89%E5%85%B3%E7%B3%BB%E5%88%86%E8%A7%A3"><span class="toc-text">（四）关系分解</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-%20%E6%97%A0%E6%8D%9F%E8%BF%9E%E6%8E%A5"><span class="toc-text">1. 无损连接</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E4%BF%9D%E6%8C%81%E4%BE%9D%E8%B5%96"><span class="toc-text">2. 保持依赖</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%94%EF%BC%89%E8%AE%BE%E8%AE%A1%E8%8C%83%E5%BC%8F"><span class="toc-text">（五）设计范式</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-%20%E7%AC%AC%E4%B8%80%E8%8C%83%E5%BC%8F%EF%BC%881NF%EF%BC%89"><span class="toc-text">1. 第一范式（1NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E7%AC%AC%E4%BA%8C%E8%8C%83%E5%BC%8F%EF%BC%882NF%EF%BC%89"><span class="toc-text">2. 第二范式（2NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-%20%E7%AC%AC%E4%B8%89%E8%8C%83%E5%BC%8F%EF%BC%883NF%EF%BC%89"><span class="toc-text">3. 第三范式（3NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-%20%E5%8D%9A%E8%8C%A8%20-%20%E7%A7%91%E5%BE%97%E8%8C%83%E5%BC%8F%EF%BC%88BCNF%EF%BC%89"><span class="toc-text">4. 博茨 - 科得范式（BCNF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-%20%E7%AC%AC%E5%9B%9B%E8%8C%83%E5%BC%8F%EF%BC%884NF%EF%BC%89"><span class="toc-text">5. 第四范式（4NF）</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1"><span class="toc-text">三、数据库设计</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E6%A6%82%E5%BF%B5%E8%AE%BE%E8%AE%A1"><span class="toc-text">（一）概念设计</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-ER%20%E5%9B%BE%E5%85%83%E7%B4%A0"><span class="toc-text">1. ER 图元素</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-ER%20%E5%9B%BE%E5%90%88%E5%B9%B6"><span class="toc-text">2. ER 图合并</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E9%80%BB%E8%BE%91%E8%AE%BE%E8%AE%A1"><span class="toc-text">（二）逻辑设计</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-ER%20%E5%9B%BE%E8%BD%AC%E6%8D%A2"><span class="toc-text">1. ER 图转换</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E8%8C%83%E5%BC%8F%E8%A7%84%E7%BA%A6"><span class="toc-text">2. 范式规约</span></a></li></ol></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Posts</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E5%A4%9A%E8%87%82%E8%80%81%E8%99%8E%E6%9C%BA/" title="多臂老虎机">多臂老虎机</a><time datetime="2025-05-28T00:57:38.000Z" title="Created 2025-05-28 08:57:38">2025-05-28</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/" title="进程间通信机制">进程间通信机制</a><time datetime="2025-05-26T06:24:56.000Z" title="Created 2025-05-26 14:24:56">2025-05-26</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/" title="Web 应用架构">Web 应用架构</a><time datetime="2025-05-21T06:52:47.000Z" title="Created 2025-05-21 14:52:47">2025-05-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E8%82%A1%E7%A5%A8%E6%8A%95%E8%B5%84%E5%85%A5%E9%97%A8%E3%80%81%E8%BF%9B%E9%98%B6%E4%B8%8E%E5%AE%9E%E6%88%98%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《股票投资入门、进阶与实战》笔记">《股票投资入门、进阶与实战》笔记</a><time datetime="2025-02-24T04:50:18.000Z" title="Created 2025-02-24 12:50:18">2025-02-24</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E6%8A%95%E8%B5%84%E4%B8%AD%E6%9C%80%E7%AE%80%E5%8D%95%E7%9A%84%E4%BA%8B%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《投资中最简单的事》笔记">《投资中最简单的事》笔记</a><time datetime="2025-01-20T01:05:49.000Z" title="Created 2025-01-20 09:05:49">2025-01-20</time></div></div></div></div></div></div></main><footer id="footer" style="background: transparent;"><div id="footer-wrap"><div class="copyright">&copy;2023 - 2025 By 一瓢清浅</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Reading Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light and Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle Between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Settings"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table of Contents"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="Scroll to Comments"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="Back to Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"><script>(() => {
+</article><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/">软件工程</a><a class="post-meta__tags" href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2024/%E7%B3%BB%E7%BB%9F%E5%88%86%E6%9E%90%E4%B8%8E%E8%AE%BE%E8%AE%A1%EF%BC%9A%E7%BB%93%E6%9E%84%E5%8C%96%E4%B8%8E%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1/" title="系统分析与设计：结构化与面向对象"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">Previous</div><div class="info-item-2">系统分析与设计：结构化与面向对象</div></div><div class="info-2"><div class="info-item-1">系统分析与设计包含结构化方法（如数据流图、实体关系图）和面向对象方法（如UML建模），前者强调功能分解与模块化，后者聚焦对象封装、继承和多态，适应不同系统复杂度需求。</div></div></div></a><a class="pagination-related" href="/2024/%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E6%8E%A7%E5%88%B6%E5%8A%9F%E8%83%BD/" title="数据库的控制功能"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">Next</div><div class="info-item-2">数据库的控制功能</div></div><div class="info-2"><div class="info-item-1">数据库控制功能涵盖事务管理（ACID特性）、并发控制（锁机制与隔离级别）、性能优化（索引/读写分离/分区分片）及备份恢复机制，保障数据一致性与系统可靠性。</div></div></div></a></nav><hr class="custom-hr"><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> Comments</span></div></div><div class="comment-wrap"><div><div id="gitalk-container"></div></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/photo.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"></div><div class="author-info-name">一瓢清浅</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">37</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="external nofollow noopener noreferrer" href="https://github.com/jiliguluss"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">个人技术博客，涉及软件开发、安全测试、AI算法等领域。不求精深，但当涉猎，有所闻耳。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>Contents</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84"><span class="toc-text">一、数据库结构 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E4%B8%89%E7%BA%A7%E6%A8%A1%E5%BC%8F"><span class="toc-text">（一）三级模式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E4%B8%A4%E7%BA%A7%E6%98%A0%E5%B0%84"><span class="toc-text">（二）两级映射</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E7%90%86%E8%AE%BA"><span class="toc-text">二、数据库理论 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E5%85%B3%E7%B3%BB%E8%BF%90%E7%AE%97"><span class="toc-text">（一）关系运算 </span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E5%87%BD%E6%95%B0%E4%BE%9D%E8%B5%96"><span class="toc-text">（二）函数依赖 </span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%89%EF%BC%89Armstrong%20%E5%85%AC%E7%90%86"><span class="toc-text">（三）Armstrong 公理</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E5%9B%9B%EF%BC%89%E5%85%B3%E7%B3%BB%E5%88%86%E8%A7%A3"><span class="toc-text">（四）关系分解 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-%20%E6%97%A0%E6%8D%9F%E8%BF%9E%E6%8E%A5"><span class="toc-text">1. 无损连接 </span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E4%BF%9D%E6%8C%81%E4%BE%9D%E8%B5%96"><span class="toc-text">2. 保持依赖 </span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%94%EF%BC%89%E8%AE%BE%E8%AE%A1%E8%8C%83%E5%BC%8F"><span class="toc-text">（五）设计范式 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-%20%E7%AC%AC%E4%B8%80%E8%8C%83%E5%BC%8F%EF%BC%881NF%EF%BC%89"><span class="toc-text">1. 第一范式（1NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E7%AC%AC%E4%BA%8C%E8%8C%83%E5%BC%8F%EF%BC%882NF%EF%BC%89"><span class="toc-text">2. 第二范式（2NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#3-%20%E7%AC%AC%E4%B8%89%E8%8C%83%E5%BC%8F%EF%BC%883NF%EF%BC%89"><span class="toc-text">3. 第三范式（3NF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#4-%20%E5%8D%9A%E8%8C%A8%20-%20%E7%A7%91%E5%BE%97%E8%8C%83%E5%BC%8F%EF%BC%88BCNF%EF%BC%89"><span class="toc-text">4. 博茨 - 科得范式（BCNF）</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#5-%20%E7%AC%AC%E5%9B%9B%E8%8C%83%E5%BC%8F%EF%BC%884NF%EF%BC%89"><span class="toc-text">5. 第四范式（4NF）</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1"><span class="toc-text">三、数据库设计 </span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%B8%80%EF%BC%89%E6%A6%82%E5%BF%B5%E8%AE%BE%E8%AE%A1"><span class="toc-text">（一）概念设计 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-ER%20%E5%9B%BE%E5%85%83%E7%B4%A0"><span class="toc-text">1. ER 图元素</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-ER%20%E5%9B%BE%E5%90%88%E5%B9%B6"><span class="toc-text">2. ER 图合并 </span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%EF%BC%88%E4%BA%8C%EF%BC%89%E9%80%BB%E8%BE%91%E8%AE%BE%E8%AE%A1"><span class="toc-text">（二）逻辑设计 </span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1-ER%20%E5%9B%BE%E8%BD%AC%E6%8D%A2"><span class="toc-text">1. ER 图转换</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-%20%E8%8C%83%E5%BC%8F%E8%A7%84%E7%BA%A6"><span class="toc-text">2. 范式规约 </span></a></li></ol></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Posts</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E5%A4%9A%E8%87%82%E8%80%81%E8%99%8E%E6%9C%BA/" title="多臂老虎机">多臂老虎机</a><time datetime="2025-05-28T00:57:38.000Z" title="Created 2025-05-28 08:57:38">2025-05-28</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6/" title="进程间通信机制">进程间通信机制</a><time datetime="2025-05-26T06:24:56.000Z" title="Created 2025-05-26 14:24:56">2025-05-26</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/Web%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84/" title="Web 应用架构">Web 应用架构</a><time datetime="2025-05-21T06:52:47.000Z" title="Created 2025-05-21 14:52:47">2025-05-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E8%82%A1%E7%A5%A8%E6%8A%95%E8%B5%84%E5%85%A5%E9%97%A8%E3%80%81%E8%BF%9B%E9%98%B6%E4%B8%8E%E5%AE%9E%E6%88%98%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《股票投资入门、进阶与实战》笔记">《股票投资入门、进阶与实战》笔记</a><time datetime="2025-02-24T04:50:18.000Z" title="Created 2025-02-24 12:50:18">2025-02-24</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2025/%E3%80%8A%E6%8A%95%E8%B5%84%E4%B8%AD%E6%9C%80%E7%AE%80%E5%8D%95%E7%9A%84%E4%BA%8B%E3%80%8B%E7%AC%94%E8%AE%B0/" title="《投资中最简单的事》笔记">《投资中最简单的事》笔记</a><time datetime="2025-01-20T01:05:49.000Z" title="Created 2025-01-20 09:05:49">2025-01-20</time></div></div></div></div></div></div></main><footer id="footer" style="background: transparent;"><div id="footer-wrap"><div class="copyright">&copy;2023 - 2025 By 一瓢清浅</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="Reading Mode"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="Toggle Between Light and Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle Between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Settings"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="Table of Contents"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="Scroll to Comments"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="Back to Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"><script>(() => {
   const runMermaid = ele => {
     window.loadMermaid = true
     const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
@@ -749,7 +740,7 @@
 
     const gitalk = new Gitalk({
       clientID: 'Ov23li8lUWNadcQIsjjS',
-      clientSecret: '0dab34b0b46c7ccd1aa1e46ea1759edeef2beb67',
+      clientSecret: 'a3a90b60503b4f298c2a09778e26da53ae01f9cd',
       repo: 'comment',
       owner: 'jiliguluss',
       admin: ['jiliguluss'],
